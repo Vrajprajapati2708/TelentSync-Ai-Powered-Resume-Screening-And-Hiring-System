@@ -1,0 +1,926 @@
+================================================================================
+          PROJECT REPORT 2 — HIREAI (TALENTSYNC)
+          AI-Powered Resume Screening & Recruitment System
+================================================================================
+Prepared by   : [Your Name / Team Members]
+Roll No / ID  : [Your Roll No / Enrollment ID]
+Guide         : [Faculty Guide Name]
+Department    : Department of Computer Science & Engineering / Information Technology
+Institution   : [College / University Name]
+Academic Year : 2025-2026
+================================================================================
+
+
+================================================================================
+SECTION 6 — SYSTEM DESIGN & DATABASE DEVELOPMENT
+================================================================================
+
+6.1 ARCHITECTURAL OVERVIEW
+--------------------------------------------------------------------------------
+HireAI (TalentSync) is architected as a modular, high-performance 3-Tier Web 
+Application integrating classical machine learning (TF-IDF vectorization, Cosine 
+Similarity) and Deep NLP (spaCy Named Entity Recognition, Tesseract OCR) with an 
+asynchronous RESTful application layer.
+
+The architecture comprises three primary tiers:
+
+1. Presentation Tier (Frontend Client):
+   - Built as a responsive Single-Page Application (SPA) using HTML5, CSS3, 
+     Vanilla JavaScript (ES6+), and SVG vector data visualizations.
+   - Communicates asynchronously with the backend using Fetch API over secure 
+     JSON REST endpoints.
+   - Provides role-segregated user interfaces for Candidates and HR Recruiters.
+
+2. Application & Intelligence Tier (Flask Backend & ML Engines):
+   - Controller & Routing Layer: Flask WSGI application managing route dispatch, 
+     session authentication, RBAC authorization, and input sanitization.
+   - Resume Ingestion & Parsing Engine: High-throughput PyPDF2, python-docx, and 
+     Tesseract OCR fallback parsing pipeline with magic-byte file signature validation.
+   - NLP & Extraction Pipeline: spaCy NER and regex tokenizers extracting 
+     contact metadata, canonical skills (80+ technical clusters), experience, and education.
+   - Recommendation & Ranking Engine: Scikit-learn TF-IDF vectorizer + Cosine 
+     Similarity engine computing multi-factor weighted match scores (Role 40%, 
+     Skills 40%, Experience 15%, Location 5%).
+   - Live Job Fetching Engine: Resilient client integrating external job providers 
+     (Adzuna REST API) with local SQLite fallback and SSRF-protected redirects.
+
+3. Persistence Tier (Relational Storage & Filesystem):
+   - Primary Database: SQLite3 (talentsync.db) operating in WAL (Write-Ahead Logging) 
+     mode with foreign key enforcement and indexed lookups.
+   - Resume Storage: SHA-256 content-addressed filesystem storage protecting against 
+     directory traversal and file overwrite attacks.
+
+
+6.2 DESIGN PRINCIPLES & CONSTRAINTS
+--------------------------------------------------------------------------------
+1. Separation of Concerns (SoC): Strict boundary isolation between REST controllers, 
+   domain repositories, ML inference pipelines, and presentation views.
+2. Security by Design: Argon2/Bcrypt salted password hashing, HTTP-only SameSite 
+   cookies, cryptographic password reset tokens, and parameterized SQL queries.
+3. Fail-Safe AI Fallbacks: If external APIs (Adzuna) experience rate limiting or 
+   network latency, the recommendation pipeline seamlessly falls back to local 
+   curated database jobs without user disruption.
+4. Explainable Scoring: Every ATS match score is decomposed into explainable 
+   sub-factors (contact, education, experience, skill match, format health).
+
+
+================================================================================
+SECTION 7 — PREPARE UML DIAGRAMS
+================================================================================
+
+7.1 USE CASE DIAGRAM
+--------------------------------------------------------------------------------
+The Use Case Diagram defines the functional boundaries of the TelentSync system, 
+illustrating the interactions between external actors and system capabilities.
+
+Primary Actors:
+1. Candidate: Job seeker who registers, uploads resumes, tracks ATS scores, and 
+   applies for AI-recommended jobs.
+2. HR Recruiter / Admin: Recruiter who posts vacancies, searches talent pools, 
+   ranks candidate resumes, and reviews analytics.
+3. External Job Provider (Adzuna API): External service providing real-time live job postings.
+4. Email Service (SMTP/Notification Provider): Handles verification and reset tokens.
+
+7.1.1 Use Case Specification Table:
++---------------------------+-----------------------+---------------------------------------------+
+| Use Case ID & Name        | Primary Actor         | Description & Relationships                 |
++---------------------------+-----------------------+---------------------------------------------+
+| UC-01: User Register      | Candidate / HR        | Create account with email & password        |
+| UC-02: Verify Email       | Candidate / HR        | Authenticate account via token link         |
+| UC-03: User Login         | Candidate / HR        | Authenticate credentials with bcrypt hash   |
+| UC-04: Upload Resume      | Candidate             | Upload PDF/DOCX resume file                 |
+| UC-05: Parse Resume Text  | System (Internal)     | <<include>> in UC-04 (PyPDF2, OCR fallback) |
+| UC-06: Extract Skills/Exp | System (Internal)     | <<include>> in UC-04 (spaCy NER & Regex)    |
+| UC-07: Compute ATS Score  | System (Internal)     | <<include>> in UC-04 (5-factor evaluation)  |
+| UC-08: View Dashboard     | Candidate             | View ATS score, extracted profile & stats   |
+| UC-09: Match Jobs         | Candidate             | Execute TF-IDF cosine matching algorithm    |
+| UC-10: Fetch Live Jobs    | External Job Provider | <<extend>> in UC-09 (Adzuna REST API query) |
+| UC-11: Apply for Job      | Candidate             | Submit application or redirect to live URL  |
+| UC-12: Post Job Vacancy   | HR Recruiter          | Create new job posting with skill criteria  |
+| UC-13: Screen Resumes     | HR Recruiter          | Rank candidate resumes against posted job   |
+| UC-14: Manage Candidates  | HR Recruiter          | Shortlist, download resume, or update status|
+| UC-15: View Analytics     | HR Recruiter          | View skill distribution & hiring metrics    |
++---------------------------+-----------------------+---------------------------------------------+
+
+7.1.2 ASCII Use Case Diagram:
+
+   +----------------------------------------------------------------------------------+
+   |                             HIREAI / TALENTSYNC SYSTEM                            |
+   |                                                                                  |
+   |   ( UC-01: Register Account ) <--------------------------------+                 |
+   |               ^                                                |                 |
+   |               | <<include>>                                    |                 |
+   |   ( UC-02: Verify Email )                                      |                 |
+   |                                                                |                 |
+   |   ( UC-03: User Login ) <------------------------------------+ |                 |
+   |                                                              | |                 |
+   |   ( UC-04: Upload Resume ) <-------+                         | |                 |
+   |       |                            |                         | |                 |
+   |       +--- <<include>> ---> ( UC-05: Parse Resume )          | |                 |
+   |       |                            |                         | |                 |
+   |       +--- <<include>> ---> ( UC-06: Extract Skills/Exp )    | |                 |
+   |       |                            |                         | |                 |
+   |       +--- <<include>> ---> ( UC-07: Compute ATS Score )     | |                 |
+   |                                    |                         | |                 |
+   |   ( UC-08: View Candidate Dash ) <-+                         | |                 |
+   |                                                              | |                 |
+   |   ( UC-09: Get Job Recommendations ) <-------------------+   | |                 |
+   |       |                                                  |   | |                 |
+   |       +--- <<extend>> ----> ( UC-10: Query Adzuna API )  |   | |                 |
+   |                                      ^                   |   | |                 |
+   |                                      |                   |   | |                 |
+   |   ( UC-11: Apply to Job / External Redirect ) <----------+   | |                 |
+   |                                                              | |                 |
+   |   ( UC-12: Post Job Opening ) <------------------------------+-+------------+   |
+   |                                                              | |            |    |
+   |   ( UC-13: AI Candidate Screening & Ranking ) <--------------+ |            |    |
+   |                                                              | |            |    |
+   |   ( UC-14: Manage Candidate Applications ) <-----------------+ |            |    |
+   |                                                                |            |    |
+   |   ( UC-15: View Recruitment Analytics ) <----------------------+            |    |
+   +-----------------------------------------------------------------------------+----+
+               ^                                                                 ^
+               |                                                                 |
+         +-----------+                                                     +-----------+
+         | Candidate |                                                     | Recruiter |
+         +-----------+                                                     +-----------+
+               |                                                                 |
+               v                                                                 v
+    +-----------------------+                                         +---------------------+
+    | External Job Provider |                                         | Notification Server |
+    |      (Adzuna)         |                                         |       (SMTP)        |
+    +-----------------------+                                         +---------------------+
+
+7.1.3 Visual Mermaid Diagram (Use Case):
+```mermaid
+graph TD
+    Cand((Candidate))
+    HR((HR Recruiter))
+    Adzuna((External Job API))
+    SMTP((Email Service))
+
+    subgraph "HireAI (TalentSync) System Boundary"
+        UC1([UC-01: Register Account])
+        UC2([UC-02: Verify Email])
+        UC3([UC-03: Login])
+        UC4([UC-04: Upload Resume])
+        UC5([UC-05: Parse Resume])
+        UC6([UC-06: Extract Skills & Exp])
+        UC7([UC-07: Compute ATS Score])
+        UC8([UC-08: View Candidate Dash])
+        UC9([UC-09: Match Jobs])
+        UC10([UC-10: Query Adzuna API])
+        UC11([UC-11: Apply / External Redirect])
+        UC12([UC-12: Post Job Vacancy])
+        UC13([UC-13: AI Resume Screening])
+        UC14([UC-14: Manage Candidate Pool])
+        UC15([UC-15: View Analytics])
+    end
+
+    Cand --> UC1
+    Cand --> UC3
+    Cand --> UC4
+    Cand --> UC8
+    Cand --> UC9
+    Cand --> UC11
+
+    HR --> UC1
+    HR --> UC3
+    HR --> UC12
+    HR --> UC13
+    HR --> UC14
+    HR --> UC15
+
+    UC1 -.->|include| UC2
+    UC2 --> SMTP
+    UC4 -.->|include| UC5
+    UC4 -.->|include| UC6
+    UC4 -.->|include| UC7
+    UC9 -.->|extend| UC10
+    UC10 --> Adzuna
+```
+
+
+--------------------------------------------------------------------------------
+7.2 CLASS DIAGRAM
+--------------------------------------------------------------------------------
+The Class Diagram illustrates the object-oriented structure, showing class 
+attributes, operations, visibility, and relationships (inheritance, association, 
+aggregation, and dependency).
+
+7.2.1 Core Classes & Responsibilities:
+- User (Base Class): Encapsulates authentication attributes and role identity.
+- Candidate & HRRecruiter (Derived Classes): Role-specific domain behaviors.
+- Resume: Manages resume files, parsed content, ATS scores, and metadata.
+- ResumeParser: Strategy class handling PDF, DOCX, and OCR text extraction.
+- SkillExtractor: NLP model utilizing spaCy NER and pattern matching.
+- JobMatcher: Mathematical recommendation engine executing TF-IDF cosine similarity.
+- AdzunaService: Gateway proxy managing HTTP requests, caching, and rate limiting.
+- Job: Domain model for internal and external job listings.
+- Application: Transaction entity linking candidates to jobs with status tracking.
+
+7.2.2 ASCII Class Diagram:
+
+ +---------------------------------------------------------+
+ |                         User                            |
+ +---------------------------------------------------------+
+ | - id: int                                               |
+ | - name: str                                             |
+ | - email: str                                            |
+ | - password_hash: str                                    |
+ | - role: str                                             |
+ | - is_verified: bool                                     |
+ | - created_at: datetime                                  |
+ +---------------------------------------------------------+
+ | + register(): bool                                      |
+ | + login(password: str): bool                            |
+ | + verify_email(token: str): bool                        |
+ | + update_profile(data: dict): bool                      |
+ +---------------------------------------------------------+
+                             ^
+                             |
+             +---------------+---------------+
+             |                               |
+ +---------------------------+   +---------------------------+
+ |         Candidate         |   |        HRRecruiter        |
+ +---------------------------+   +---------------------------+
+ | - skills: str             |   | - department: str         |
+ | - ats_score: int          |   | - company_id: int         |
+ | - location: str           |   +---------------------------+
+ +---------------------------+   | + post_job(job: Job)      |
+ | + upload_resume(f): Resume|   | + screen_candidates(j_id) |
+ | + view_matches(): List    |   | + download_resume(r_id)   |
+ | + apply(job_id: int)      |   | + view_analytics(): dict  |
+ +---------------------------+   +---------------------------+
+             | 1                             | 1
+             |                               |
+             | 1..*                          | 0..*
+             v                               v
+ +---------------------------+   +---------------------------+
+ |          Resume           |   |            Job            |
+ +---------------------------+   +---------------------------+
+ | - id: int                 |   | - id: int                 |
+ | - user_id: int            |   | - title: str              |
+ | - original_name: str      |   | - company: str            |
+ | - file_hash: str          |   | - location: str           |
+ | - ats_score: int          |   | - type: str               |
+ | - extracted_skills: str   |   | - salary: str             |
+ | - structured_json: dict   |   | - skills: str             |
+ | - status: str             |   | - is_external: bool       |
+ +---------------------------+   | - apply_url: str          |
+ | + compute_ats(): int      |   +---------------------------+
+ | + extract_skills(): List  |   | + get_details(): dict     |
+ +---------------------------+   +---------------------------+
+             | 1                             | 1
+             |                               |
+             +---------------+---------------+
+                             |
+                             v 0..*
+             +-------------------------------+
+             |          Application          |
+             +-------------------------------+
+             | - id: int                     |
+             | - candidate_id: int           |
+             | - job_id: int                 |
+             | - match_score: float          |
+             | - status: str                 |
+             | - applied_at: datetime        |
+             +-------------------------------+
+             | + update_status(status: str)  |
+             +-------------------------------+
+
+7.2.3 Visual Mermaid Diagram (Class Diagram):
+```mermaid
+classDiagram
+    class User {
+        -int id
+        -string name
+        -string email
+        -string password_hash
+        -string role
+        -boolean is_verified
+        -datetime created_at
+        +register() boolean
+        +login(password: string) boolean
+        +verify_email(token: string) boolean
+        +update_profile(data: dict) boolean
+    }
+
+    class Candidate {
+        -string skills
+        -int ats_score
+        -string location
+        +upload_resume(file) Resume
+        +view_matches() List
+        +apply(job_id: int) boolean
+    }
+
+    class HRRecruiter {
+        -string company_name
+        +post_job(job: Job) boolean
+        +screen_candidates(job_id: int) List
+        +download_resume(resume_id: int) File
+        +view_analytics() dict
+    }
+
+    class Resume {
+        -int id
+        -int user_id
+        -string original_name
+        -string file_hash
+        -int ats_score
+        -string extracted_skills
+        -string structured_json
+        -string status
+        +compute_ats() int
+        +extract_skills() List
+    }
+
+    class Job {
+        -int id
+        -string title
+        -string company
+        -string location
+        -string type
+        -string skills
+        -string description
+        -boolean is_external
+        -string apply_url
+        +get_details() dict
+    }
+
+    class JobMatcher {
+        -TfidfVectorizer vectorizer
+        +rank_jobs(skills: List, jobs: List, user_prefs: dict) List
+        -_calc_experience(job_desc: str, user_exp: str) float
+        -_calc_similarity(text1: str, text2: str) float
+    }
+
+    class AdzunaService {
+        -string app_id
+        -string app_key
+        -string base_url
+        +fetch_live_jobs(skills: List, location: str) List
+        -_build_query(skills: List) str
+    }
+
+    class Application {
+        -int id
+        -int user_id
+        -int job_id
+        -float match_score
+        -string status
+        -datetime applied_at
+        +update_status(new_status: str) boolean
+    }
+
+    User <|-- Candidate
+    User <|-- HRRecruiter
+    Candidate "1" --> "1..*" Resume : owns
+    Candidate "1" --> "0..*" Application : submits
+    Job "1" --> "0..*" Application : receives
+    HRRecruiter "1" --> "0..*" Job : manages
+    Candidate ..> JobMatcher : uses
+    JobMatcher ..> AdzunaService : delegates live fetch
+    JobMatcher ..> Job : ranks
+```
+
+
+--------------------------------------------------------------------------------
+7.3 ACTIVITY DIAGRAM
+--------------------------------------------------------------------------------
+The Activity Diagram documents the execution flow for the system's core pipeline:
+"Resume Ingestion, Multimodal Parsing, NLP Skill Extraction, and AI Job Recommendation."
+
+7.3.1 Workflow Steps:
+1. Start: Candidate submits a resume file via Drag-and-Drop on the UI.
+2. File Validation: Verify file type (PDF/DOCX) and size (<10MB).
+   - If invalid: Return HTTP 400 with user-friendly error message -> Terminate.
+3. Secure File Write: Compute SHA-256 hash, save to isolated storage.
+4. Text Extraction Decision:
+   - If PDF: Run PyPDF2 text extraction.
+   - Quality Check: Did PyPDF2 extract sufficient text?
+     - YES -> Proceed to Text Cleaning.
+     - NO (Scanned/Image PDF) -> Trigger Tesseract OCR fallback engine.
+   - If DOCX: Run python-docx XML paragraph and table parser.
+5. NLP Skill Intelligence: Run spaCy NER model + Regex entity matcher 
+   against canonical skill database (80+ clusters).
+6. ATS Scoring: Calculate multi-factor score:
+   Score = (Skills * 0.40) + (Experience * 0.25) + (Education * 0.15) + (Format * 0.20).
+7. Job Recommendation Request:
+   - Query Adzuna HTTPS Live API with extracted candidate skills.
+   - Was Adzuna query successful (HTTP 200 with > 0 jobs)?
+     - YES -> Normalize external job payload (title, salary, company, apply_url).
+     - NO (Timeout/Offline/Empty) -> Retrieve curated fallback jobs from local SQLite DB.
+8. AI Ranking Algorithm:
+   - Compute TF-IDF matrix between candidate skill profile and job requirements.
+   - Compute Cosine Similarity between vectors.
+   - Compute Deterministic Experience Score [0.0 - 1.0].
+   - Compute Final Match Percentage = (Role*0.40 + Skill*0.40 + Exp*0.15 + Loc*0.05).
+9. Output Presentation: Sort jobs descending by match percentage and render 
+   interactive job cards on Candidate Dashboard with Direct External Apply links.
+10. End.
+
+7.3.2 Visual Mermaid Diagram (Activity Diagram):
+```mermaid
+flowchart TD
+    Start([Start: Candidate Uploads Resume]) --> Validate{Valid PDF/DOCX & <10MB?}
+    Validate -- No --> Reject[Return Validation Error Toast] --> EndFail([End: Upload Rejected])
+    Validate -- Yes --> Hash[Compute SHA-256 Hash & Save Securely]
+    
+    Hash --> CheckType{File Type?}
+    CheckType -- PDF --> PyPDF2[Execute PyPDF2 Extraction]
+    PyPDF2 --> CheckChars{Text Length > 50 chars?}
+    CheckChars -- No (Scanned) --> OCR[Execute Tesseract OCR Fallback]
+    CheckChars -- Yes --> Clean[Clean & Normalize Text]
+    OCR --> Clean
+    CheckType -- DOCX --> DocxParse[Execute python-docx Parser]
+    DocxParse --> Clean
+
+    Clean --> NLP[Run spaCy NER Model: Extract Skills & Entities]
+    NLP --> ExpEdu[Extract Experience & Education History]
+    ExpEdu --> ATS[Compute 5-Factor ATS Quality Score 0-100]
+    ATS --> SaveDB[(Save Resume Intelligence to Database)]
+
+    SaveDB --> JobQuery[Initiate Job Recommendation Pipeline]
+    JobQuery --> FetchAdzuna{Query Live Adzuna API}
+    FetchAdzuna -- Success (200 OK) --> NormalizeLive[Normalize Live Job Payloads]
+    FetchAdzuna -- Failed / Offline --> FallbackDB[Fetch Curated Jobs from Local SQLite DB]
+
+    NormalizeLive --> Rank[Run Scikit-Learn TF-IDF Vectorizer]
+    FallbackDB --> Rank
+
+    Rank --> Cosine[Compute Cosine Similarity Matrix]
+    Cosine --> ScoreExp[Compute Deterministic Experience Match]
+    ScoreExp --> MatchScore[Calculate Final Match %: 40% Role + 40% Skill + 15% Exp + 5% Loc]
+    MatchScore --> Render[Render Live Ranked Job Cards & External Apply Links]
+    Render --> EndSuccess([End: Candidate Views Matched Jobs])
+```
+
+================================================================================
+SECTION 8 — CREATE DATA DICTIONARY
+================================================================================
+
+The Data Dictionary provides complete, rigorous technical metadata for every table 
+and attribute in the finalized HireAI relational database (talentsync.db).
+
+--------------------------------------------------------------------------------
+8.1 TABLE: users
+Description: Stores primary account credentials, role designations, and candidate profiles.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Unique surrogate identifier for the user account        |
+| name            | TEXT          | 100    | None    | None (NOT NULL)   | Full name of the registered user                        |
+| email           | TEXT          | 150    | UNIQUE  | None (NOT NULL)   | Normalized unique email address (RFC 5322 compliant)    |
+| password        | TEXT          | 255    | None    | None (NOT NULL)   | Cryptographically salted Bcrypt/Argon2 password hash    |
+| role            | TEXT          | 20     | None    | 'candidate'       | RBAC access role: 'candidate', 'hr', or 'admin'         |
+| is_verified     | INTEGER       | 1 byte | None    | 0                 | Account activation flag: 1 = Verified, 0 = Pending      |
+| skills          | TEXT          | 1000   | None    | ''                | Comma-separated canonical technical skills list         |
+| ats_score       | INTEGER       | 4 byte | None    | 0                 | Latest evaluated ATS resume quality score (0 to 100)    |
+| phone           | TEXT          | 20     | None    | ''                | International contact phone number with country code    |
+| location        | TEXT          | 100    | None    | ''                | Candidate primary geographic location (City, Country)   |
+| linkedin        | TEXT          | 255    | None    | ''                | Sanitized public LinkedIn profile URL                   |
+| github          | TEXT          | 255    | None    | ''                | Sanitized public GitHub profile URL                     |
+| summary         | TEXT          | 2000   | None    | ''                | Professional summary or bio extracted from resume       |
+| education       | TEXT          | 500    | None    | ''                | Highest qualification (e.g., 'B.Tech Computer Science') |
+| is_outlier      | INTEGER       | 1 byte | None    | 0                 | ML clustering outlier flag: 1 = Outlier, 0 = In-cluster |
+| cluster_label   | TEXT          | 50     | None    | 'Unclustered'     | K-Means/DBSCAN talent pool cluster assignment           |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC account creation timestamp                 |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.2 TABLE: resumes
+Description: Stores parsed resume files, hashes, ATS scores, and structured JSON intelligence.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Unique resume record identifier                         |
+| user_id         | INTEGER       | 8 byte | FK      | None (NOT NULL)   | Foreign key referencing users(id) ON DELETE CASCADE     |
+| original_name   | TEXT          | 255    | None    | None (NOT NULL)   | Original uploaded filename submitted by client          |
+| stored_filename | TEXT          | 255    | UNIQUE  | None (NOT NULL)   | Sanitized UUID-prefixed storage filename on disk        |
+| file_path       | TEXT          | 500    | None    | None (NOT NULL)   | Absolute or relative filesystem path to binary file     |
+| file_hash       | TEXT          | 64     | INDEX   | None (NOT NULL)   | SHA-256 cryptographic digest for duplicate detection    |
+| file_size_bytes | INTEGER       | 8 byte | None    | None (NOT NULL)   | Exact file payload size in bytes                        |
+| mime_type       | TEXT          | 100    | None    | None (NOT NULL)   | Validated MIME type ('application/pdf', '.docx')        |
+| parsed_text     | TEXT          | MAX    | None    | ''                | Full extracted raw text extracted via PyPDF2/OCR/Docx   |
+| word_count      | INTEGER       | 4 byte | None    | 0                 | Total lexical word count in resume text                 |
+| ats_score       | INTEGER       | 4 byte | None    | 0                 | Evaluated ATS score (0-100)                             |
+| extracted_skills| TEXT          | MAX    | None    | ''                | Comma-separated skills identified by spaCy NER pipeline |
+| structured_json | TEXT          | MAX    | None    | ''                | Complete Resume Intelligence JSON (Exp, Edu, Metrics)   |
+| status          | TEXT          | 30     | None    | 'processed'       | Processing lifecycle state: 'queued', 'processed', 'err'|
+| version         | INTEGER       | 4 byte | None    | 1                 | Monotonically increasing candidate resume version       |
+| uploaded_at     | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC upload timestamp                           |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.3 TABLE: jobs
+Description: Stores internal enterprise job vacancies created by HR recruiters.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Unique internal job opening identifier                  |
+| title           | TEXT          | 150    | None    | None (NOT NULL)   | Job title designation (e.g. 'Senior Python Engineer')   |
+| company         | TEXT          | 150    | None    | None (NOT NULL)   | Hiring organization or employer name                    |
+| location        | TEXT          | 100    | None    | ''                | Job location / office address / 'Remote'                |
+| type            | TEXT          | 50     | None    | 'Full-time'       | Employment contract: 'Full-time', 'Contract', 'Part-time|
+| salary          | TEXT          | 100    | None    | ''                | Compensation package representation (e.g. '₹12-18 LPA') |
+| skills          | TEXT          | 1000   | None    | ''                | Comma-separated required skills for matching algorithm  |
+| description     | TEXT          | MAX    | None    | ''                | Full job description, responsibilities, and requirements|
+| status          | TEXT          | 30     | None    | 'Active'          | Job state: 'Active', 'Filled', 'Draft', 'Archived'      |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC job creation timestamp                     |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.4 TABLE: external_jobs
+Description: Stores normalized live job postings fetched from external providers (Adzuna).
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Internal primary key for external job record            |
+| external_id     | TEXT          | 100    | UNIQUE  | None (NOT NULL)   | Unique ID assigned by provider (e.g., 'adzuna_5864431') |
+| provider        | TEXT          | 50     | None    | None (NOT NULL)   | Provenance identifier (e.g., 'adzuna', 'indeed')        |
+| title           | TEXT          | 200    | None    | None (NOT NULL)   | Job vacancy title                                       |
+| company         | TEXT          | 150    | None    | None (NOT NULL)   | Company / employer name                                 |
+| location        | TEXT          | 150    | None    | ''                | Normalized city, state, or regional location            |
+| salary_min      | REAL          | 8 byte | None    | 0.0               | Minimum annual compensation figure                      |
+| salary_max      | REAL          | 8 byte | None    | 0.0               | Maximum annual compensation figure                      |
+| description     | TEXT          | MAX    | None    | ''                | Sanitized external job snippet or full description      |
+| skills          | TEXT          | 1000   | None    | ''                | Extracted requirement keywords and skills               |
+| apply_url       | TEXT          | 1000   | None    | ''                | Direct HTTPS target URL for external candidate apply    |
+| posted_date     | TEXT          | 30     | None    | ''                | Publication date string from external feed              |
+| status          | TEXT          | 30     | None    | 'Active'          | Feed status: 'Active', 'Expired'                        |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC ingestion timestamp                       |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.5 TABLE: recommendation_history
+Description: Audit log storing AI recommendation scores, matched skills, and candidate rankings.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Unique recommendation log identifier                    |
+| user_id         | INTEGER       | 8 byte | FK      | None (NOT NULL)   | Foreign key referencing users(id) ON DELETE CASCADE     |
+| job_id          | INTEGER       | 8 byte | None    | NULL              | ID of internal job matched (if local job)               |
+| external_id     | TEXT          | 100    | None    | NULL              | ID of external Adzuna job matched (if live feed)        |
+| match_score     | INTEGER       | 4 byte | None    | 0                 | Composite AI match score percentage (0 to 100%)         |
+| matched_skills  | TEXT          | 1000   | None    | ''                | Comma-separated list of candidate skills matching job   |
+| missing_skills  | TEXT          | 1000   | None    | ''                | Comma-separated list of required skills candidate lacks |
+| recommended_at  | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC inference calculation timestamp            |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.6 TABLE: email_verification_tokens
+Description: Cryptographic single-use tokens for email account verification.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Surrogate token ID                                      |
+| user_id         | INTEGER       | 8 byte | FK      | None (NOT NULL)   | Foreign key referencing users(id) ON DELETE CASCADE     |
+| token_hash      | TEXT          | 64     | UNIQUE  | None (NOT NULL)   | SHA-256 hash of plaintext verification token            |
+| expires_at      | TEXT          | 25     | None    | None (NOT NULL)   | ISO-8601 UTC timestamp when token validity lapses       |
+| is_used         | INTEGER       | 1 byte | None    | 0                 | Token status: 0 = Unused, 1 = Consumed                  |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC issuance timestamp                         |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.7 TABLE: password_reset_tokens
+Description: Cryptographic single-use tokens for self-service password recovery.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Surrogate token ID                                      |
+| user_id         | INTEGER       | 8 byte | FK      | None (NOT NULL)   | Foreign key referencing users(id) ON DELETE CASCADE     |
+| token_hash      | TEXT          | 64     | UNIQUE  | None (NOT NULL)   | SHA-256 hash of plaintext reset token                   |
+| expires_at      | TEXT          | 25     | None    | None (NOT NULL)   | Expiration timestamp (strictly enforced 15-min window)  |
+| is_used         | INTEGER       | 1 byte | None    | 0                 | Consumption flag: 0 = Active, 1 = Invalidated           |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | ISO-8601 UTC creation timestamp                         |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+--------------------------------------------------------------------------------
+8.8 TABLE: provider_cache
+Description: High-speed caching layer storing external Adzuna query responses to prevent rate-limiting.
+--------------------------------------------------------------------------------
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| Field Name      | Data Type     | Length | Key     | Default Value     | Description / Constraints                               |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+| id              | INTEGER       | 8 byte | PK      | AUTOINCREMENT     | Cache entry surrogate ID                                |
+| provider        | TEXT          | 50     | None    | None (NOT NULL)   | External service name (e.g. 'adzuna')                   |
+| query_hash      | TEXT          | 64     | UNIQUE  | None (NOT NULL)   | SHA-256 digest of sanitized search query + location     |
+| response        | TEXT          | MAX    | None    | None (NOT NULL)   | Serialized JSON array of returned job listings          |
+| expires_at      | TEXT          | 25     | None    | None (NOT NULL)   | TTL expiration timestamp (default: 3600 seconds / 1 hr) |
+| created_at      | TEXT          | 25     | None    | datetime('now')   | Ingestion timestamp                                     |
++-----------------+---------------+--------+---------+-------------------+---------------------------------------------------------+
+
+
+================================================================================
+SECTION 9 — FINALIZE DATABASE SCHEMA
+================================================================================
+
+9.1 RELATIONAL SCHEMA (SQL DDL SPECIFICATION)
+--------------------------------------------------------------------------------
+Below is the clean, verified Data Definition Language (DDL) representing the 
+finalized relational database schema in SQLite:
+
+```sql
+-- 1. USERS TABLE
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'candidate' CHECK(role IN ('candidate', 'hr', 'admin')),
+    is_verified INTEGER NOT NULL DEFAULT 0 CHECK(is_verified IN (0, 1)),
+    skills TEXT DEFAULT '',
+    ats_score INTEGER DEFAULT 0 CHECK(ats_score BETWEEN 0 AND 100),
+    phone TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    linkedin TEXT DEFAULT '',
+    github TEXT DEFAULT '',
+    summary TEXT DEFAULT '',
+    education TEXT DEFAULT '',
+    is_outlier INTEGER DEFAULT 0,
+    cluster_label TEXT DEFAULT 'Unclustered',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 2. RESUMES TABLE
+CREATE TABLE IF NOT EXISTS resumes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    original_name TEXT NOT NULL,
+    stored_filename TEXT NOT NULL UNIQUE,
+    file_path TEXT NOT NULL,
+    file_hash TEXT NOT NULL,
+    file_size_bytes INTEGER NOT NULL,
+    mime_type TEXT NOT NULL,
+    parsed_text TEXT DEFAULT '',
+    word_count INTEGER DEFAULT 0,
+    ats_score INTEGER DEFAULT 0 CHECK(ats_score BETWEEN 0 AND 100),
+    extracted_skills TEXT DEFAULT '',
+    structured_json TEXT DEFAULT '',
+    status TEXT DEFAULT 'processed',
+    version INTEGER DEFAULT 1,
+    uploaded_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 3. INTERNAL JOBS TABLE
+CREATE TABLE IF NOT EXISTS jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    company TEXT NOT NULL,
+    location TEXT DEFAULT '',
+    type TEXT DEFAULT 'Full-time',
+    salary TEXT DEFAULT '',
+    skills TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Closed', 'Draft')),
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 4. EXTERNAL JOBS TABLE (Adzuna Feed)
+CREATE TABLE IF NOT EXISTS external_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id TEXT NOT NULL UNIQUE,
+    provider TEXT NOT NULL,
+    title TEXT NOT NULL,
+    company TEXT NOT NULL,
+    company_id TEXT DEFAULT '',
+    company_logo TEXT DEFAULT '',
+    industry TEXT DEFAULT '',
+    location TEXT DEFAULT '',
+    country TEXT DEFAULT '',
+    latitude REAL DEFAULT 0.0,
+    longitude REAL DEFAULT 0.0,
+    salary_min REAL DEFAULT 0.0,
+    salary_max REAL DEFAULT 0.0,
+    currency TEXT DEFAULT '',
+    employment_type TEXT DEFAULT '',
+    experience TEXT DEFAULT '',
+    remote INTEGER DEFAULT 0,
+    description TEXT DEFAULT '',
+    skills TEXT DEFAULT '',
+    benefits TEXT DEFAULT '',
+    education TEXT DEFAULT '',
+    posted_date TEXT DEFAULT '',
+    expires_date TEXT DEFAULT '',
+    apply_url TEXT DEFAULT '',
+    source_url TEXT DEFAULT '',
+    language TEXT DEFAULT 'en',
+    status TEXT DEFAULT 'Active',
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 5. RECOMMENDATION HISTORY TABLE
+CREATE TABLE IF NOT EXISTS recommendation_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    job_id INTEGER DEFAULT NULL,
+    external_id TEXT DEFAULT NULL,
+    match_score INTEGER DEFAULT 0 CHECK(match_score BETWEEN 0 AND 100),
+    matched_skills TEXT DEFAULT '',
+    missing_skills TEXT DEFAULT '',
+    recommended_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 6. SAVED JOBS TABLE
+CREATE TABLE IF NOT EXISTS saved_jobs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    job_id INTEGER DEFAULT NULL,
+    external_id TEXT DEFAULT NULL,
+    saved_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 7. EMAIL VERIFICATION TOKENS TABLE
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    is_used INTEGER DEFAULT 0 CHECK(is_used IN (0, 1)),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 8. PASSWORD RESET TOKENS TABLE
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TEXT NOT NULL,
+    is_used INTEGER DEFAULT 0 CHECK(is_used IN (0, 1)),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 9. PROVIDER CACHE TABLE
+CREATE TABLE IF NOT EXISTS provider_cache (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    provider TEXT NOT NULL,
+    query_hash TEXT NOT NULL UNIQUE,
+    response TEXT NOT NULL,
+    expires_at TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now'))
+);
+
+-- 10. NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT DEFAULT '',
+    type TEXT DEFAULT 'info',
+    is_read INTEGER DEFAULT 0 CHECK(is_read IN (0, 1)),
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+```
+
+9.2 INDEXES & PERFORMANCE OPTIMIZATIONS
+--------------------------------------------------------------------------------
+To achieve sub-25 millisecond query execution under concurrent candidate load, 
+the schema specifies the following compound and specialized indexes:
+
+```sql
+-- User and Authentication Lookups
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_role ON users(role);
+
+-- Resume Duplication and Candidate Retrieval
+CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(user_id);
+CREATE INDEX IF NOT EXISTS idx_resumes_hash ON resumes(file_hash);
+
+-- Token Lookups for Fast Validation
+CREATE INDEX IF NOT EXISTS idx_email_tokens_hash ON email_verification_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_email_tokens_user ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_hash ON password_reset_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens(user_id);
+
+-- Recommendation History and Notifications
+CREATE INDEX IF NOT EXISTS idx_recs_user ON recommendation_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifs_user_unread ON notifications(user_id, is_read);
+
+-- External Cache Acceleration
+CREATE INDEX IF NOT EXISTS idx_cache_hash_exp ON provider_cache(query_hash, expires_at);
+```
+
+9.3 REFERENTIAL INTEGRITY & ER RELATIONSHIPS
+--------------------------------------------------------------------------------
+1. USERS (1) <----> (M) RESUMES:
+   - One user can upload multiple versioned resumes over time.
+   - Foreign key `resumes.user_id` strictly references `users.id`.
+   - `ON DELETE CASCADE`: Deleting an account removes associated uploaded resumes.
+
+2. USERS (1) <----> (M) RECOMMENDATION_HISTORY:
+   - Captures historical match outputs across candidate search sessions.
+   - Foreign key `recommendation_history.user_id` references `users.id`.
+
+3. USERS (1) <----> (M) EMAIL_VERIFICATION_TOKENS & PASSWORD_RESET_TOKENS:
+   - Tracks security tokens issued for account verification and password reset.
+   - Strict 1:M relationship with automatic cascade cleanup upon account removal.
+
+4. USERS (1) <----> (M) SAVED_JOBS:
+   - Associates bookmarked opportunities (both local and external) to a candidate.
+
+5. ENTITY RELATIONSHIP VISUALIZATION (Mermaid ERD):
+```mermaid
+erDiagram
+    USERS ||--o{ RESUMES : "uploads"
+    USERS ||--o{ RECOMMENDATION_HISTORY : "receives"
+    USERS ||--o{ SAVED_JOBS : "bookmarks"
+    USERS ||--o{ NOTIFICATIONS : "notified_by"
+    USERS ||--o{ EMAIL_VERIFICATION_TOKENS : "verifies_with"
+    USERS ||--o{ PASSWORD_RESET_TOKENS : "recovers_with"
+
+    USERS {
+        int id PK
+        string name
+        string email UK
+        string password
+        string role
+        int is_verified
+        string skills
+        int ats_score
+        string location
+        datetime created_at
+    }
+
+    RESUMES {
+        int id PK
+        int user_id FK
+        string original_name
+        string stored_filename UK
+        string file_hash
+        string parsed_text
+        int ats_score
+        string extracted_skills
+        string structured_json
+        datetime uploaded_at
+    }
+
+    JOBS {
+        int id PK
+        string title
+        string company
+        string location
+        string type
+        string salary
+        string skills
+        string description
+        string status
+    }
+
+    EXTERNAL_JOBS {
+        int id PK
+        string external_id UK
+        string provider
+        string title
+        string company
+        string location
+        float salary_min
+        float salary_max
+        string apply_url
+        string skills
+    }
+
+    RECOMMENDATION_HISTORY {
+        int id PK
+        int user_id FK
+        int job_id
+        string external_id
+        int match_score
+        string matched_skills
+        datetime recommended_at
+    }
+
+    EMAIL_VERIFICATION_TOKENS {
+        int id PK
+        int user_id FK
+        string token_hash UK
+        datetime expires_at
+        int is_used
+    }
+
+    PASSWORD_RESET_TOKENS {
+        int id PK
+        int user_id FK
+        string token_hash UK
+        datetime expires_at
+        int is_used
+    }
+```
+
+================================================================================
+END OF REPORTING-2
+================================================================================

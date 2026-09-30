@@ -1,0 +1,29 @@
+# Top-level configuration for Pyrefly
+project-includes = [
+    "AI-Resume-Screening-System/app/**/*.py",
+    "AI-Resume-Screening-System/tests/**/*.py",
+    "AI-Resume-Screening-System/*.py"
+]
+
+project-excludes = [
+    "**/__pyrefly_virtual__/**",
+    "**/inmemory/**",
+    "**/.venv/**",
+    "**/notebooks/**",
+    "**/.pytest_cache/**"
+]
+
+[tool.pyrefly]
+project-includes = [
+    "AI-Resume-Screening-System/app/**/*.py",
+    "AI-Resume-Screening-System/tests/**/*.py",
+    "AI-Resume-Screening-System/*.py"
+]
+
+project-excludes = [
+    "**/__pyrefly_virtual__/**",
+    "**/inmemory/**",
+    "**/.venv/**",
+    "**/notebooks/**",
+    "**/.pytest_cache/**"
+]

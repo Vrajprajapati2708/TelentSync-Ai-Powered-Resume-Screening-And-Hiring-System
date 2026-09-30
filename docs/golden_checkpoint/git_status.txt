@@ -1,0 +1,13 @@
+============================================================
+HIREAI / TALENTSYNC — GIT / REPOSITORY STATUS
+============================================================
+Date: 2026-09-02T15:35:00Z
+Working Directory: V:\HireAI_Website-main (2)
+
+Command Output:
+$ git status
+fatal: not a git repository (or any of the parent directories): .git
+
+Status:
+Git repository/status unavailable (Standalone project workspace directory, not initialized as a git working tree).
+Repository integrity is tracked via deterministic SHA-256 baseline hashes and backups.

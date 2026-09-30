@@ -1,0 +1,29 @@
+# Top-level configuration for Pyrefly
+project-includes = [
+    "app/**/*.py",
+    "tests/**/*.py",
+    "*.py"
+]
+
+project-excludes = [
+    "**/__pyrefly_virtual__/**",
+    "**/inmemory/**",
+    "**/.venv/**",
+    "**/notebooks/**",
+    "**/.pytest_cache/**"
+]
+
+[tool.pyrefly]
+project-includes = [
+    "app/**/*.py",
+    "tests/**/*.py",
+    "*.py"
+]
+
+project-excludes = [
+    "**/__pyrefly_virtual__/**",
+    "**/inmemory/**",
+    "**/.venv/**",
+    "**/notebooks/**",
+    "**/.pytest_cache/**"
+]

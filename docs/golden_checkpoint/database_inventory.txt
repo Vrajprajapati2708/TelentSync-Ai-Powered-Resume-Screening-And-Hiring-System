@@ -1,0 +1,29 @@
+============================================================
+ TALENTSYNC PHASE 5 — GOLDEN CHECKPOINT DATABASE INVENTORY
+ (POST-REMEDIATION VERIFIED PRISTINE STATE)
+============================================================
+Database Path: V:\HireAI_Website-main (2)\AI-Resume-Screening-System\talentsync.db
+SHA-256: c064dcfe206b1fdcc604fd13b5353f8c433c5aad4575bf5e28ebc65abf335986
+Integrity Check: ok
+Table Count: 18
+------------------------------------------------------------
+TABLES AND ROW COUNTS:
+------------------------------------------------------------
+  application_status            : 0 rows
+  applications                  : 43 rows
+  companies                     : 0 rows
+  email_verification_tokens     : 2250 rows
+  external_jobs                 : 0 rows
+  job_alerts                    : 0 rows
+  jobs                          : 109 rows
+  login_attempts                : 1012 rows
+  notifications                 : 2207 rows
+  password_reset_tokens         : 156 rows
+  provider_cache                : 0 rows
+  provider_health               : 0 rows
+  recommendation_history        : 0 rows
+  resumes                       : 413 rows
+  saved_jobs                    : 0 rows
+  search_history                : 0 rows
+  sqlite_sequence               : 8 rows
+  users                         : 2208 rows

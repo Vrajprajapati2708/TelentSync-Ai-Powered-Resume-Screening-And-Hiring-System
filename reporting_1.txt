@@ -1,0 +1,382 @@
+================================================================================
+          PROJECT REPORT — HIREAI (TALENTSYNC)
+          AI-Powered Resume Screening & Recruitment System
+================================================================================
+Prepared by : [Your Name / Team Members]
+Guide       : [Faculty Guide Name]
+Department  : [Department Name]
+Institution : [College / University Name]
+Academic Year: 2025-2026
+================================================================================
+
+
+================================================================================
+SECTION 1 — INITIAL PROJECT PROPOSAL & PLANNING
+================================================================================
+
+During the initial phase, we thought about what kind of project would be useful
+in today's world and also involve technology we are learning.
+
+We noticed that companies receive thousands of resumes when they post a job.
+Reading every resume by hand takes a lot of time, and sometimes good candidates
+are skipped just because of that rush.
+
+So we decided to build a smart system that:
+  - Automatically reads resumes
+  - Checks how good the resume is
+  - Suggests the best matching jobs to the candidate
+
+We planned the following steps to build this project:
+  Step 1 : Understand the problem (manual recruitment is slow and unfair)
+  Step 2 : Research available tools (Python, AI libraries, web technologies)
+  Step 3 : Design the system structure
+  Step 4 : Build the system module by module
+  Step 5 : Test and verify each feature
+  Step 6 : Prepare documentation and final report
+
+This planning helped us stay organized and complete the project on time.
+
+
+================================================================================
+SECTION 2 — PROJECT TITLE (FINALIZED)
+================================================================================
+
+  Project Title:
+  HireAI — AI-Powered Resume Screening and Candidate Recruitment System
+
+  Also Known As: TalentSync
+
+  Short Description:
+  HireAI is a web-based system that automatically reads a candidate's resume,
+  checks its quality, extracts skills, and matches it to the best job openings
+  using Artificial Intelligence.
+
+
+================================================================================
+SECTION 3 — PROBLEM STATEMENT
+================================================================================
+
+  In today's job market, companies post one job and receive hundreds to
+  thousands of applications. This creates the following problems:
+
+  Problem 1 — Too Many Resumes, Too Little Time
+  -----------------------------------------------
+  HR teams cannot read every resume carefully. They often spend only
+  5-7 seconds on each resume, which means many good candidates are missed.
+
+  Problem 2 — Human Errors and Bias
+  ------------------------------------
+  Humans can make mistakes. Sometimes a recruiter may ignore a resume due to
+  personal preferences or tiredness, even if the candidate is qualified.
+
+  Problem 3 — Old Keyword Matching Systems Don't Work Well
+  ----------------------------------------------------------
+  Many companies use basic ATS (Applicant Tracking System) software that only
+  looks for exact keywords. So if a resume says "JS" instead of "JavaScript",
+  the system may reject it — even though they mean the same thing.
+
+  Problem 4 — No Feedback for Candidates
+  ----------------------------------------
+  Candidates submit their resumes but never know why they were rejected.
+  They don't know which skills are missing or how to improve their resume.
+
+  Problem 5 — Fake Resumes
+  --------------------------
+  Some candidates add skills they don't actually have, just to pass the filter.
+  This is called "keyword stuffing" and it wastes the company's time.
+
+  Our Solution:
+  HireAI solves all these problems by using AI to automatically read, score,
+  and match resumes — faster, smarter, and without any human bias.
+
+
+================================================================================
+SECTION 4 — SYSTEM ANALYSIS
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 — EXISTING SYSTEM AND ITS LIMITATIONS
+--------------------------------------------------------------------------------
+
+  What is the Existing System?
+  The existing system means how companies currently handle recruitment.
+  Most companies either:
+    (a) Read resumes manually (by HR teams), OR
+    (b) Use basic ATS software that just looks for keywords
+
+  Limitations of the Existing System:
+
+  | Limitation                  | Explanation                                      |
+  |-----------------------------|--------------------------------------------------|
+  | Slow Process                | Reading 500+ resumes takes days of work          |
+  | Human Bias                  | Recruiter's mood or preferences can affect the   |
+  |                             | final decision                                   |
+  | Poor Keyword Matching       | Basic systems can't understand that "React" and  |
+  |                             | "React.js" are the same thing                    |
+  | No Candidate Feedback       | Candidates don't know why they were rejected or  |
+  |                             | what skills they should improve                  |
+  | Cannot Detect Fake Resumes  | HR may not always catch resumes with fake or     |
+  |                             | exaggerated skills                               |
+  | Not Scalable                | The more applications come in, the worse the     |
+  |                             | system performs                                  |
+
+
+--------------------------------------------------------------------------------
+4.2 — PROPOSED SYSTEM: FUNCTIONALITY, MODULES, AND SUB-MODULES
+--------------------------------------------------------------------------------
+
+  What Does the Proposed System Do?
+  ----------------------------------
+  HireAI is a complete web application where:
+    - A candidate uploads their resume (PDF or Word file)
+    - The AI engine reads and understands the resume
+    - It gives the resume a quality score (0 to 100)
+    - It extracts all the skills from the resume
+    - It matches the resume to the best jobs available
+    - The candidate sees the results instantly on the dashboard
+
+  Two types of users can use HireAI:
+    1. Candidate : uploads resume, sees score and matched jobs
+    2. Admin / HR : manages job postings, views all candidates, shortlists them
+
+
+  SYSTEM FLOW (How the System Works — Step by Step):
+  ---------------------------------------------------
+
+   [Candidate Uploads Resume]
+            |
+            v
+   [System Reads the File — PDF or Word]
+            |
+            v
+   [Text is Cleaned and Prepared]
+            |
+            v
+   [AI Extracts Skills from Resume]
+            |
+            v
+   [ATS Score is Calculated (0 to 100)]
+            |
+            v
+   [System Matches Resume to Jobs]
+            |
+            v
+   [Results Shown on Dashboard]
+
+
+  MODULES AND SUB-MODULES:
+  -------------------------
+
+  MODULE 1: USER AUTHENTICATION MODULE
+  Purpose: Allows users to register, log in, and log out safely.
+
+  | Sub-Module           | What It Does                                  |
+  |----------------------|-----------------------------------------------|
+  | 1.1 Registration     | New users can create an account               |
+  | 1.2 Login / Logout   | Users can sign in and sign out safely         |
+  | 1.3 Role Management  | Separates Candidate and Admin access          |
+  | 1.4 Password Security| Passwords are encrypted using Bcrypt          |
+
+
+  MODULE 2: RESUME UPLOAD MODULE
+  Purpose: Accepts resume files from candidates and saves them safely.
+
+  | Sub-Module              | What It Does                               |
+  |-------------------------|--------------------------------------------|
+  | 2.1 File Upload         | Web page where candidate selects a file    |
+  | 2.2 File Validation     | Accepts only PDF and DOCX formats          |
+  | 2.3 Secure File Storage | Saves the file with a safe, unique name    |
+
+
+  MODULE 3: DOCUMENT PARSING MODULE
+  Purpose: Reads and extracts text from the uploaded resume file.
+
+  | Sub-Module         | What It Does                                    |
+  |--------------------|-------------------------------------------------|
+  | 3.1 PDF Parser     | Reads text from PDF resumes                     |
+  | 3.2 Word Parser    | Reads text from .docx resumes                   |
+  | 3.3 Text Cleaning  | Removes extra spaces, symbols, and noise        |
+
+
+  MODULE 4: AI SKILL EXTRACTION MODULE
+  Purpose: Identifies and lists the skills present in the resume.
+
+  | Sub-Module                  | What It Does                           |
+  |-----------------------------|----------------------------------------|
+  | 4.1 Named Entity Recognition| AI model that finds skill names like   |
+  |     (NER using spaCy)       | Python, SQL, React from resume text    |
+  | 4.2 Skill Pattern Matching  | Recognizes multi-word skills like      |
+  |                             | "Machine Learning", "Data Science"     |
+  | 4.3 Skill List Output       | Produces a clean list of 500+ skills   |
+
+
+  MODULE 5: ATS SCORING MODULE
+  Purpose: Gives the resume a quality score from 0 to 100.
+
+  | Sub-Module              | What It Does                               |
+  |-------------------------|--------------------------------------------|
+  | 5.1 Keyword Density     | Checks how many relevant keywords exist    |
+  | 5.2 Section Check       | Checks if resume has Education, Skills,    |
+  |                         | Experience sections                        |
+  | 5.3 Format Check        | Checks if the resume is well-formatted     |
+  | 5.4 ATS Score Output    | Returns a final score between 0 and 100   |
+
+
+  MODULE 6: JOB RECOMMENDATION MODULE
+  Purpose: Matches the candidate's resume with the most suitable jobs.
+
+  | Sub-Module           | What It Does                                  |
+  |----------------------|-----------------------------------------------|
+  | 6.1 TF-IDF           | Converts resume text and job descriptions     |
+  |     Vectorization    | into numbers for comparison                   |
+  | 6.2 Cosine Similarity| Compares resume with each job and calculates  |
+  |                      | a match percentage                            |
+  | 6.3 Skill Overlap    | Directly checks which resume skills match     |
+  |                      | the job requirements                          |
+  | 6.4 Ranked Output    | Shows top 10 matching jobs with percentages   |
+
+
+  MODULE 7: ADMIN / HR DASHBOARD MODULE
+  Purpose: Gives HR and admin full control over the recruitment process.
+
+  | Sub-Module              | What It Does                               |
+  |-------------------------|--------------------------------------------|
+  | 7.1 Job Management      | Admin can add, edit, or delete jobs        |
+  | 7.2 Candidate Overview  | Admin can view all candidates and scores   |
+  | 7.3 Shortlisting        | Admin can shortlist or reject candidates   |
+  | 7.4 Fake Resume Flag    | Flags resumes with suspicious patterns     |
+  | 7.5 Candidate Clusters  | Groups candidates by skill similarity for  |
+  |                         | quick batch review                         |
+
+
+  MODULE 8: SECURITY MODULE
+  Purpose: Keeps the system safe from attacks and unauthorized access.
+
+  | Sub-Module              | What It Does                               |
+  |-------------------------|--------------------------------------------|
+  | 8.1 Password Hashing    | Passwords stored as encrypted codes,       |
+  |                         | cannot be read directly                    |
+  | 8.2 Rate Limiting       | Blocks repeated wrong login attempts       |
+  |                         | (brute-force protection)                   |
+  | 8.3 SQL Injection Guard | Input is handled safely so hackers cannot  |
+  |                         | damage the database                        |
+  | 8.4 Role-Based Access   | Only admins see admin panel; candidates    |
+  |                         | see only their own data                    |
+
+
+  MODULE 9: DATABASE MODULE
+  Purpose: Stores all data — users, resumes, jobs, scores, and matches.
+
+  | Sub-Module          | What It Does                                   |
+  |---------------------|------------------------------------------------|
+  | 9.1 Users Table     | Stores email, name, password, and role         |
+  | 9.2 Resumes Table   | Stores extracted skills and ATS score          |
+  | 9.3 Jobs Table      | Stores all available job listings              |
+  | 9.4 Matches Table   | Stores which candidate matched which job and   |
+  |                     | what percentage was the match                  |
+
+
+================================================================================
+SECTION 5 — TECHNICAL SPECIFICATIONS
+================================================================================
+
+  5.1 TECHNOLOGY STACK (Tools & Languages Used)
+  -----------------------------------------------
+
+  | Category           | Technology / Tool Used                         |
+  |--------------------|------------------------------------------------|
+  | Programming        | Python 3.11                                    |
+  | Language           | (Main language for backend and AI logic)       |
+  | Web Framework      | Flask                                          |
+  |                    | (Handles web pages and API connections)        |
+  | Frontend           | HTML5, CSS3, Vanilla JavaScript                |
+  |                    | (Single Page App — no page reload needed)      |
+  | AI / NLP Library   | spaCy                                          |
+  |                    | (Reads text and finds skill names from resumes)|
+  | Machine Learning   | Scikit-learn                                   |
+  |                    | (TF-IDF and Cosine Similarity for job matching)|
+  | PDF Reading        | PyMuPDF (fitz), PyPDF2                         |
+  |                    | (Extracts text from uploaded PDF resumes)      |
+  | Word Doc Reading   | python-docx                                    |
+  |                    | (Extracts text from .docx resumes)             |
+  | Database           | SQLite (talentsync.db)                         |
+  |                    | (Stores users, resumes, jobs, match results)   |
+  | Data Processing    | NumPy, Pandas                                  |
+  |                    | (Used for data calculations and processing)    |
+  | Security           | Flask-Bcrypt, Flask-Limiter, Werkzeug          |
+  |                    | (Password encryption and attack prevention)    |
+  | Testing            | Pytest                                         |
+  |                    | (Used to test that all features work correctly)|
+  | Version Control    | Git and GitHub                                 |
+  |                    | (Track code changes and team collaboration)    |
+
+
+  5.2 HARDWARE REQUIREMENTS (Minimum)
+  -------------------------------------
+    Processor  : Intel Core i3 or above
+    RAM        : Minimum 4 GB (8 GB Recommended)
+    Storage    : Minimum 500 MB free space
+    OS         : Windows 10 / macOS / Linux (Ubuntu)
+    Browser    : Google Chrome, Firefox, or Edge (Modern Browser)
+
+
+  5.3 SOFTWARE REQUIREMENTS
+  ---------------------------
+    Python         : Version 3.11 or above
+    pip            : Package manager (comes with Python)
+    Web Browser    : Any modern browser (Chrome recommended)
+    Git            : For version control
+    VS Code / IDE  : For code editing (optional but recommended)
+
+
+  5.4 KEY PERFORMANCE BENCHMARKS
+  --------------------------------
+
+  | Feature                   | Speed / Performance                       |
+  |---------------------------|-------------------------------------------|
+  | PDF Reading               | Less than 40 milliseconds per resume      |
+  | Skill Extraction (AI/NER) | Around 15 milliseconds (500+ skills)      |
+  | ATS Scoring               | Less than 5 milliseconds per candidate    |
+  | Job Matching (TF-IDF)     | Less than 25 milliseconds (100+ jobs)     |
+
+
+  5.5 DATABASE DESIGN (Simple View)
+  -----------------------------------
+    The system uses SQLite, a lightweight database. It has the following
+    main tables:
+
+    USERS Table            RESUMES Table          JOB_MATCHES Table
+    ----------------       ----------------       ----------------
+    id (Primary Key)       id (Primary Key)       id (Primary Key)
+    email                  user_id (Foreign Key)  resume_id (Foreign Key)
+    password (hashed)      extracted_skills       job_id (Foreign Key)
+    role (admin/user)      ats_score              match_percentage
+
+    JOBS Table
+    ----------------
+    id (Primary Key)
+    title
+    description
+    required_skills
+
+
+  5.6 SYSTEM ARCHITECTURE TYPE
+  ------------------------------
+    The project uses a 3-Tier Architecture:
+
+    Tier 1 — Frontend (Presentation Layer)
+       What the user sees and interacts with.
+       Built with: HTML, CSS, JavaScript (Single Page App)
+
+    Tier 2 — Backend (Application / Logic Layer)
+       The brain of the system. Handles all requests and AI processing.
+       Built with: Python + Flask + spaCy + Scikit-learn
+
+    Tier 3 — Database (Data Layer)
+       Stores all information permanently.
+       Built with: SQLite (talentsync.db)
+
+
+================================================================================
+END OF REPORT
+================================================================================

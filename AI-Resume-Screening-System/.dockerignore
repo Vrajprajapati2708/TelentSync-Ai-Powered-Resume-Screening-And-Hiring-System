@@ -1,0 +1,39 @@
+# Git and version control
+.git
+.gitignore
+
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+
+# Development secrets and local databases
+.env
+.env.*
+*.db
+talentsync.db
+talentsync_backup*.db
+
+# Temporary upload files
+uploads/temp/*
+uploads/resumes/*
+
+# IDE and editor files
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Documentation and scratch files
+docs/
+*.md

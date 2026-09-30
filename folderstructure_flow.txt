@@ -1,0 +1,327 @@
+================================================================================
+TalentSync (HireAI) — Project Folder Structure & System Architecture
+Current Production Snapshot
+================================================================================
+
+1. EXECUTIVE OVERVIEW & TECHNOLOGY STACK
+--------------------------------------------------------------------------------
+TalentSync (HireAI) is an AI-powered resume screening, ATS optimization, and 
+personalized live job recommendation platform.
+
+Core Stack:
+  • Backend: Python 3.14+, Flask (Application Factory & Blueprints)
+  • Database: SQLite (WAL mode, parameterized queries, custom composite indexes)
+  • NLP & ML Pipeline:
+      - spaCy (custom SKILL NER model for skill extraction)
+      - scikit-learn (TF-IDF vectorizer + Cosine Similarity for job matching)
+      - scikit-learn (K-Means Clustering for candidate grouping)
+      - scikit-learn (Isolation Forest for outlier & resume fraud detection)
+  • External Integration:
+      - Adzuna Live Jobs API (Multi-query personalization, single-flight coalescing,
+        LRU cache with TTL & size cap, graceful threadpool timeouts)
+  • Frontend:
+      - Single Page Application (SPA) architecture
+      - HTML5 Semantic Structure + Vanilla CSS (No heavy framework overhead)
+      - Vanilla JavaScript Router, UI state management, and real-time DOM rendering
+      - Chart.js for candidate analytics and dashboard metrics
+  • Testing:
+      - pytest test suite (419 unit, integration, and security regression tests)
+
+
+================================================================================
+2. COMPLETE PROJECT DIRECTORY TREE
+================================================================================
+
+AI-Resume-Screening-System/
+│
+├── run.py                          # Flask application launcher (local dev server)
+├── wsgi.py                         # WSGI production entry point (Gunicorn/uWSGI)
+├── gunicorn.conf.py                # Gunicorn production worker configuration
+├── Dockerfile                      # Containerization definition
+├── docker-compose.yml              # Local container stack setup
+├── requirements.txt                # Production Python dependencies
+├── requirements-dev.txt            # Development & testing dependencies
+├── talentsync.db                   # Active SQLite database file
+├── talentsync_backup_phase5.db     # Baseline database backup
+├── pyrightconfig.json              # Python language server environment config
+├── pyrefly.toml                    # Pyrefly linter configuration
+├── README.md                       # High-level project documentation
+│
+├── app/                            # Core Application Package
+│   │
+│   ├── __init__.py                 # Flask App Factory: initializes DB, Blueprints,
+│   │                               # rate limiter, error handlers, and session config
+│   │
+│   ├── ai/                         # Ranking & Matcher Layer
+│   │   └── job_matcher.py          # TF-IDF Cosine Similarity & rule-based ranking engine
+│   │
+│   ├── config/                     # Configuration Management
+│   │   └── settings.py             # Development, Testing, and Production Config classes
+│   │
+│   ├── controllers/                # Business Logic Controllers
+│   │   ├── resume_controller.py    # Resume upload validation, hash check, and orchestration
+│   │   └── platform_admin_controller.py # Platform-wide metrics, user deactivation, role changes
+│   │
+│   ├── database/                   # Data Layer & Database Migrations
+│   │   ├── connection.py           # SQLite connection helper (thread-safe, get_db)
+│   │   ├── schema.sql              # Core SQLite schema (users, jobs, applications, resumes)
+│   │   └── migrations/             # Incremental Database Migrations
+│   │       ├── jobs_search_indexes.sql    # Composite indexes for search performance
+│   │       └── jobs_search_migration.py   # Migration runner (work_mode, salary ranges)
+│   │
+│   ├── ml/                         # Machine Learning & NLP Subsystems
+│   │   ├── ml_pipeline.py          # End-to-end ML orchestrator
+│   │   ├── analytics/              # Analytics aggregation helpers
+│   │   ├── ats/                    # ATS Scoring Engine
+│   │   │   └── ats_checker.py      # Rule-based + keyword density ATS scoring (0-100)
+│   │   ├── clustering/             # Unsupervised Candidate Clustering
+│   │   │   └── candidate_clusterer.py # K-Means candidate grouping by skill profile
+│   │   ├── outlier_detection/      # Fraud & Anomaly Detection
+│   │   │   └── outlier_detector.py # Isolation Forest for anomalous/fake resume profiles
+│   │   ├── recommendation/         # Recommendation Vectorizer
+│   │   │   └── tfidf_model.py      # TF-IDF model loader and cosine similarity calculator
+│   │   └── skill_extraction/       # NLP Skill Parsing
+│   │       ├── extract_skills.py   # spaCy NER + regex pattern skill extractor
+│   │       ├── skill_intelligence.py # Categorization (technical, soft, tools, frameworks)
+│   │       └── skills_db.py        # Canonical skill dictionary & role frequency mappings
+│   │
+│   ├── models/                     # Data Models & Schemas
+│   │   └── __init__.py             # Relational mapping definitions
+│   │
+│   ├── routes/                     # Flask HTTP Blueprints (REST API)
+│   │   ├── admin_routes.py         # Recruiter / HR API (job CRUD, applicant rankings)
+│   │   ├── auth_routes.py          # Authentication API (login, register, logout, session)
+│   │   ├── jobs_routes.py          # Unified Live Jobs Network search (/api/jobs/search)
+│   │   ├── ml_routes.py            # ML pipeline health, model metadata, latency checks
+│   │   ├── platform_admin_routes.py# Platform Owner API (analytics, user status, roles)
+│   │   ├── resume_routes.py        # Candidate API (upload, download, /api/match_jobs, /api/apply)
+│   │   └── user_routes.py          # Profile management, settings, notifications
+│   │
+│   ├── services/                   # External APIs & Service Integrations
+│   │   ├── adzuna_client.py        # Hardened Adzuna API client (concurrency, single-flight, LRU)
+│   │   ├── adzuna_service.py       # Adapter service bridging routes to AdzunaClient
+│   │   ├── jobs_search_service.py  # Unified search coordinator (merges internal + Adzuna)
+│   │   └── resume_service.py       # Resume parsing and storage service wrapper
+│   │
+│   ├── static/                     # Frontend Static Web Assets
+│   │   ├── css/
+│   │   │   └── style.css           # Vanilla CSS (design system, dark mode, responsive grid)
+│   │   ├── js/
+│   │   │   └── app.js              # Full Single Page Application (Router, UI components, state)
+│   │   └── img/                    # Logos, illustrations, and fallback favicons
+│   │
+│   ├── templates/                  # Frontend HTML Views
+│   │   ├── index.html              # Main application template housing all SPA portals
+│   │   └── errors/
+│   │       ├── 403.html            # Forbidden error page
+│   │       ├── 404.html            # Page not found error page
+│   │       └── 500.html            # Internal server error page
+│   │
+│   └── utils/                      # Shared Cross-Cutting Utilities
+│       ├── logger.py               # Centralized structured logger
+│       ├── security.py             # Route security guards (@login_required, @role_required)
+│       └── validators.py           # Email, password, and safe redirect URL validators
+│
+├── tests/                          # Automated Regression & Unit Test Suite (419 tests)
+│   ├── conftest.py                 # Pytest fixtures, test database setup, and mock helpers
+│   ├── test_adzuna_client.py       # AdzunaClient unit tests (retries, caching, error classes)
+│   ├── test_multi_query_personalization.py # Concurrency, timeout, and deduplication tests
+│   ├── test_jobs_search_api.py     # Live jobs search API and filter regression tests
+│   ├── test_platform_admin_regression.py # Platform admin analytics & role guards tests
+│   ├── test_phase0_auth_regression.py   # Authentication, password hashing, and token guards
+│   ├── test_phase1_stability_regression.py # Database connection & stability tests
+│   ├── test_phase2_upload_regression.py # Resume upload, magic-byte, and hash tests
+│   ├── test_phase3_jobs_talent_pool_regression.py # Job ranking & talent pool tests
+│   ├── test_phase4_email_ml_ocr_regression.py     # OCR, NLP, and email alert tests
+│   └── test_phase5_production_regression.py       # Security, SQL injection, and RBAC tests
+│
+└── uploads/                        # Server Storage
+    └── resumes/                    # Secure persistent resume document storage
+
+
+================================================================================
+3. SYSTEM ARCHITECTURE & COMPONENT LAYOUT
+================================================================================
+
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                           FRONTEND (SPA)                               │
+  │  HTML5 + Vanilla CSS + Vanilla JS Router (app.js)                      │
+  │  Portals: Candidate Portal | HR/Recruiter Portal | Platform Admin      │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                      │ HTTP / JSON REST APIs
+                                      ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │                    FLASK APPLICATION LAYER (run.py)                    │
+  │  App Factory (__init__.py) • Security Decorators • Rate Limiter        │
+  │                                                                        │
+  │   /api/auth       /api/jobs/search     /api/match_jobs     /api/apply  │
+  │   (AuthRoutes)    (JobsRoutes)         (ResumeRoutes)      (Resume)    │
+  │                                                                        │
+  │   /api/admin      /api/platform-admin  /api/ml             /api/users  │
+  │   (AdminRoutes)   (PlatformAdmin)      (MLRoutes)          (UserRoutes)│
+  └───────────────────┬───────────────────────────────┬────────────────────┘
+                      │                               │
+                      ▼                               ▼
+  ┌───────────────────────────────┐   ┌────────────────────────────────────┐
+  │     INTERNAL SERVICE LAYER    │   │         AI & MACHINE LEARNING      │
+  │  • JobsSearchService          │   │  • spaCy Skill NER Parser          │
+  │  • ResumeController           │   │  • ATS Heuristic Scorer (0-100)    │
+  │  • PlatformAdminController    │   │  • TF-IDF Cosine Matcher           │
+  │  • Connection Manager (SQLite)│   │  • Candidate K-Means Clusterer     │
+  └───────────────┬───────────────┘   │  • Isolation Forest Outlier Guard  │
+                  │                   └────────────────────────────────────┘
+                  │                                   ▲
+                  ▼                                   │
+  ┌───────────────────────────────┐                   │
+  │    PERSISTENCE LAYER (DB)     │                   │
+  │  SQLite (talentsync.db)       │                   │
+  │  • users (candidates, hr, adm)│                   │
+  │  • resumes (parsed & hashes)  │                   │
+  │  • jobs (internal listings)   │                   │
+  │  • applications (submits)     │                   │
+  └───────────────────────────────┘                   │
+                                                      │
+  ┌───────────────────────────────────────────────────┴────────────────────┐
+  │               EXTERNAL RESILIENT INTEGRATION (Adzuna)                  │
+  │  AdzunaClient (Multi-Query Personalization):                           │
+  │   • Query 1: Inferred Target Role (from candidate skills)              │
+  │   • Query 2: Top 2 Skills by Market Frequency                          │
+  │   • Query 3: Role + Candidate City (e.g. Pune, Bengaluru)              │
+  │   • Features: Single-Flight Coalescing • ThreadPool Timeouts           │
+  │     Bounded LRU Cache (500 max) • Deepcopy to prevent data leakage     │
+  └────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+4. DATA FLOW & LIFECYCLE
+================================================================================
+
+1. Candidate Resume Ingestion:
+   Candidate uploads PDF/DOCX -> Magic bytes & extension validated -> SHA-256
+   hash computed (detects duplicate files instantly).
+   
+2. NLP Parsing & Intelligence Extraction:
+   spaCy SKILL NER extracts domain technical skills, soft skills, and frameworks.
+   Education, contact information, and experience are parsed and serialized to
+   canonical structured_json in the resumes table.
+
+3. ATS Score Calculation:
+   compute_ats_score() scores the resume from 0 to 100 based on weighted
+   categories: Skills match (40%), Contact info (10%), Education (15%),
+   Experience completeness (20%), and Content formatting (15%). Missing
+   high-value market keywords are identified.
+
+4. Multi-Query Live Job Matching (/api/match_jobs):
+   Candidate's skills and location trigger up to 3 concurrent live queries to
+   Adzuna via ThreadPoolExecutor. If one query times out, results from the
+   others are preserved.
+   Results are merged, deduplicated, and passed to JobMatcher.rank_jobs()
+   which calculates TF-IDF cosine similarity between candidate skills and job
+   descriptions.
+
+5. Unified Job Search & Filtering (/api/jobs/search):
+   Candidate searches with keywords, location, salary min, work mode, and
+   experience brackets. Searches both local partner jobs and live Adzuna jobs.
+   Jobs with unspecified experience or salary are retained so candidates are
+   not excluded from open opportunities.
+
+6. Application Submission (/api/apply):
+   - Internal Jobs: Recorded directly in the applications table.
+   - External Jobs (Adzuna): Strictly validated for safe HTTPS redirect URL,
+     returning redirect_url to open external partner site in a new tab
+     (noopener,noreferrer).
+
+
+================================================================================
+5. DATABASE SCHEMA SUMMARY (talentsync.db)
+================================================================================
+
+Table: users
+  • id (INTEGER PRIMARY KEY)
+  • name (TEXT)
+  • email (TEXT UNIQUE)
+  • password (TEXT - werkzeug scrypt hash)
+  • role (TEXT - 'candidate' | 'hr' | 'admin')
+  • skills (TEXT - comma separated)
+  • ats_score (REAL)
+  • location (TEXT)
+  • phone, linkedin, github, summary, education (TEXT)
+  • is_outlier (INTEGER - 0 or 1)
+  • cluster_label (TEXT)
+  • is_verified (INTEGER - 0 or 1)
+  • created_at (TIMESTAMP)
+
+Table: resumes
+  • id (INTEGER PRIMARY KEY)
+  • user_id (INTEGER REFERENCES users(id))
+  • original_name, stored_filename, file_path (TEXT)
+  • file_hash (TEXT - SHA-256 for deduplication)
+  • file_size_bytes, mime_type, parsed_text, word_count (METADATA)
+  • ats_score (REAL)
+  • extracted_skills (TEXT)
+  • structured_json (TEXT - canonical resume intelligence)
+  • status, version, uploaded_at (METADATA)
+
+Table: jobs
+  • id (INTEGER PRIMARY KEY)
+  • title, company, location, type (TEXT)
+  • salary, salary_min, salary_max (INTEGER / TEXT)
+  • work_mode (TEXT - 'remote' | 'onsite' | 'hybrid')
+  • skills, description, status ('Active' | 'Closed')
+  • created_at, created_by (METADATA)
+
+Table: applications
+  • id (INTEGER PRIMARY KEY)
+  • user_id (INTEGER REFERENCES users(id))
+  • job_id (INTEGER REFERENCES jobs(id))
+  • resume_id (INTEGER REFERENCES resumes(id))
+  • match_score, ats_score (REAL)
+  • status (TEXT - 'Pending' | 'Reviewing' | 'Shortlisted' | 'Rejected')
+  • applied_at (TIMESTAMP)
+
+
+================================================================================
+6. SECURITY & ROLES MATRIX (RBAC)
+================================================================================
+
+Role: candidate
+  • Can upload resumes, view own ATS analysis, receive personalized matches,
+    apply to jobs, and view personal application history.
+  • Ownership Guard: Candidate A cannot download Candidate B's resume (HTTP 403).
+
+Role: hr / recruiter
+  • Can post/edit/close internal job listings, view applicants for their jobs,
+    access candidate ATS scores, download applicant resumes, and update
+    application statuses ('Shortlisted', 'Rejected', etc.).
+
+Role: admin (Platform Administrator)
+  • Access to system-wide KPI analytics (live user counts, application volumes,
+    ATS distribution).
+  • User management: can activate/deactivate accounts and change user roles.
+  • Safeguards: Cannot deactivate own account; cannot demote the last remaining admin.
+
+
+================================================================================
+7. TEST SUITE & SYSTEM HEALTH
+================================================================================
+Test Runner: pytest
+Test Directory: tests/
+Test Count: 419 Passing Tests (0 Failures)
+
+Core Test Suites:
+  • test_adzuna_client.py: Cache size limits, eviction, single-flight coalescing,
+    fast 429 handling, and upstream error mapping.
+  • test_multi_query_personalization.py: 3-query construction, threadpool timeouts,
+    deep copying, and per-user cache isolation.
+  • test_jobs_search_api.py: Live search endpoint validation, pagination, work_mode,
+    min_salary, and experience brackets.
+  • test_platform_admin_regression.py: Admin analytics aggregation, role updates,
+    deactivation safeguards, and security permissions.
+  • test_phase0_auth_regression.py: Authentication, password hashing, and token guards.
+  • test_phase1_stability_regression.py: DB connectivity, thread concurrency, WAL mode.
+  • test_phase2_upload_regression.py: File parsing, magic bytes, SHA-256 deduplication.
+  • test_phase5_production_regression.py: Production isolation, RBAC, and SQL injection.
+
+================================================================================
+End of Document
+================================================================================

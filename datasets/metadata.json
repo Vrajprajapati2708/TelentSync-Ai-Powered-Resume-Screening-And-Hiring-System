@@ -1,0 +1,17 @@
+{
+  "num_resumes": 600,
+  "num_jobs": 200,
+  "roles": [
+    "Data Scientist",
+    "ML Engineer",
+    "NLP Engineer",
+    "Data Analyst",
+    "Data Engineer",
+    "Python Developer",
+    "Full Stack Developer",
+    "Cloud Architect",
+    "DevOps Engineer",
+    "Computer Vision Engineer"
+  ],
+  "total_skills": 86
+}

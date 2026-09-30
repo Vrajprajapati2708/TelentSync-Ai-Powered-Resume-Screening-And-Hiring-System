@@ -1,0 +1,590 @@
+====================================================================================================
+                        HIREAI (TALENTSYNC) - COMPLETE SOURCE CODE EXPORT
+====================================================================================================
+Export Date: 2026-08-03
+Repository: AI-Resume-Screening-System
+Version   : 2.0.0
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/run.py
+LANGUAGE: Python
+CONTENT:
+#!/usr/bin/env python3
+# ============================================================
+#  TalentSync - Application Entry Point
+#  Run this file to start the server:
+#    py run.py
+# ============================================================
+
+import sys
+import io
+import os
+
+# Fix Windows console encoding for emojis
+if sys.platform == 'win32':
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
+
+from app import create_app
+from app.config.settings import ActiveConfig
+
+app = create_app()
+
+if __name__ == '__main__':
+    print("=" * 55)
+    print("  TalentSync -- AI Resume Screening System  v2.0")
+    print("=" * 55)
+    print(f"  Running at:  http://127.0.0.1:{ActiveConfig.PORT}")
+    print(f"  Database:   {ActiveConfig.DB_FILE}")
+    print(f"  Debug mode: {ActiveConfig.DEBUG}")
+
+    app.run(
+        debug=ActiveConfig.DEBUG,
+        port=ActiveConfig.PORT,
+        host='0.0.0.0'
+    )
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/requirements.txt
+LANGUAGE: Text
+CONTENT:
+Flask
+Werkzeug
+PyPDF2
+python-dotenv
+reportlab
+pandas
+numpy
+matplotlib
+seaborn
+spacy
+scikit-learn
+joblib
+jupyter
+python-docx
+Flask-Limiter==4.1.1
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/__init__.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Application Factory  (app/__init__.py)
+#  Creates and configures the Flask app, registers Blueprints,
+#  initialises the database, and creates upload directories.
+# ============================================================
+
+import os
+import sqlite3
+from datetime import datetime
+from flask import Flask, render_template, jsonify
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
+from app.config.settings import ActiveConfig
+
+# Global limiter instance (attached to app in create_app)
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],          # No global default — apply per route
+    storage_uri="memory://",    # In-memory (swap for Redis in production)
+)
+
+
+def create_app(config=None) -> Flask:
+    """
+    Flask Application Factory.
+    Call this function to create a configured Flask instance.
+    """
+    app = Flask(
+        __name__,
+        static_folder='static',
+        template_folder='templates'
+    )
+
+    # ── Load configuration
+    app.config.from_object(config or ActiveConfig)
+    app.secret_key = ActiveConfig.SECRET_KEY
+
+    # ── Attach rate limiter
+    limiter.init_app(app)
+
+    # ── Ensure upload directories exist
+    os.makedirs(ActiveConfig.UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(ActiveConfig.TEMP_FOLDER,   exist_ok=True)
+
+    # ── Register Blueprints
+    from app.routes.auth_routes   import auth_bp
+    from app.routes.resume_routes import resume_bp
+    from app.routes.user_routes   import user_bp
+    from app.routes.admin_routes  import admin_bp
+    from app.routes.ml_routes     import ml_bp
+    from app.routes.jobs_routes   import jobs_bp
+
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(resume_bp)
+    app.register_blueprint(user_bp)
+    app.register_blueprint(admin_bp)
+    app.register_blueprint(ml_bp)
+    app.register_blueprint(jobs_bp)
+
+    # ── Landing page route
+    @app.route('/')
+    def index():
+        return render_template('index.html')
+
+    # ── Error handlers
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(429)
+    def rate_limit_exceeded(e):
+        return jsonify({
+            'success': False,
+            'message': 'Too many requests. Please slow down and try again later.'
+        }), 429
+
+    @app.errorhandler(500)
+    def server_error(e):
+        return render_template('errors/404.html'), 500
+
+    # ── Initialise database on first run
+    _init_db(ActiveConfig.DB_FILE)
+
+    return app
+
+
+def _init_db(db_file: str):
+    """Create all tables and seed demo data if the DB is empty."""
+    schema_path = os.path.join(os.path.dirname(__file__), 'database', 'schema.sql')
+
+    with sqlite3.connect(db_file) as conn:
+        if os.path.exists(schema_path):
+            with open(schema_path, 'r') as f:
+                conn.executescript(f.read())
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/config/settings.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Settings
+# ============================================================
+
+import os
+
+class ActiveConfig:
+    SECRET_KEY     = os.environ.get('SECRET_KEY', 'talentsync-default-secret-key-change-in-prod')
+    PORT           = int(os.environ.get('PORT', 5000))
+    DEBUG          = os.environ.get('DEBUG', 'True').lower() in ('true', '1')
+    DB_FILE        = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'talentsync.db')
+    UPLOAD_FOLDER  = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads')
+    TEMP_FOLDER    = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'temp')
+    MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/controllers/auth_controller.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Auth Controller
+# ============================================================
+
+import sqlite3
+from datetime import datetime
+from werkzeug.security import generate_password_hash, check_password_hash
+from app.database.connection import get_db
+from app.utils.validators import validate_email, validate_password, validate_required_fields
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+ALLOWED_ROLES = {'candidate', 'hr'}
+
+
+def login_user(email: str, password: str) -> dict:
+    if not email or not password:
+        return {'success': False, 'message': 'Email and password are required.'}
+
+    with get_db() as conn:
+        user = conn.execute("SELECT * FROM users WHERE email=?", (email.strip().lower(),)).fetchone()
+
+    if not user:
+        return {'success': False, 'message': 'Invalid email or password.'}
+
+    try:
+        is_valid = check_password_hash(user['password'], password)
+    except Exception:
+        is_valid = False
+
+    if not is_valid:
+        return {'success': False, 'message': 'Invalid email or password.'}
+
+    logger.info(f"Login successful: {email}")
+    u_dict = dict(user)
+    u_dict.pop('password', None)
+    return {'success': True, 'user': u_dict}
+
+
+def register_user(name: str, email: str, password: str, role: str) -> dict:
+    valid, msg = validate_required_fields({'name': name, 'email': email, 'password': password, 'role': role}, ['name', 'email', 'password', 'role'])
+    if not valid: return {'success': False, 'message': msg}
+    if not validate_email(email): return {'success': False, 'message': 'Invalid email address.'}
+    ok, err = validate_password(password)
+    if not ok: return {'success': False, 'message': err}
+    if role not in ALLOWED_ROLES: return {'success': False, 'message': "Invalid role."}
+
+    hashed_password = generate_password_hash(password)
+
+    try:
+        with get_db() as conn:
+            cur = conn.execute("INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)", (name.strip(), email.strip().lower(), hashed_password, role))
+            user_id = cur.lastrowid
+            conn.execute("INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, ?, ?)", (user_id, 'Welcome to TalentSync! 🎉', 'Your account is ready.', 'success', datetime.now().strftime('%Y-%m-%d %H:%M')))
+            conn.commit()
+
+        return {'success': True, 'user': {'id': user_id, 'name': name, 'email': email, 'role': role, 'ats_score': 0, 'skills': ''}}
+    except sqlite3.IntegrityError:
+        return {'success': False, 'message': 'Email already registered.'}
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/controllers/resume_controller.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Resume Controller
+# ============================================================
+
+import os
+from datetime import datetime
+from werkzeug.utils import secure_filename
+from app.ml.parsers.resume_parser import parse_resume
+from app.ml.ats.ats_checker import compute_ats_score
+from app.database.connection import get_db
+from app.utils.validators import validate_file_extension
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def process_resume_upload(file, user_id: int | None = None) -> dict:
+    if file is None or file.filename == '':
+        return {'success': False, 'message': 'No file selected.'}
+
+    filename = secure_filename(file.filename)
+    if not validate_file_extension(filename):
+        return {'success': False, 'message': 'Only PDF, DOC, and DOCX files are allowed.'}
+
+    parsed = parse_resume(file, filename)
+    if not parsed['raw_text']:
+        return {'success': False, 'message': 'Could not extract text from PDF.'}
+
+    ats_result = compute_ats_score(parsed['raw_text'])
+    ats_score  = ats_result['score']
+
+    if user_id:
+        skills_str = ','.join(parsed['skills'])
+        with get_db() as conn:
+            conn.execute("UPDATE users SET skills=?, ats_score=? WHERE id=?", (skills_str, ats_score, user_id))
+            conn.commit()
+
+    return {
+        'success': True,
+        'message': 'Resume parsed and analysed successfully.',
+        'data': {
+            'skills':      parsed['skills'],
+            'ats_score':   ats_score,
+            'ats_grade':   ats_result['grade'],
+            'suggestions': ats_result['suggestions'],
+            'breakdown':   ats_result['breakdown'],
+            'email':       parsed['email'],
+            'phone':       parsed['phone'],
+            'linkedin':    parsed['linkedin'],
+            'github':      parsed['github'],
+            'degree':      parsed['degree'],
+            'skill_categories': parsed['skill_categories'],
+        }
+    }
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/database/connection.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Database Connection Manager
+# ============================================================
+
+import sqlite3
+import os
+from app.config.settings import ActiveConfig
+
+
+def get_db() -> sqlite3.Connection:
+    conn = sqlite3.connect(ActiveConfig.DB_FILE)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def execute_query(query: str, params: tuple = ()) -> list[dict]:
+    with get_db() as conn:
+        rows = conn.execute(query, params).fetchall()
+        return [dict(r) for r in rows]
+
+
+def execute_write(query: str, params: tuple = ()) -> int:
+    with get_db() as conn:
+        cur = conn.execute(query, params)
+        conn.commit()
+        return cur.lastrowid or 0
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/database/schema.sql
+LANGUAGE: SQL
+CONTENT:
+CREATE TABLE IF NOT EXISTS users (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    name        TEXT    NOT NULL,
+    email       TEXT    UNIQUE NOT NULL,
+    password    TEXT    NOT NULL,
+    role        TEXT    NOT NULL DEFAULT 'candidate',
+    skills         TEXT    DEFAULT '',
+    ats_score      INTEGER DEFAULT 0,
+    phone          TEXT    DEFAULT '',
+    location       TEXT    DEFAULT '',
+    linkedin       TEXT    DEFAULT '',
+    github         TEXT    DEFAULT '',
+    summary        TEXT    DEFAULT '',
+    education      TEXT    DEFAULT '',
+    is_outlier     INTEGER DEFAULT 0,
+    cluster_label  TEXT    DEFAULT 'Unclustered',
+    created_at     TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    company     TEXT    NOT NULL,
+    location    TEXT    DEFAULT '',
+    type        TEXT    DEFAULT 'Full-time',
+    salary      TEXT    DEFAULT '',
+    skills      TEXT    DEFAULT '',
+    description TEXT    DEFAULT '',
+    status      TEXT    DEFAULT 'Active',
+    created_at  TEXT    DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS applications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    job_id      INTEGER NOT NULL,
+    match_score INTEGER DEFAULT 0,
+    status      TEXT    DEFAULT 'Reviewing',
+    applied_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(job_id)  REFERENCES jobs(id)  ON DELETE CASCADE,
+    UNIQUE(user_id, job_id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    title       TEXT    NOT NULL,
+    message     TEXT    DEFAULT '',
+    type        TEXT    DEFAULT 'info',
+    is_read     INTEGER DEFAULT 0,
+    created_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/ml/ml_pipeline.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — ML Pipeline Orchestrator
+# ============================================================
+
+import time
+from app.ml.preprocessing.clean_text import preprocess_to_string
+from app.ml.skill_extraction.extract_skills import extract_skills, extract_skills_with_categories, get_skill_gaps, get_extraction_method
+from app.ml.recommendation.recommend_jobs import recommend_jobs
+from app.ml.recommendation.tfidf_model    import get_model_info
+from app.ml.ats.ats_checker               import compute_ats_score
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+
+def run_full_pipeline(resume_text: str, jobs: list[dict], top_n: int = 10) -> dict:
+    t_start = time.time()
+    cleaned_text = preprocess_to_string(resume_text)
+    skills         = extract_skills(resume_text)
+    skills_by_cat  = extract_skills_with_categories(resume_text)
+    
+    all_job_skills = list({s.strip() for j in jobs for s in j.get('skills', '').split(',') if s.strip()})
+    ats_result = compute_ats_score(resume_text, job_skills=all_job_skills)
+
+    recommendations = recommend_jobs(candidate_skills=skills, jobs=jobs, top_n=top_n, candidate_resume_text=resume_text)
+
+    for rec in recommendations:
+        role = rec.get('title', rec.get('role', ''))
+        rec['skill_gap'] = get_skill_gaps(skills, role)
+
+    return {
+        'skills':          skills,
+        'skills_by_cat':   skills_by_cat,
+        'ats':             ats_result,
+        'recommendations': recommendations,
+        'pipeline_meta': {
+            'total_time_s': round(time.time() - t_start, 4),
+            'extraction_method': get_extraction_method(),
+            'tfidf_model':       get_model_info(),
+        }
+    }
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/ml/ats/ats_checker.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — ATS Score Checker
+# ============================================================
+
+import re
+from app.ml.skill_extraction.extract_skills import extract_skills
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+
+_CONTACT_PATTERNS  = [r'@', r'\+?\d{10,}', r'linkedin\.com', r'github\.com']
+_EDUCATION_WORDS   = ['education', 'degree', 'university', 'college', 'b.tech', 'bachelor', 'master', 'cgpa', 'gpa']
+_EXPERIENCE_WORDS  = ['experience', 'work', 'internship', 'project', 'employment', 'company', 'organisation']
+
+
+def compute_ats_score(text: str, job_skills: list[str] | None = None) -> dict:
+    if not text:
+        return {'score': 0, 'grade': 'Poor', 'breakdown': {}, 'suggestions': ['Upload a valid text resume.'], 'skills': [], 'keyword_match': None}
+
+    text_lower = text.lower()
+    suggestions, breakdown = [], {}
+
+    skills     = extract_skills(text)
+    skill_pts  = min(len(skills) * 4, 40)
+    breakdown['skills'] = skill_pts
+
+    contact_pts = sum(4 for pat in _CONTACT_PATTERNS if re.search(pat, text_lower))
+    breakdown['contact_info'] = min(contact_pts, 15)
+
+    edu_pts = sum(3 for kw in _EDUCATION_WORDS if kw in text_lower)
+    breakdown['education'] = min(edu_pts, 15)
+
+    exp_pts = sum(3 for kw in _EXPERIENCE_WORDS if kw in text_lower)
+    breakdown['experience'] = min(exp_pts, 15)
+
+    word_count  = len(text.split())
+    breakdown['content_length'] = min(int(word_count / 20), 15)
+
+    total = max(min(sum(breakdown.values()), 100), 0)
+
+    grade = 'Excellent' if total >= 85 else 'Good' if total >= 70 else 'Average' if total >= 50 else 'Poor'
+
+    return {
+        'score':        total,
+        'grade':        grade,
+        'breakdown':    breakdown,
+        'suggestions':  suggestions,
+        'skills':       skills,
+    }
+END FILE
+
+====================================================================================================
+FILE: AI-Resume-Screening-System/app/ml/recommendation/recommend_jobs.py
+LANGUAGE: Python
+CONTENT:
+# ============================================================
+#  TalentSync — Job Recommendation Engine
+# ============================================================
+
+from app.ml.recommendation.tfidf_model import get_vectorizer
+from app.ml.recommendation.cosine_similarity import cosine_similarity, skill_overlap_score
+from app.ml.preprocessing.clean_text import preprocess_to_string
+from app.utils.logger import get_logger
+
+logger = get_logger(__name__)
+SEMANTIC_WEIGHT = 0.40
+SKILL_WEIGHT    = 0.60
+
+
+def recommend_jobs(candidate_skills: list[str], jobs: list[dict], top_n: int = 10, candidate_resume_text: str | None = None) -> list[dict]:
+    if not jobs: return []
+
+    candidate_text = preprocess_to_string(candidate_resume_text) if candidate_resume_text else preprocess_to_string(' '.join(candidate_skills))
+    job_texts = [preprocess_to_string(f"{j.get('title', '')} {j.get('skills', '')} {j.get('description', '')}") for j in jobs]
+
+    vectorizer = get_vectorizer()
+
+    if vectorizer.is_sklearn:
+        import scipy.sparse as sp
+        from sklearn.metrics.pairwise import cosine_similarity as sk_cos
+        cand_vec  = vectorizer.transform(candidate_text)
+        job_matrix = sp.vstack([vectorizer.transform(t) for t in job_texts])
+        sim_scores = sk_cos(cand_vec, job_matrix).flatten()
+    else:
+        all_vecs = vectorizer.fit_transform([candidate_text] + job_texts)
+        sim_scores = [cosine_similarity(all_vecs[0], v) for v in all_vecs[1:]]
+
+    results = []
+    for i, job in enumerate(jobs):
+        job_skills = [s.strip() for s in job.get('skills', '').split(',') if s.strip()]
+        overlap    = skill_overlap_score(candidate_skills, job_skills)
+        semantic   = float(sim_scores[i]) if i < len(sim_scores) else 0.0
+
+        final_score = (SEMANTIC_WEIGHT * semantic) + (SKILL_WEIGHT * overlap)
+        match_pct   = min(int(final_score * 100), 100)
+
+        if match_pct <= 0: continue
+
+        enriched = dict(job)
+        enriched['match_percentage'] = match_pct
+        enriched['matched_skills']   = [s for s in job_skills if s.lower() in {cs.lower() for cs in candidate_skills}]
+        enriched['missing_skills']   = [s for s in job_skills if s.lower() not in {cs.lower() for cs in candidate_skills}]
+        results.append(enriched)
+
+    results.sort(key=lambda x: x['match_percentage'], reverse=True)
+    return results[:top_n]
+END FILE
+
+====================================================================================================
+BINARY ARTIFACTS METADATA SUMMARY
+====================================================================================================
+Artifact: vectorizer.pkl
+File Location: trained_models/tfidf_recommender/vectorizer.pkl
+Purpose: Serialized scikit-learn TfidfVectorizer for fast C-optimized vector transformation.
+How generated: Generated by `app.ml.training.train_recommender.train_tfidf_recommender()` fitting on `datasets/jobs.json`.
+How loaded: Loaded via `joblib.load()` in `app/ml/recommendation/tfidf_model.py`.
+Dependencies: `scikit-learn`, `joblib`, `scipy`.
+
+Artifact: spaCy SKILL NER Model
+File Location: trained_models/spacy_skill_ner/
+Purpose: Custom trained Named Entity Recognition pipeline for extracting SKILL entity spans from resume text.
+How generated: Generated by `app.ml.training.train_skill_ner.train_ner_model()` fine-tuning on `datasets/ner_training_data.json` (1.65 MB).
+How loaded: Loaded via `spacy.load("trained_models/spacy_skill_ner")` in `app/ml/skill_extraction/extract_skills.py`.
+Dependencies: `spacy`.
+
+Artifact: talentsync.db
+File Location: talentsync.db
+Purpose: Production SQLite database file storing Users, Resumes, Jobs, Applications, and Notifications.
+How generated: Auto-bootstrapped on server startup via `app/database/schema.sql`.
+How loaded: Accessed via `sqlite3.connect()` context manager in `app/database/connection.py`.
+Dependencies: `sqlite3`.
+====================================================================================================
+                                      END OF SOURCE CODE EXPORT
+====================================================================================================

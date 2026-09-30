@@ -1,0 +1,560 @@
+====================================================================================================
+           TALENTSYNC / HIREAI — MASTER SYSTEM AUDIT, PAGES, & FEATURES SPECIFICATION
+====================================================================================================
+Generated: 2026-09-30
+System Version: 2.0 (Phase 1 & Phase 2 Verified Complete)
+Target Environment: Production & Isolated Test Architecture
+Code Integrity: READ-ONLY AUDIT DOCUMENTATION (Zero Code Changes Applied)
+
+====================================================================================================
+TABLE OF CONTENTS
+====================================================================================================
+1. EXECUTIVE SUMMARY & VERIFIED SYSTEM BASELINE
+2. TECHNOLOGY STACK & ARCHITECTURE OVERVIEW
+3. PRODUCTION DATABASE & FILE SYSTEM INVENTORY
+4. MACHINE LEARNING & AI SUBSYSTEM STATUS
+5. DETAILED PAGE-BY-PAGE AUDIT:
+   5.1. PUBLIC PAGES & MARKETING PORTAL
+   5.2. AUTHENTICATION & ACCESS CONTROL SUBSYSTEM
+   5.3. CANDIDATE PORTAL (7 DEDICATED SECTIONS)
+   5.4. HR RECRUITER PORTAL (7 DEDICATED SECTIONS)
+   5.5. CENTRAL PLATFORM ADMINISTRATOR CONTROL PORTAL
+6. COMPREHENSIVE STATUS MATRIX (WORKING vs PARTIALLY WORKING vs NOT WORKING)
+7. API ENDPOINTS CATALOG & AUTHORIZATION MATRIX
+8. SECURITY, RBAC, & DATA INTEGRITY CONTROLS
+9. TEST SUITE & VERIFICATION EVIDENCE SUMMARY
+
+====================================================================================================
+1. EXECUTIVE SUMMARY & VERIFIED SYSTEM BASELINE
+====================================================================================================
+TalentSync (HireAI) is an enterprise-grade AI resume screening, job recommendation, and talent
+acquisition platform. The system operates on a dual-engine recommendation pipeline combining local
+SQL internal jobs with real-time live Adzuna external job market postings, backed by spaCy Named
+Entity Recognition (NER), scikit-learn TF-IDF vectorization, cosine similarity ranking, and
+canonical resume intelligence parsing.
+
+Current Verified Production Baseline:
+----------------------------------------------------------------------------------------------------
+- Pytest Suite:                 502 tests passing (0 failures, 0 errors, 2 standard warnings)
+- Production Database:          talentsync.db (SQLite with WAL-safe connection patterns)
+- Total Registered Users:       2,213
+  * Candidates:                 1,675
+  * HR Recruiters:              537
+  * Platform Administrators:    1 (admin@talentsync.ai, user_id=3003)
+- Internal Job Postings:        109
+- Active Job Applications:      46
+- Stored Resume DB Records:     417
+- Physical Resume Files:        419 (in uploads/resumes/)
+- Resume Inventory SHA-256:     d7fbbd30ce85e009ea858d7fd33db2d4052415a75e1818a24dcb545ab01347d9
+- Active Server Entrypoint:     python run.py (listening on http://127.0.0.1:5000)
+
+====================================================================================================
+2. TECHNOLOGY STACK & ARCHITECTURE OVERVIEW
+====================================================================================================
+Backend:
+- Runtime: Python 3.14+
+- Framework: Flask 3.1+ with Blueprint-driven modular design
+- Security: Werkzeug (scrypt / pbkdf2 password hashing), Flask-Limiter (in-memory rate limiting)
+- Database Layer: SQLite3 with custom connection manager (app/database/connection.py), foreign keys,
+  ROW_NUMBER() window functions, and WAL support
+- Email Provider: Abstracted multi-backend (SMTP / SendGrid / Test Provider)
+
+Frontend:
+- Architecture: Single Page Application (SPA) driven by Vanilla JavaScript and hash routing (Router)
+- HTML/CSS: HTML5 semantic structure, Custom Design Tokens (index.css), FontAwesome 6, Syne & Inter
+  Google Fonts typography, Glassmorphism, and responsive layout
+- State Management: Global window.DB and isolated controller closures (UI, Modal, Toast, Router,
+  PlatformAdminState)
+
+Machine Learning & Parsing:
+- Resume Parsers: python-docx (DOCX), PyPDF2 & pdfplumber (PDF)
+- NLP & Skill Extraction: spaCy custom NER model ('trained_models/spacy_skill_ner') + curated 2,400+
+  canonical skills taxonomy
+- Job Matching: scikit-learn TF-IDF Vectorizer (4,206 vocabulary terms) + Cosine Similarity
+- Clustering: MiniBatchKMeans / KMeans (k=5 candidate clustering)
+- Outlier Detection: IsolationForest (anomaly detection for candidate quality/ATS divergence)
+
+External Integrations:
+- Adzuna Jobs API: Multi-query parallel fetching, role inference, location filtering, client-side
+  caching (5 min TTL), contract hardening, and secure redirection
+
+====================================================================================================
+3. PRODUCTION DATABASE & FILE SYSTEM INVENTORY
+====================================================================================================
+Database Tables in 'talentsync.db':
+1. users:
+   - Primary user table storing candidates, HR recruiters, and administrators.
+   - Fields: id, name, email, password, role ('candidate'|'hr'|'admin'), location, education,
+     skills, ats_score, phone, linkedin, github, summary, is_verified, created_at.
+2. resumes:
+   - Parsed resume metadata, ATS calculations, extracted skills, and full structured JSON.
+   - Fields: id, user_id, original_name, stored_filename, file_path, file_hash, file_size_bytes,
+     mime_type, parsed_text, word_count, ats_score, extracted_skills, structured_json,
+     status, version, uploaded_at.
+3. jobs:
+   - Internal employer job postings.
+   - Fields: id, title, company, description, location, required_skills, min_experience_years,
+     salary_range, job_type, created_at.
+4. applications:
+   - Candidate internal job applications.
+   - Fields: id, user_id, job_id, match_score, status ('Pending'|'Reviewing'|'Shortlisted'|'Rejected'),
+     applied_at.
+5. notifications:
+   - In-app notification and audit log events.
+   - Fields: id, user_id, title, message, type ('info'|'success'|'warning'|'danger'), is_read, created_at.
+6. login_attempts:
+   - Security audit log for brute-force protection and lockout management.
+   - Fields: id, email, ip_address, success, attempt_time.
+7. tokens:
+   - Email verification and password reset tokens.
+   - Fields: id, user_id, token_hash, token_type ('verify'|'reset'), expires_at, used_at.
+
+File Storage:
+- uploads/resumes/: Stores physical resume files on disk (.pdf, .docx).
+- uploads/temp/: Temporary buffer directory for processing uploads.
+
+====================================================================================================
+4. MACHINE LEARNING & AI SUBSYSTEM STATUS
+====================================================================================================
+1. spaCy Skill NER Model:
+   - Location: trained_models/spacy_skill_ner/
+   - Status: WORKING & LOADED
+   - Extracts software engineering, data science, DevOps, and cloud competencies with confidence scores.
+2. TF-IDF Job Recommendation Model:
+   - Location: trained_models/tfidf_recommender/tfidf_vectorizer.pkl
+   - Status: WORKING & LOADED (4,206 terms)
+   - Computes weighted cosine similarity between candidate resume text and job descriptions.
+3. Candidate Quality Analyzer:
+   - Status: WORKING
+   - Evaluates formatting, readability, section coverage, contact completeness, and word count.
+4. Outlier Detector (IsolationForest):
+   - Status: WORKING
+   - Identifies candidate scoring anomalies across ATS and experience metrics.
+5. Candidate Clusterer (K-Means):
+   - Status: WORKING
+   - Partitions talent pool into 5 skill clusters (e.g., Python/Data, Web Development, DevOps, etc.).
+
+====================================================================================================
+5. DETAILED PAGE-BY-PAGE AUDIT
+====================================================================================================
+
+----------------------------------------------------------------------------------------------------
+5.1. PUBLIC PAGES & MARKETING PORTAL
+----------------------------------------------------------------------------------------------------
+A. Landing Page (Home View)
+   - Route: GET /
+   - DOM Element: #view-landing
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Hero section with dynamic headline, gradient CTAs ("Get Started", "Explore Jobs", "Sign In").
+     * Real-time metrics counters and feature highlights.
+     * "How It Works" workflow cards for candidates and recruiters.
+     * System Architecture and technology stack transparency badges.
+     * Testimonial carousel and footer navigation links.
+     * Responsive navigation topbar with role-sensitive buttons.
+
+B. Public Jobs Explorer
+   - Route: GET /api/jobs/search
+   - DOM Element: #landing-jobs-section / modal
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Public search interface allowing unauthenticated users to search internal database jobs.
+     * Supports search filters: keyword (q), location, job_type.
+     * Shows job details, requirements, and tags. Clicking "Apply" prompts user to log in or register.
+
+----------------------------------------------------------------------------------------------------
+5.2. AUTHENTICATION & ACCESS CONTROL SUBSYSTEM
+----------------------------------------------------------------------------------------------------
+A. Candidate Sign In
+   - Route: POST /api/auth/login
+   - DOM Element: #auth-modal (Role Tab: Candidate)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Security: Rate-limited (10/min), password verification via Werkzeug scrypt/pbkdf2, session fixation
+     defense (session.clear() + regeneration), account lockout defense via login_attempts (5 attempts).
+
+B. Candidate Registration
+   - Route: POST /api/auth/register
+   - DOM Element: #auth-modal (Sign Up Tab)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Security: Public registration strictly permits role='candidate' (SEC-01). Privileged roles ('hr',
+     'admin') are rejected with HTTP 403. Auto-sends verification email.
+
+C. HR / Recruiter Sign In
+   - Route: POST /api/auth/login
+   - DOM Element: #auth-modal (Role Tab: HR / Recruiter)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details: Authenticates HR recruiters; grants access to the Recruiter Dashboard and Talent Pool.
+
+D. Platform Administrator Sign In
+   - Route: POST /api/auth/login
+   - DOM Element: #auth-modal (Role Tab: HR / Admin)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details: Authenticates bootstrapped administrator; unlocks Central Administrative Control portal.
+
+E. Password Reset Flow
+   - Routes: POST /api/auth/forgot_password, POST /api/auth/reset_password
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details: Cryptographic token generation, expiration check, password complexity enforcement.
+
+F. Email Verification Flow
+   - Routes: GET /api/auth/verify_email/<token>, POST /api/auth/resend_verification
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details: Unverified users receive HTTP 403 on protected actions; one-click token verification.
+
+----------------------------------------------------------------------------------------------------
+5.3. CANDIDATE PORTAL (7 DEDICATED SECTIONS)
+----------------------------------------------------------------------------------------------------
+Primary Route: GET / (Active Portal: #portal-cand)
+Access Guard: @login_required + candidate role session
+
+A. Candidate Dashboard (#cand-dashboard)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Welcome banner displaying candidate's verified name and profile completeness badge.
+     * KPI Stat Cards: ATS Score, Active Job Applications Count, Recommended Jobs Count, Profile Views.
+     * Recent applications summary table with real-time status badges.
+     * Quick-action buttons to upload resume or explore jobs.
+
+B. Resume Upload & Storage (#cand-upload)
+   - Route: POST /api/upload_resume
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Drag-and-drop file upload zone supporting PDF and DOCX formats (max 5MB).
+     * Strict Magic Byte validation (PDF header %PDF-, DOCX zip signature PK\x03\x04).
+     * Rejects legacy .doc, executables, scripts, and spoofed extensions.
+     * Saves binary to isolated disk path with unique UUID prefix (`res_{user_id}_{uuid}.ext`).
+     * Real-time parsing, spaCy NER skill extraction, and ATS scoring on upload.
+     * Updates candidate profile (users.skills and users.ats_score) automatically.
+
+C. Resume History & Secure Deletion (#upload-list) [NEW - PHASE 2]
+   - Routes: GET /api/resume/my_resumes, DELETE /api/resume/<id>, POST /api/resume/delete/<id>
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Dynamic list of all resumes uploaded by the logged-in candidate with ATS scores and timestamps.
+     * "Preview" button (inline PDF viewer via /api/resume/download/<id>?preview=1).
+     * "Download" button (RFC-compliant attachment download).
+     * "ATS" shortcut button navigating to the ATS analysis view.
+     * "Delete" button with confirmation prompt:
+       - Enforces strict ownership (Candidate A cannot delete Candidate B's resume -> 403).
+       - Removes DB record atomically within transaction.
+       - Safely unlinks physical file from uploads/resumes/ with path traversal jail check.
+       - Recalculates candidate profile ATS score and skills from remaining resumes.
+       - Preserves job application history (applications table untouched).
+       - Records audit notification in notifications table.
+
+D. Resume Intelligence View (#cand-intelligence)
+   - Route: GET /api/resume/my_resumes (hydrated from structured_json)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Renders canonical JSON resume breakdown:
+       - Candidate contact details (phone, email, LinkedIn, GitHub, portfolio).
+       - Extracted experience history with calculated total years.
+       - Education records (degrees, institutions, graduation dates).
+       - Categorized skills breakdown (Programming Languages, Databases, Cloud, Frameworks).
+       - Quality analysis card (readability score, formatting indicators, missing sections).
+
+E. ATS Score & Diagnostic Audit (#cand-ats)
+   - Route: Internal ML scoring engine (compute_ats_score)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Radial score gauge (0-100) with rating badge (Excellent, Good, Fair, Poor).
+     * Weighted scoring breakdown: Skills match (40%), Experience (20%), Education (15%),
+       Contact info (10%), Content length & readability (15%).
+     * Dynamic actionable suggestions to optimize resume for corporate ATS systems.
+
+F. AI Job Recommendations (#cand-recommendations)
+   - Route: POST /api/match_jobs, GET /api/jobs/search
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Real-time hybrid job matching combining Adzuna external postings + TalentSync internal jobs.
+     * Personalization summary pill (e.g. "Personalized for: Python Developer • Docker, SQL • Pune").
+     * Per-user thread-safe recommendation cache (5 min TTL).
+     * Dynamic match score badge (e.g. "85% Match").
+     * Separate Apply flows:
+       - Internal Jobs: Submits record directly to applications table.
+       - External Jobs (Adzuna): Validates safe external URL and triggers redirection flow.
+
+G. Candidate Application Tracker (#cand-applications)
+   - Route: GET /api/user/applications
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Tabular tracker showing all jobs applied for by the candidate.
+     * Columns: Job Title, Company, Applied Date, Match Score, Current Status.
+     * Color-coded status pills: Pending (yellow), Reviewing (blue), Shortlisted (green), Rejected (red).
+
+----------------------------------------------------------------------------------------------------
+5.4. HR RECRUITER PORTAL (7 DEDICATED SECTIONS)
+----------------------------------------------------------------------------------------------------
+Primary Route: GET / (Active Portal: #portal-admin)
+Access Guard: @login_required + @role_required('hr', 'admin')
+
+A. HR Overview & Analytics Dashboard (#admin-overview)
+   - Route: GET /api/admin/stats
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Top-level KPI Cards: Total Applicants, Shortlisted, Reviewing, Pending, Rejected.
+     * Platform KPIs: Total Jobs, Total Registered Candidates, Average ATS Score, Resumes Analyzed.
+     * Top demanded skills chart & acceptance rate percentage.
+     * Applications by role breakdown chart.
+     * ATS score distribution histogram (ranges: 0-20, 21-40, ..., 91-100).
+     * Monthly application timeline trend chart (last 6 months).
+
+B. Global Talent Pool (#admin-talentpool) [ENHANCED - PHASE 2]
+   - Route: GET /api/admin/talent_pool
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Displays all registered candidates across the platform independently of job applications.
+     * Real-time search filter: query (q) matches candidate name, email, skills, and location.
+     * Column view: Candidate Name & Avatar, Degree/Education, Experience Summary, Extracted Skills tags,
+       ATS Score badge, Resume Preview/Download buttons, Application Count, Action button.
+     * Dynamic counter badge showing total matching candidates (1,675 total registered).
+
+C. HR Talent Pool CSV Export [NEW - PHASE 2]
+   - Routes: GET /api/admin/talent_pool/export, GET /api/admin/talent_pool/export_csv
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Exports candidate records directly to RFC-4180 compliant CSV.
+     * Reuses the exact same underlying SQL query and filter parameters as the Talent Pool UI:
+       `?q=keyword&skills=python&location=city&min_ats=75`
+     * Exports full filtered dataset (not truncated by UI pagination).
+     * Formula Injection Defense (CWE-1236): prefixes `=, +, -, @, \t, \r` with single quote `'`.
+     * Strict Sensitive Field Exclusion: Passwords, password hashes, tokens, and session secrets are absent.
+     * Standard UTF-8 with BOM (utf-8-sig) encoding with Content-Disposition attachment.
+     * Accessible by HR and Admin roles; rejected with 401 for unauth and 403 for candidates.
+
+D. Candidate Rankings & Application Screening (#admin-rankings)
+   - Route: GET /api/admin/candidates
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Weighted tripartite AI ranking score: ATS Score (40%) + Skill Overlap (30%) + Cosine Similarity (30%).
+     * Filter applicants by job posting via dropdown selector.
+     * Interactive Action buttons:
+       - "Shortlist": Updates status to 'Shortlisted', sends notification to candidate.
+       - "Reject": Updates status to 'Rejected', sends polite feedback notification.
+       - "View Details": Opens comprehensive candidate modal with resume and intelligence details.
+
+E. Candidate Skill Clustering (#admin-clusters)
+   - Route: GET /api/admin/clusters
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Unsupervised K-Means clustering (k=5) partitioning candidates into domain clusters.
+     * Shows cluster tags, dominant skill sets, candidate count, and average match scores.
+
+F. Outlier & Anomaly Detection (#admin-outliers)
+   - Route: Integrated in /api/admin/candidates (detect_outliers)
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * IsolationForest model flags unusual applicant profiles (e.g. extremely high ATS with zero
+       verifiable skills, or non-traditional background high-performers).
+
+G. Job Posting Management (#admin-jobs)
+   - Routes: POST /api/jobs, GET /api/jobs, DELETE /api/jobs/<id>
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * HR interface to create new corporate job openings.
+     * Input fields: Title, Company, Description, Location, Required Skills, Experience, Salary.
+     * Immediately exposes new jobs to internal candidate recommendations and applications.
+
+----------------------------------------------------------------------------------------------------
+5.5. CENTRAL PLATFORM ADMINISTRATOR CONTROL PORTAL
+----------------------------------------------------------------------------------------------------
+Primary Route: GET / (Active Portal: #portal-platform-admin)
+Access Guard: @login_required + @role_required('admin')
+Created/Hardened in Phase 1 Bootstrap
+
+A. Platform Governance Overview (#platform-admin-overview)
+   - Route: GET /api/platform/stats
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * System-wide metrics: Total Users, Candidates, HR Recruiters, Admins, Jobs, Applications, Resumes.
+     * System Health & Integrity Monitor: Database status, storage engine check, ML ready state.
+
+B. User Governance & Role Management (#platform-admin-users)
+   - Routes: GET /api/platform/users, POST /api/platform/users/<id>/role, POST /api/platform/users/<id>/status
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Global user table with role filtering ('candidate', 'hr', 'admin') and keyword search.
+     * Role Modification Control: Promote/demote user roles securely via server-side RBAC.
+     * Account Deactivation / Activation: Immediate revocation of session and access for deactivated accounts.
+     * Last-Admin Protection Rule: Prevents deactivating or demoting the last remaining administrator.
+     * Self-Demotion Defense: Prevents logged-in admin from accidentally revoking their own admin role.
+
+C. Platform Security & Audit Trail (#platform-admin-audit)
+   - Route: GET /api/platform/audit_logs
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Real-time security events log: login attempts, role changes, deactivations, resume deletions.
+     * Captures IP addresses, timestamps, actor user ID, target ID, and event status.
+
+D. CLI Admin Bootstrap Engine
+   - Command: python -m app.cli create-admin --email <email> --password <pwd> --name <name>
+   - Status: [WORKING - 100% OPERATIONAL]
+   - Details:
+     * Production-safe, idempotent, audit-logged CLI mechanism for provisioning platform administrators.
+     * Enforces minimum 10-character complex passwords and prevents accidental duplication.
+
+====================================================================================================
+6. COMPREHENSIVE STATUS MATRIX (WORKING vs PARTIALLY WORKING vs NOT WORKING)
+====================================================================================================
+
++-------------------------------------------------------------+----------------------+--------------------+
+| Feature / Subsystem                                         | Current Status       | Data Mode          |
++-------------------------------------------------------------+----------------------+--------------------+
+| 1. Landing Page & Marketing UI                              | WORKING (100%)       | Static + Dynamic   |
+| 2. Public Job Search API                                    | WORKING (100%)       | Live Dynamic DB    |
+| 3. Candidate Registration (SEC-01)                          | WORKING (100%)       | Live Dynamic DB    |
+| 4. User Authentication & Login Lockout                      | WORKING (100%)       | Live Dynamic DB    |
+| 5. Email Verification & Cryptographic Tokens                | WORKING (100%)       | Live Dynamic DB    |
+| 6. Password Reset Flow                                      | WORKING (100%)       | Live Dynamic DB    |
+| 7. Candidate Profile & Dashboard                            | WORKING (100%)       | Live Dynamic DB    |
+| 8. Resume Binary Upload & Magic Byte Security               | WORKING (100%)       | Live File System   |
+| 9. spaCy SKILL NER & Taxonomy Extraction                    | WORKING (100%)       | Live ML Inference  |
+| 10. ATS Score Computation & Diagnostic Breakdown            | WORKING (100%)       | Live ML Scoring    |
+| 11. Canonical Resume Intelligence JSON Generation           | WORKING (100%)       | Live Dynamic DB    |
+| 12. Candidate Resume History Display                        | WORKING (100%)       | Live Dynamic DB    |
+| 13. Secure Resume Deletion & File Unlinking (PHASE 2)       | WORKING (100%)       | Live DB + Disk     |
+| 14. Remaining Resume Profile State Sync (PHASE 2)           | WORKING (100%)       | Live Dynamic DB    |
+| 15. Inline PDF Resume Browser Preview                       | WORKING (100%)       | Live File Stream   |
+| 16. Secure Resume Attachment Download                       | WORKING (100%)       | Live File Stream   |
+| 17. Hybrid Job Recommendations (Adzuna + Internal)          | WORKING (100%)       | Live External + DB |
+| 18. Adzuna External Job Apply Redirection                   | WORKING (100%)       | Live External URL  |
+| 19. Internal Job Application Submission                     | WORKING (100%)       | Live Dynamic DB    |
+| 20. Candidate Application Tracker                           | WORKING (100%)       | Live Dynamic DB    |
+| 21. HR Analytics Dashboard & Status KPIs                    | WORKING (100%)       | Live Dynamic DB    |
+| 22. Global HR Talent Pool Table & Search                    | WORKING (100%)       | Live Dynamic DB    |
+| 23. HR Talent Pool Dynamic CSV Export (PHASE 2)             | WORKING (100%)       | Live CSV Stream    |
+| 24. CSV Formula Injection Defense (CWE-1236) (PHASE 2)      | WORKING (100%)       | Active Sanitizer   |
+| 25. HR Applicant Screening (Shortlist / Reject)             | WORKING (100%)       | Live Dynamic DB    |
+| 26. K-Means Candidate Skill Clustering                      | WORKING (100%)       | Live ML Model      |
+| 27. IsolationForest Outlier Detection                       | WORKING (100%)       | Live ML Model      |
+| 28. HR Job Posting Creation & Deletion                      | WORKING (100%)       | Live Dynamic DB    |
+| 29. Platform Admin Overview & System Telemetry              | WORKING (100%)       | Live System Stats  |
+| 30. Platform User Role Governance & Deactivation            | WORKING (100%)       | Live Dynamic DB    |
+| 31. Last-Admin & Self-Demotion Safety Invariants            | WORKING (100%)       | Enforced in DB/API |
+| 32. CLI Admin Bootstrap Engine (PHASE 1)                    | WORKING (100%)       | Production Verified|
+| 33. In-App Notifications & Audit Event Logging              | WORKING (100%)       | Live Dynamic DB    |
+|                                                             |                      |                    |
+| 34. AI Automated Resume Triage / Bulk Auto-Decisioning      | NOT WORKING          | Planned (Phase 3)  |
+| 35. Direct Video Interview Integration                      | NOT WORKING          | Roadmap Future     |
+| 36. Candidate-Recruiter Live Chat WebSockets                | NOT WORKING          | Roadmap Future     |
++-------------------------------------------------------------+----------------------+--------------------+
+
+====================================================================================================
+7. API ENDPOINTS CATALOG & AUTHORIZATION MATRIX
+====================================================================================================
+
+Auth Routes (/api/auth):
+- POST /api/auth/login                  Public (Rate-limited 10/min)  -> Authenticate & set session
+- POST /api/auth/register               Public (Candidate only)       -> Create candidate account
+- POST /api/auth/logout                 Authenticated                 -> Clear session
+- POST /api/auth/forgot_password        Public                        -> Generate password reset token
+- POST /api/auth/reset_password         Public                        -> Reset password with token
+- GET  /api/auth/verify_email/<token>   Public                        -> Verify email address
+- GET  /api/auth/me                     Authenticated                 -> Get current user profile
+
+Candidate Resume & Job Routes (/api):
+- POST   /api/upload_resume             Candidate (@login_required)   -> Upload, parse, score resume
+- GET    /api/resume/my_resumes         Candidate (@login_required)   -> List candidate's resumes
+- GET    /api/resume/download/<id>      Owner / HR / Admin            -> Secure resume download/preview
+- DELETE /api/resume/<id>               Owner / Admin [NEW]           -> Secure delete resume & file
+- POST   /api/resume/delete/<id>        Owner / Admin [NEW]           -> Alternate POST delete endpoint
+- POST   /api/match_jobs                Candidate (@login_required)   -> Hybrid AI job recommendations
+- GET    /api/jobs/search               Public / Authenticated        -> Search job postings
+- POST   /api/jobs/apply                Candidate (@login_required)   -> Apply internal / external job
+- GET    /api/user/applications         Candidate (@login_required)   -> Get candidate applied jobs
+
+HR / Recruiter Routes (/api/admin):
+- GET /api/admin/stats                  HR / Admin (@login_required)  -> Dashboard KPI & chart metrics
+- GET /api/admin/candidates             HR / Admin (@login_required)  -> Screen applicants with ML rank
+- GET /api/admin/talent_pool            HR / Admin [ENHANCED]         -> Filterable global candidate pool
+- GET /api/admin/talent_pool/export     HR / Admin [NEW]              -> Download filtered talent pool CSV
+- GET /api/admin/clusters               HR / Admin (@login_required)  -> Candidate skill clusters
+- POST /api/admin/shortlist/<id>        HR / Admin (@login_required)  -> Shortlist applicant
+- POST /api/admin/reject/<id>           HR / Admin (@login_required)  -> Reject applicant
+
+Platform Admin Routes (/api/platform):
+- GET  /api/platform/stats              Admin (@role_required('admin'))-> System-wide metrics
+- GET  /api/platform/users              Admin (@role_required('admin'))-> Paginated user management table
+- POST /api/platform/users/<id>/role    Admin (@role_required('admin'))-> Change user role (RBAC)
+- POST /api/platform/users/<id>/status  Admin (@role_required('admin'))-> Deactivate / activate user
+
+Health & Telemetry (/api/health):
+- GET /api/health                       Public                        -> Database, ML & redis health
+
+====================================================================================================
+8. SECURITY, RBAC, & DATA INTEGRITY CONTROLS
+====================================================================================================
+1. IDOR & Ownership Verification:
+   - In resume deletion and downloads, the user ID in the session is strictly compared to the resume's
+     recorded owner ID (`resume['user_id'] == current_user_id`).
+   - Cross-candidate tampering returns HTTP 403 Forbidden.
+2. Path Traversal & Disk Jail:
+   - File operations canonicalize paths via `os.path.realpath`.
+   - Any path escaping the designated upload directory or containing `..`, `/`, `\` is rejected with
+     HTTP 400 Bad Request.
+3. CSV Formula Injection Defense (CWE-1236):
+   - Cells beginning with spreadsheet formula triggers (`=, +, -, @, \t, \r`) are automatically escaped
+     with a leading `'` before CSV emission.
+4. Production Data Immutability:
+   - Unit and integration tests run under `TestingConfig`, directing DB writes to an isolated temporary
+     database (`talentsync_test.db`) and isolated upload folder in the OS temp directory.
+   - Production business data is never modified by automated test suites.
+5. Referential & History Integrity:
+   - Deleting a resume updates profile ATS metrics from remaining resumes, but NEVER deletes past
+     job application records in the applications table.
+
+====================================================================================================
+9. TEST SUITE & VERIFICATION EVIDENCE SUMMARY
+====================================================================================================
+Automated Test Suite Results:
+----------------------------------------------------------------------------------------------------
+Command: .venv/Scripts/pytest.exe tests/
+Collected Items: 502
+Results: 502 passed, 0 failures, 0 errors, 2 warnings in ~157.44s
+
+Test Suite Breakdown by Module:
+- tests/test_resume_deletion_talent_pool_csv_p2.py:  29 passed [PHASE 2 VALIDATION]
+- tests/test_admin_bootstrap_p1.py:                  25 passed [PHASE 1 VALIDATION]
+- tests/test_adzuna_client.py:                       11 passed
+- tests/test_adzuna_external_apply_canonical.py:     19 passed
+- tests/test_auth_p0.py:                             14 passed
+- tests/test_education_extractor.py:                 20 passed
+- tests/test_entity_extractor.py:                    17 passed
+- tests/test_experience_extractor.py:                 20 passed
+- tests/test_external_apply_state_isolation.py:      10 passed
+- tests/test_jobs_search_api.py:                      9 passed
+- tests/test_multi_query_personalization.py:         18 passed
+- tests/test_phase1_stability_regression.py:         13 passed
+- tests/test_phase2_resume_intelligence_regression.py: 12 passed
+- tests/test_phase3_jobs_talent_pool_regression.py:  17 passed
+- tests/test_phase4_email_ml_ocr_regression.py:      23 passed
+- tests/test_phase5_production_regression.py:        23 passed
+- tests/test_phase5_test_isolation_regression.py:     3 passed
+- tests/test_phase6_1_security_regression.py:        22 passed
+- tests/test_phase6_2a_live_job_engine_hardening.py: 16 passed
+- tests/test_platform_admin_regression.py:           23 passed
+- tests/test_platform_admin_security_remediation.py: 17 passed
+- tests/test_recommendation.py:                       6 passed
+- tests/test_resume_intelligence_builder.py:         30 passed
+- tests/test_resume_intelligence_foundation_p0.py:   28 passed
+- tests/test_resume_parser.py:                        5 passed
+- tests/test_resume_quality_analyzer.py:             22 passed
+- tests/test_resume_upload_p0.py:                    33 passed
+- tests/test_ri_integration_05_persistence.py:        2 passed
+- tests/test_skill_intelligence.py:                  15 passed
+
+Browser E2E Recordings & Evidence:
+- Talent Pool E2E Video Recording: talent_pool_e2e_1790761924656.webp
+- Talent Pool Filter & Export Screenshots:
+  * talent_pool_export_1790762595755.png
+  * talent_pool_top_export_1790762644673.png
+- Candidate Portal Resume Screenshot:
+  * candidate_resume_uploaded_1790765132710.png
+
+Production Baseline Verification Post-Audit:
+- Users: 2,213 | Jobs: 109 | Applications: 46 | Resumes: 417 | Files: 419
+- Resume Inventory SHA-256: d7fbbd30ce85e009ea858d7fd33db2d4052415a75e1818a24dcb545ab01347d9 (VERIFIED UNCHANGED)
+
+====================================================================================================
+END OF SYSTEM SPECIFICATION AUDIT REPORT
+====================================================================================================

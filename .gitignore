@@ -1,0 +1,74 @@
+# ============================================================
+#  HireAI / TalentSync — Root .gitignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environments
+.venv/
+venv/
+env/
+
+# Environment / Secrets — NEVER COMMIT
+.env
+*.env
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (user resumes — private data)
+uploads/
+AI-Resume-Screening-System/uploads/
+
+# Trained ML models (large binaries — use Git LFS or exclude)
+trained_models/
+AI-Resume-Screening-System/trained_models/
+
+# Jupyter Notebooks checkpoints
+.jupyter/
+*.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+
+# IDE / Editor folders
+.vscode/
+.cursor/
+.idea/
+*.suo
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Pytest cache
+.pytest_cache/
+**/.pytest_cache/
+
+# Logs
+*.log
+logs/
+
+# Backup DB files
+*_backup*.db
+
+# Agent / AI tool config (optional — keep if you want)
+.agents/
+.jetro/
+.refact/
+.windsurfrules
+AGENT.md
+CLAUDE.md
+
+# Scratch files
+scratch/

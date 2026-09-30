@@ -1,0 +1,62 @@
+============================================================
+ TALENTSYNC PHASE 5 — RESUME STORAGE INVENTORY
+ (POST-REMEDIATION VERIFIED PRISTINE STATE)
+============================================================
+Storage Directory: V:\HireAI_Website-main (2)\AI-Resume-Screening-System\uploads\resumes
+Total File Count: 418
+Total Size on Disk: 14353416 bytes
+Inventory Filename Hash (SHA-256): 85150df1a89f35f7c22d47d134b5d1cbd710ac143a5b1cc0661886490bbd7dd4
+------------------------------------------------------------
+FILE MANIFEST (First 50):
+------------------------------------------------------------
+  res_1009_8eae6f5fcc27.docx               : 35519 bytes
+  res_1013_150c9794a2ef.docx               : 35309 bytes
+  res_1016_614d4fe9ad64.docx               : 35309 bytes
+  res_1019_d2c2590d9b57.docx               : 35298 bytes
+  res_1022_b87674ba8400.docx               : 35309 bytes
+  res_1025_da1e39c06fe7.docx               : 35309 bytes
+  res_1031_63ff83308f27.docx               : 35309 bytes
+  res_1032_884cadf9a4c6.docx               : 35304 bytes
+  res_103_19fa9a1e3970.docx                : 35310 bytes
+  res_1052_0b75ce794c3e.docx               : 35310 bytes
+  res_106_02ef88eb013c.docx                : 35310 bytes
+  res_1091_f25843886add.docx               : 35309 bytes
+  res_1094_ad8bd9337924.docx               : 35309 bytes
+  res_1097_2a247a8bcab0.docx               : 35298 bytes
+  res_109_5f151e54877c.docx                : 35298 bytes
+  res_1100_5289d397a467.docx               : 35309 bytes
+  res_1103_913909037dab.docx               : 35309 bytes
+  res_1109_417c09f65712.docx               : 35309 bytes
+  res_1110_57b64af64087.docx               : 35303 bytes
+  res_112_2283251de18a.docx                : 35310 bytes
+  res_112_7886c45609e4.docx                : 35310 bytes
+  res_1130_5fbd1f1fb04d.docx               : 35309 bytes
+  res_1134_28ed9f21747b.docx               : 35519 bytes
+  res_1149_1a8252ba8dcc.docx               : 35310 bytes
+  res_1152_7650fe5cae5c.docx               : 35309 bytes
+  res_1155_3c3451ebe3c3.docx               : 35298 bytes
+  res_1158_918971f4caec.docx               : 35310 bytes
+  res_115_b6cf4863e2e1.docx                : 35309 bytes
+  res_1161_9fe83db9d533.docx               : 35310 bytes
+  res_1167_e5f91084f1b5.docx               : 35310 bytes
+  res_1168_a79594fdab80.docx               : 35303 bytes
+  res_1188_06ac96890e03.docx               : 35309 bytes
+  res_1192_426c28ae3bae.docx               : 35519 bytes
+  res_1193_c6e65a180266.docx               : 35314 bytes
+  res_1194_d7e94643b1be.docx               : 35314 bytes
+  res_1195_895e61dbe5a4.docx               : 35314 bytes
+  res_1207_93334d19b03e.docx               : 35314 bytes
+  res_1211_a5720267ecd3.docx               : 35309 bytes
+  res_1214_4b41ca154ac8.docx               : 35309 bytes
+  res_1217_c8aef333af23.docx               : 35298 bytes
+  res_121_83edb6ddf892.docx                : 35310 bytes
+  res_1220_d9eab10e0f66.docx               : 35309 bytes
+  res_1223_bd44548e3f03.docx               : 35309 bytes
+  res_1229_e2f84141c577.docx               : 35309 bytes
+  res_122_f079a29865f7.docx                : 35303 bytes
+  res_1230_7e5954591eb5.docx               : 35303 bytes
+  res_1250_afe54277a1e8.docx               : 35310 bytes
+  res_1254_0e2d75971db7.docx               : 35519 bytes
+  res_1266_a0815bacc1d6.docx               : 35314 bytes
+  res_1270_43b1d3068909.docx               : 35310 bytes
+  ... [368 more files omitted for brevity] ...

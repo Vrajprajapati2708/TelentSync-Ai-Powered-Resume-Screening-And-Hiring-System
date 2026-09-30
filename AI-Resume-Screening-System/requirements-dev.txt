@@ -1,0 +1,6 @@
+# ============================================================
+#  TalentSync / HireAI — Development & Typing Dependencies
+# ============================================================
+
+-r requirements.txt
+types-reportlab>=4.4.0

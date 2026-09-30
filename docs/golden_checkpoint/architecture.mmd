@@ -1,0 +1,83 @@
+graph TD
+    %% ============================================================
+    %% HIREAI / TALENTSYNC — PHASE 5 PRODUCTION ARCHITECTURE
+    %% ============================================================
+
+    subgraph ClientTier ["Client / External Tier"]
+        Browser["Web Browser (SPA / Vanilla JS / CSS)"]
+        ExternalAPI["External Job Providers (Adzuna / RapidAPI)"]
+    end
+
+    subgraph ContainerRuntime ["Production Container Runtime (Gunicorn / WSGI)"]
+        WSGI["wsgi:app (WSGI Entry Point)"]
+        GunicornMaster["Gunicorn Master (gthread, 120s timeout)"]
+        Worker1["Gunicorn Worker 1 (4 Threads)"]
+        Worker2["Gunicorn Worker 2 (4 Threads)"]
+    end
+
+    subgraph ApplicationLayer ["TalentSync Application Core (Flask Factory)"]
+        AppFactory["create_app() Factory"]
+        Limiter["Flask-Limiter Gateway (KeyPrefix: talentsync_rl)"]
+        HealthProbe["GET /api/health Probe"]
+        AuthBP["Auth Blueprint (/api/auth)"]
+        ResumeBP["Resume Blueprint (/api/resume)"]
+        JobsBP["Jobs Blueprint (/api/jobs)"]
+        AdminBP["Admin Blueprint (/api/admin)"]
+        MLBP["ML Blueprint (/api/ml)"]
+    end
+
+    subgraph StorageLayer ["Persistence & Cache Tier"]
+        RedisStorage[("Redis 7 (Port 6379)<br/>Distributed Rate Limiting<br/>Moving-Window")]
+        PostgresDB[("PostgreSQL 16 (Port 5432)<br/>Production Dual-Engine<br/>Connection Pool min=2 max=5")]
+        SQLiteDev[("SQLite 3 (talentsync.db)<br/>Local Dev & Test Engine<br/>Row Factory = sqlite3.Row")]
+        ResumeFiles["Resume File Storage<br/>(uploads/resumes/)<br/>436 documents / 14.26 MB"]
+    end
+
+    subgraph IntelligenceLayer ["Machine Learning & Parsing Subsystems"]
+        DocParser["Multi-Format Parser (PDF / DOCX / Text)"]
+        OCR["Tesseract OCR Engine (Scanned PDF Fallback)"]
+        TFIDF["TF-IDF Recommendation Engine (4,206 Terms)"]
+        SpaCyNER["spaCy Custom NER (Skill Extraction)"]
+        QualityAnalyzer["Resume Quality & ATS Analyzer"]
+    end
+
+    subgraph UtilityLayer ["Infrastructure & Migration Tools"]
+        MigrationTool["migration.py (SQLite -> PostgreSQL)<br/>Atomic, Idempotent, Non-Destructive"]
+    end
+
+    Browser -->|HTTP Requests| WSGI
+    WSGI --> GunicornMaster
+    GunicornMaster --> Worker1
+    GunicornMaster --> Worker2
+    Worker1 --> AppFactory
+    Worker2 --> AppFactory
+
+    AppFactory --> Limiter
+    AppFactory --> HealthProbe
+    AppFactory --> AuthBP
+    AppFactory --> ResumeBP
+    AppFactory --> JobsBP
+    AppFactory --> AdminBP
+    AppFactory --> MLBP
+
+    Limiter -->|Distributed Bucket Sync| RedisStorage
+    Limiter -.->|Emergency Fallback 3/min| Worker1
+
+    AuthBP -->|Connection Pool| PostgresDB
+    ResumeBP -->|Connection Pool| PostgresDB
+    JobsBP -->|Connection Pool| PostgresDB
+    AdminBP -->|Connection Pool| PostgresDB
+
+    AuthBP -.->|Dev/Testing Mode| SQLiteDev
+    ResumeBP -.->|Dev/Testing Mode| SQLiteDev
+
+    ResumeBP -->|Save Disk Binary| ResumeFiles
+    ResumeBP --> DocParser
+    DocParser -->|Text Extraction| QualityAnalyzer
+    DocParser -.->|Low Text Density| OCR
+    QualityAnalyzer --> SpaCyNER
+    JobsBP --> TFIDF
+    JobsBP --> ExternalAPI
+
+    SQLiteDev -->|Safe Export| MigrationTool
+    MigrationTool -->|Atomic Transaction Load| PostgresDB
