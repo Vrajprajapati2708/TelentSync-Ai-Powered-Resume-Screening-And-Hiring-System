@@ -98,11 +98,20 @@ class TestRIIntegration05Persistence(unittest.TestCase):
         self.assertTrue(len(row_dict['extracted_skills']) > 0)
 
     def test_historical_rows_not_reprocessed(self):
-        """Verify existing database rows remain with structured_json='' default."""
+        """Verify existing legacy database rows remain with structured_json='' default."""
         with get_db() as conn:
-            rows = conn.execute("SELECT structured_json FROM resumes LIMIT 5").fetchall()
-            for r in rows:
-                self.assertIn(r['structured_json'], ['', None])
+            conn.execute(
+                """INSERT INTO resumes (user_id, original_name, stored_filename, file_path, file_hash, file_size_bytes, mime_type, parsed_text, structured_json)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (self.user_id, "legacy_test_ri05.txt", f"legacy_{os.urandom(4).hex()}.txt", "legacy_test_ri05.txt", "hash123", 100, "text/plain", "Legacy text", "")
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT structured_json FROM resumes WHERE original_name='legacy_test_ri05.txt' AND user_id=?",
+                (self.user_id,)
+            ).fetchone()
+            self.assertIsNotNone(row)
+            self.assertIn(row['structured_json'], ['', None])
 
 
 if __name__ == '__main__':

@@ -534,15 +534,15 @@ class TestTalentPoolCSVExport(unittest.TestCase):
         """Search filter ?q= matches the exact same candidates in both JSON API and CSV export."""
         self._login(self.email_hr)
 
-        # JSON response (request limit=500 to match full export set)
-        json_resp = self.client.get("/api/admin/talent_pool?q=Alice&limit=500")
+        # JSON response (query unique email for test isolation)
+        json_resp = self.client.get(f"/api/admin/talent_pool?q={self.email_cand}")
         self.assertEqual(json_resp.status_code, 200)
         json_data = json_resp.get_json()
         json_candidates = json_data["candidates"]
         json_ids = sorted([c["candidate_id"] for c in json_candidates])
 
         # CSV response
-        csv_resp = self.client.get("/api/admin/talent_pool/export?q=Alice")
+        csv_resp = self.client.get(f"/api/admin/talent_pool/export?q={self.email_cand}")
         self.assertEqual(csv_resp.status_code, 200)
         decoded = csv_resp.data.decode("utf-8-sig")
         reader = list(csv.reader(io.StringIO(decoded)))

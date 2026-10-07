@@ -302,6 +302,75 @@ def change_platform_user_role(user_id: int, new_role: str, admin_user_id: int) -
     return True, f"User role successfully updated to '{clean_role}'.", 200
 
 
+def delete_platform_user(user_id: int, admin_user_id: int) -> Tuple[bool, str, int]:
+    """
+    Permanently deletes a user account with cascading cleanup and audit logging.
+    Enforces final-admin and self-deletion protections.
+    Returns (success, message, status_code).
+    """
+    if user_id == admin_user_id:
+        return False, "Administrators cannot delete their own account.", 400
+
+    with get_db() as conn:
+        user = conn.execute("SELECT id, name, email, role, is_verified FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user:
+            return False, "User not found.", 404
+
+        # Final Active Admin Protection
+        if user["role"] == "admin" and user["is_verified"] == 1:
+            active_admin_count = conn.execute(
+                "SELECT COUNT(*) FROM users WHERE role = 'admin' AND is_verified = 1"
+            ).fetchone()[0]
+            if active_admin_count <= 1:
+                return False, "Cannot delete the final active administrator on the platform.", 400
+
+        # 1. Clean up resume files from disk
+        resume_rows = conn.execute("SELECT file_path FROM resumes WHERE user_id = ?", (user_id,)).fetchall()
+        for rr in resume_rows:
+            fpath = rr["file_path"]
+            if fpath and os.path.isfile(fpath):
+                try:
+                    os.remove(fpath)
+                except Exception as e:
+                    logger.warning(f"Failed to remove resume file on user delete: {e}")
+
+        # 2. Cascading DB cleanup
+        conn.execute("DELETE FROM resumes WHERE user_id = ?", (user_id,))
+        conn.execute("DELETE FROM applications WHERE user_id = ?", (user_id,))
+        try:
+            conn.execute("DELETE FROM notifications WHERE user_id = ?", (user_id,))
+        except Exception:
+            pass
+        try:
+            conn.execute("DELETE FROM search_history WHERE user_id = ?", (user_id,))
+        except Exception:
+            pass
+        try:
+            conn.execute("DELETE FROM recommendation_history WHERE user_id = ?", (user_id,))
+        except Exception:
+            pass
+
+        # 3. Record audit log
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'delete_user', ?, '127.0.0.1', datetime('now'))",
+                (admin_user_id, f"Deleted user {user['email']} (ID #{user_id}, role={user['role']})")
+            )
+        except Exception as e:
+            logger.warning(f"Audit log write on delete failed: {e}")
+
+        # 4. Delete user record
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+        if hasattr(conn, "commit"):
+            conn.commit()
+
+    logger.info(f"Platform admin (ID #{admin_user_id}) deleted user_id={user_id}")
+    return True, "User account and associated records deleted successfully.", 200
+
+
 # ── 2. System-Wide Analytics ─────────────────────────────────
 
 def get_platform_analytics() -> Dict[str, Any]:

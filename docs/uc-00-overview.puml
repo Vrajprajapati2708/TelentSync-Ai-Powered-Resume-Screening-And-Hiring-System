@@ -1,0 +1,111 @@
+@startuml
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam roundCorner 10
+
+skinparam nodesep 40
+skinparam ranksep 90
+skinparam linetype polyline
+skinparam padding 6
+
+skinparam rectangle {
+    BorderColor #0E2621
+    BackgroundColor #FFFFFF
+    RoundCorner 12
+}
+
+skinparam usecase {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    ArrowColor #0E2621
+}
+
+skinparam actor {
+    BackgroundColor #E59074
+    BorderColor #0E2621
+}
+
+left to right direction
+
+' Actors
+actor "Candidate\n(Job Seeker)" as Cand
+actor "HR Recruiter\n(Hiring Manager)" as HR
+actor "Platform Admin\n(System Administrator)" as Admin
+
+Cand -[hidden]down-> HR
+HR -[hidden]down-> Admin
+
+rectangle "HireAI (TalentSync) Platform — High-Level Overview" as System {
+    rectangle "== Shared Authentication ==" as Zone_Auth #F1F5F9 {
+        usecase "UC1: Register Account" as UC_Reg
+        usecase "UC2: Login" as UC_Login
+        UC_Reg -[hidden]down-> UC_Login
+    }
+
+    rectangle "== Candidate Workflow ==" as Zone_Cand #ECFDF5 {
+        usecase "UC3: Upload Resume" as UC_Upload
+        usecase "UC4: View Candidate Dashboard" as UC_Dash
+        usecase "UC5: Discover Job Matches" as UC_Match
+        usecase "UC6: Apply for Job" as UC_Apply
+        usecase "UC7: Track Application Status" as UC_Track
+
+        UC_Upload -[hidden]down-> UC_Dash
+        UC_Dash -[hidden]down-> UC_Match
+        UC_Match -[hidden]down-> UC_Apply
+        UC_Apply -[hidden]down-> UC_Track
+    }
+
+    rectangle "== HR Recruiter Workflow ==" as Zone_HR #FFF7ED {
+        usecase "UC8: Post Job Vacancy" as UC_Post
+        usecase "UC9: View Ranked Applicants" as UC_Rank
+        usecase "UC10: Update Application Status" as UC_Status
+        usecase "UC11: View Hiring Analytics" as UC_Analytics
+
+        UC_Post -[hidden]down-> UC_Rank
+        UC_Rank -[hidden]down-> UC_Status
+        UC_Status -[hidden]down-> UC_Analytics
+    }
+
+    rectangle "== Platform Admin Workflow ==" as Zone_Admin #EFF6FF {
+        usecase "UC12: Manage User Accounts" as UC_AdmUsers
+        usecase "UC13: Audit Security & ML Outliers" as UC_AdmSec
+        usecase "UC14: Monitor Platform Health" as UC_Health
+        usecase "UC15: View System Audit Logs" as UC_AuditLogs
+
+        UC_AdmUsers -[hidden]down-> UC_AdmSec
+        UC_AdmSec -[hidden]down-> UC_Health
+        UC_Health -[hidden]down-> UC_AuditLogs
+    }
+}
+
+Zone_Auth -[hidden]down-> Zone_Cand
+Zone_Cand -[hidden]down-> Zone_HR
+Zone_HR -[hidden]down-> Zone_Admin
+
+' Candidate Associations
+Cand --> UC_Reg
+Cand --> UC_Login
+Cand --> UC_Upload
+Cand --> UC_Dash
+Cand --> UC_Match
+Cand --> UC_Apply
+Cand --> UC_Track
+
+' HR Recruiter Associations
+HR --> UC_Reg
+HR --> UC_Login
+HR --> UC_Post
+HR --> UC_Rank
+HR --> UC_Status
+HR --> UC_Analytics
+
+' Platform Admin Associations
+Admin --> UC_Login
+Admin --> UC_AdmUsers
+Admin --> UC_AdmSec
+Admin --> UC_Health
+Admin --> UC_AuditLogs
+
+@enduml

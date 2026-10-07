@@ -56,6 +56,7 @@ def create_app(config=None) -> Flask:
     from app.routes.jobs_routes   import jobs_bp, jobs_v1_bp
     from app.routes.health_routes import health_bp
     from app.routes.platform_admin_routes import platform_admin_bp
+    from app.routes.notification_routes import notification_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(resume_bp)
@@ -66,6 +67,7 @@ def create_app(config=None) -> Flask:
     app.register_blueprint(jobs_v1_bp)
     app.register_blueprint(health_bp)
     app.register_blueprint(platform_admin_bp)
+    app.register_blueprint(notification_bp)
 
     # ── Landing page route
     @app.route('/')
@@ -143,6 +145,16 @@ def _init_db(db_file: str):
         cols_resumes = [row[1] for row in conn.execute("PRAGMA table_info(resumes)").fetchall()]
         if 'structured_json' not in cols_resumes:
             conn.execute("ALTER TABLE resumes ADD COLUMN structured_json TEXT DEFAULT ''")
+
+        cols_notifs = [row[1] for row in conn.execute("PRAGMA table_info(notifications)").fetchall()]
+        if 'action_type' not in cols_notifs:
+            conn.execute("ALTER TABLE notifications ADD COLUMN action_type TEXT DEFAULT 'none'")
+        if 'action_target' not in cols_notifs:
+            conn.execute("ALTER TABLE notifications ADD COLUMN action_target TEXT DEFAULT ''")
+        if 'metadata' not in cols_notifs:
+            conn.execute("ALTER TABLE notifications ADD COLUMN metadata TEXT DEFAULT '{}'")
+        if 'updated_at' not in cols_notifs:
+            conn.execute("ALTER TABLE notifications ADD COLUMN updated_at TEXT")
 
         _seed_demo_data(conn)
         conn.commit()

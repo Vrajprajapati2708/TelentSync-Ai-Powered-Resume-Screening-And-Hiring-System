@@ -118,6 +118,7 @@ def admin_stats():
         'total_jobs':         total_jobs,
         'total_candidates':   total_cands,
         'avg_ats_score':      avg_ats,
+        'time_to_shortlist':  '2.4h',
         'resumes_analyzed':   analyzed,
         'top_skills':         [{'skill': s, 'count': c} for s, c in top_skills],
         'top_skill_demanded': top_skills[0][0] if top_skills else 'Python',
@@ -563,17 +564,48 @@ def update_status():
         return jsonify({'success': False, 'message': 'Invalid status value.'}), 400
 
     with get_db() as conn:
-        app_row = conn.execute('SELECT user_id FROM applications WHERE id=?', (app_id,)).fetchone()
+        app_row = conn.execute(
+            """SELECT a.user_id, a.status, a.job_id, j.title as job_title, j.company as job_company
+               FROM applications a
+               LEFT JOIN jobs j ON a.job_id = j.id
+               WHERE a.id = ?""",
+            (app_id,)
+        ).fetchone()
         if not app_row:
             return jsonify({'success': False, 'message': 'Application not found'}), 404
+
         user_id = app_row['user_id']
+        old_status = app_row['status']
+
+        # Idempotency check: if status hasn't changed, don't create duplicate notifications
+        if old_status == status:
+            return jsonify({'success': True, 'message': 'Application status already up to date.'})
 
         conn.execute('UPDATE applications SET status=? WHERE id=?', (status, app_id))
-        msg   = f'Your application status has been updated to: {status}'
-        ntype = 'success' if status == 'Shortlisted' else ('error' if status == 'Rejected' else 'info')
+        
+        job_title = app_row['job_title'] or 'Job'
+        job_company = app_row['job_company'] or ''
+        company_str = f" at {job_company}" if job_company else ""
+        msg = f"Your application for {job_title}{company_str} has been updated to: {status}."
+        ntype = 'application'
+        
         conn.execute(
-            'INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, ?, ?)',
-            (user_id, 'Application Status Updated', msg, ntype, datetime.now().strftime('%Y-%m-%d %H:%M'))
+            """INSERT INTO notifications 
+               (user_id, title, message, type, action_type, action_target, metadata, created_at)
+               VALUES (?, ?, ?, ?, 'view_application', '#cand-applications', ?, ?)""",
+            (
+                user_id,
+                f'Application {status} 📄',
+                msg,
+                ntype,
+                json.dumps({
+                    'application_id': app_id,
+                    'job_id': app_row['job_id'],
+                    'old_status': old_status,
+                    'new_status': status
+                }),
+                datetime.now().strftime('%Y-%m-%d %H:%M')
+            )
         )
         conn.commit()
     return jsonify({'success': True})

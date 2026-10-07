@@ -82,6 +82,13 @@ def is_sklearn_available() -> bool:
     return bool(_sklearn_available)
 
 
+def clear_tfidf_cache():
+    """Reset cached in-memory vectorizer to force fresh reload from disk."""
+    global _sklearn_vectorizer, _sklearn_available
+    _sklearn_vectorizer = None
+    _sklearn_available  = False
+
+
 
 # ── Pure-Python Fallback (used before training) ───────────────
 class _PurePythonTFIDF:

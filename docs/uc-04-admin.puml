@@ -1,0 +1,74 @@
+@startuml
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam roundCorner 10
+
+skinparam nodesep 40
+skinparam ranksep 90
+skinparam linetype polyline
+skinparam padding 6
+
+skinparam rectangle {
+    BorderColor #0E2621
+    BackgroundColor #FFFFFF
+    RoundCorner 12
+}
+
+skinparam usecase {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    ArrowColor #0E2621
+}
+
+skinparam actor {
+    BackgroundColor #E59074
+    BorderColor #0E2621
+}
+
+left to right direction
+
+actor "Platform Admin\n(System Administrator)" as Admin
+actor "Adzuna Job API\n(Live Jobs)" as Adzuna <<External System>>
+
+rectangle "HireAI (TalentSync) — Platform Admin Subsystem" as System {
+    rectangle "== Platform Admin Flow ==" as Zone_Admin #EFF6FF {
+        ' Column 1: Main Use Cases (Workflow Order)
+        usecase "UC12: Manage User Accounts" as UC_AdmUsers
+        usecase "UC13: Audit Security & ML Outliers" as UC_AdmSec
+        usecase "UC14: Monitor Platform Health" as UC_Health
+        usecase "UC15: View System Audit Logs" as UC_AuditLogs
+
+        UC_AdmUsers -[hidden]down-> UC_AdmSec
+        UC_AdmSec -[hidden]down-> UC_Health
+        UC_Health -[hidden]down-> UC_AuditLogs
+
+        ' Column 2: Sub Use Cases
+        usecase "UC12.1: Deactivate / Ban Malicious User" as UC_Ban
+        usecase "UC13.1: Inspect IsolationForest Flags" as UC_AuditML
+        usecase "UC13.2: Monitor Failed Logins" as UC_Logins
+        usecase "UC14.1: Check External API Health" as UC_APIHealth
+
+        UC_Ban -[hidden]down-> UC_AuditML
+        UC_AuditML -[hidden]down-> UC_Logins
+        UC_Logins -[hidden]down-> UC_APIHealth
+
+        ' Internal Relationships
+        UC_Ban .left.> UC_AdmUsers : <<extend>>\n[on rule violation]
+        UC_AdmSec .right.> UC_AuditML : <<include>>
+        UC_AdmSec .right.> UC_Logins : <<include>>
+        UC_Health .right.> UC_APIHealth : <<include>>
+    }
+}
+
+' Platform Admin Associations
+Admin --> UC_AdmUsers
+Admin --> UC_AdmSec
+Admin --> UC_Health
+Admin --> UC_AuditLogs
+
+' External System Link
+UC_APIHealth -right-> Adzuna
+
+@enduml

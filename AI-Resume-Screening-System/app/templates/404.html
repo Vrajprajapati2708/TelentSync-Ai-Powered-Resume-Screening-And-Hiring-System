@@ -1,0 +1,522 @@
+{# 
+   NOTE FOR FLASK DEVELOPER:
+   The route names below ('index', 'dashboard', 'candidates', 'jobs', 'interviews', 
+   'reports', 'settings', 'help', 'contact', 'privacy', 'login') are standard placeholders. 
+   Rename them in the url_for() calls if your application routes differ.
+#}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <script>try{var t=localStorage.getItem('ts-theme');if(t)document.documentElement.setAttribute('data-theme',t)}catch(e){}</script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow">
+  <title>404 - Page Not Found | TalentSync AI</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+
+  <!-- Existing Site Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  
+  <!-- 404 Custom Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/404.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/404-game.css') }}">
+</head>
+<body class="error-page-body">
+  <!-- Interactive Background Canvas -->
+  <canvas id="particle-canvas" class="particle-canvas" aria-hidden="true"></canvas>
+  <div class="ambient-glow glow-top" aria-hidden="true"></div>
+  <div class="ambient-glow glow-bottom" aria-hidden="true"></div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
+    <svg class="toast-icon" viewBox="0 0 20 20" fill="currentColor" width="18" height="18" aria-hidden="true">
+      <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+    </svg>
+    <span id="toast-message">Link copied to clipboard</span>
+  </div>
+
+  <div class="page-wrapper">
+    <!-- ====================================================================
+         1. TOP NAVIGATION BAR
+         ==================================================================== -->
+    <header class="top-nav" role="banner">
+      <div class="nav-container">
+        <!-- Logo -->
+        <a href="{{ url_for('index') }}" class="brand-logo" aria-label="TalentSync Home">
+          <div class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="28" height="28" fill="none">
+              <rect width="32" height="32" rx="8" fill="url(#logo-grad)"/>
+              <path d="M9 16L14 21L23 11" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle cx="23" cy="11" r="2.5" fill="#14d9c0"/>
+              <defs>
+                <linearGradient id="logo-grad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                  <stop stop-color="#3b6cff"/>
+                  <stop offset="1" stop-color="#14d9c0"/>
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+          <span class="brand-text">Talent<span class="brand-accent">Sync</span></span>
+        </a>
+
+        <!-- Navigation Actions -->
+        <nav class="nav-links" aria-label="Main Navigation">
+          {# Route endpoint placeholders: index, dashboard, login #}
+          <a href="{{ url_for('index') }}" class="nav-link">Home</a>
+          <a href="{{ url_for('dashboard') }}" class="nav-link">Dashboard</a>
+          <a href="{{ url_for('login') }}" class="nav-link nav-btn-signin">Sign in</a>
+          
+          <!-- Theme Toggle Button -->
+          <button id="theme-toggle-btn" class="theme-toggle" type="button" aria-label="Toggle light and dark theme">
+            <svg class="theme-icon sun-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg class="theme-icon moon-icon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- ====================================================================
+         2. MAIN HERO SECTION (TWO COLUMNS)
+         ==================================================================== -->
+    <main class="main-content" role="main">
+      <section class="hero-section" aria-labelledby="hero-heading">
+        <div class="hero-container">
+          
+          <!-- Left Column: Status, Big 404 Radar, Actions -->
+          <div class="hero-col-left">
+            <div class="status-pill">
+              <span class="status-dot" aria-hidden="true"></span>
+              <span class="status-text">Error 404 &bull; Page Not Found</span>
+            </div>
+
+            <!-- Big 404 Display with Radar '0' -->
+            <div class="big-404-wrapper" aria-label="Error code 404">
+              <span class="glitch-digit" aria-hidden="true">4</span>
+              
+              <div class="radar-container" title="Radar searching for missing page">
+                <div class="radar-grid" aria-hidden="true">
+                  <div class="radar-circle circle-1"></div>
+                  <div class="radar-circle circle-2"></div>
+                  <div class="radar-circle circle-3"></div>
+                  <div class="radar-crosshair crosshair-h"></div>
+                  <div class="radar-crosshair crosshair-v"></div>
+                  <div class="radar-sweep"></div>
+                  <div class="radar-blip blip-1"></div>
+                  <div class="radar-blip blip-2"></div>
+                </div>
+                <span class="sr-only">0</span>
+              </div>
+
+              <span class="glitch-digit" aria-hidden="true">4</span>
+            </div>
+
+            <h1 id="hero-heading" class="hero-title">We searched everywhere and couldn't find this page</h1>
+            <p class="hero-subtitle">
+              Our AI talent matching pipeline indexed millions of nodes, but the requested destination has either moved, expired, or never existed in this workspace.
+            </p>
+
+            <!-- URL Chip with Copy Action -->
+            <div class="failed-url-box">
+              <span class="failed-url-label">Requested Path:</span>
+              <code id="failed-url-chip" class="failed-url-chip">/loading...</code>
+              <button id="copy-url-btn" class="btn-copy-chip" type="button" aria-label="Copy requested link to clipboard" title="Copy URL">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                <span>Copy</span>
+              </button>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="hero-cta-group">
+              {# Route endpoint placeholder: index #}
+              <a href="{{ url_for('index') }}" class="btn btn-primary">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                  <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                </svg>
+                <span>Back to home</span>
+              </a>
+
+              <button id="go-back-btn" class="btn btn-ghost" type="button">
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>Go to previous page</span>
+              </button>
+            </div>
+
+            <!-- 15-second Auto-Redirect Ring -->
+            {# Route endpoint placeholder: index #}
+            <div id="redirect-container" class="redirect-banner" data-home="{{ url_for('index') }}" data-timeout="15">
+              <div class="countdown-ring-wrap" aria-hidden="true">
+                <svg class="countdown-svg" width="38" height="38" viewBox="0 0 38 38">
+                  <circle class="ring-bg" cx="19" cy="19" r="16" />
+                  <circle id="countdown-circle" class="ring-progress" cx="19" cy="19" r="16" />
+                </svg>
+                <span id="countdown-number" class="countdown-text">15</span>
+              </div>
+              <div class="redirect-info">
+                <span>Redirecting to home in <strong id="countdown-text-inline">15 seconds</strong>.</span>
+                <button id="cancel-redirect-btn" class="btn-link-stay" type="button">Stay here</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- Right Column: Glass Missing Candidate Card + 3D Tilt + Floating Bubbles -->
+          <div class="hero-col-right">
+            <div class="card-stage" id="card-stage">
+              
+              <!-- Floating Info Bubbles -->
+              <div class="info-bubble bubble-1" aria-hidden="true">
+                <div class="bubble-icon">📡</div>
+                <div class="bubble-content">
+                  <span class="bubble-label">AI Status</span>
+                  <strong class="bubble-val">HTTP 404 Null</strong>
+                </div>
+              </div>
+
+              <div class="info-bubble bubble-2" aria-hidden="true">
+                <div class="bubble-icon">⚡</div>
+                <div class="bubble-content">
+                  <span class="bubble-label">Confidence</span>
+                  <strong class="bubble-val">0.00% Match</strong>
+                </div>
+              </div>
+
+              <div class="info-bubble bubble-3" aria-hidden="true">
+                <div class="bubble-icon">📍</div>
+                <div class="bubble-content">
+                  <span class="bubble-label">Last Seen</span>
+                  <strong class="bubble-val">Unknown Origin</strong>
+                </div>
+              </div>
+
+              <!-- 3D Glass Profile Card -->
+              <article class="missing-card glass-panel" id="tilt-card" aria-label="Missing Candidate Profile Card">
+                
+                <!-- Slamming Stamp Overlay -->
+                <div class="stamp-overlay" aria-hidden="true">
+                  <div class="stamp-box">
+                    <span>NOT FOUND</span>
+                  </div>
+                </div>
+
+                <!-- Card Header -->
+                <div class="card-header">
+                  <div class="avatar-wrapper">
+                    <div class="avatar-placeholder">
+                      <span class="avatar-query">?</span>
+                    </div>
+                    <span class="avatar-badge" title="Status: Offline"></span>
+                  </div>
+                  <div class="card-title-group">
+                    <div class="skeleton-title">Candidate Profile Unavailable</div>
+                    <div class="skeleton-subtitle">Role: Unassigned Route Index</div>
+                  </div>
+                </div>
+
+                <!-- Skeleton Body Lines -->
+                <div class="skeleton-lines" aria-hidden="true">
+                  <div class="sk-line sk-w-85"></div>
+                  <div class="sk-line sk-w-100"></div>
+                  <div class="sk-line sk-w-65"></div>
+                </div>
+
+                <!-- Match Progress Bar -->
+                <div class="match-progress-container">
+                  <div class="progress-label-row">
+                    <span class="progress-title">Match with your request</span>
+                    <span class="progress-score">0%</span>
+                  </div>
+                  <div class="progress-track" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Match score 0 percent">
+                    <div class="progress-fill"></div>
+                  </div>
+                </div>
+
+                <!-- Skill Chips -->
+                <div class="card-chips-section">
+                  <span class="chips-heading">Diagnostic Tags</span>
+                  <div class="chips-grid">
+                    <span class="skill-chip chip-missing">Page</span>
+                    <span class="skill-chip chip-missing">Missing</span>
+                    <span class="skill-chip chip-moved">Moved</span>
+                    <span class="skill-chip chip-typo">Mistyped</span>
+                    <span class="skill-chip chip-retired">Retired</span>
+                  </div>
+                </div>
+
+                <!-- Card Footer Mini Specs -->
+                <div class="card-footer-metrics">
+                  <div class="metric-item">
+                    <span class="m-label">Cluster</span>
+                    <span class="m-val">talent-ai-01</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-label">Scan Latency</span>
+                    <span class="m-val">12ms</span>
+                  </div>
+                  <div class="metric-item">
+                    <span class="m-label">Resolution</span>
+                    <span class="m-val">Unresolved</span>
+                  </div>
+                </div>
+
+              </article>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Mini-Game: Catch the Candidate -->
+      <section class="game-section" aria-labelledby="game-heading">
+        <div class="game-container">
+          <div class="game-panel glass-panel" id="game-panel">
+
+            <!-- Start -->
+            <div class="game-screen" id="game-screen-start">
+              <div class="game-badge">🕹️ 30-second round</div>
+              <h2 id="game-heading" class="game-title">Catch the Candidate</h2>
+              <p class="game-subtitle">Lost? Play a quick round while you decide where to go next.</p>
+              <ul class="game-rules">
+                <li><span aria-hidden="true">🎯</span><span>Tap <strong>verified candidates</strong> for +10. Golden leads give +50 and slow time.</span></li>
+                <li><span aria-hidden="true">⚠️</span><span>Avoid <strong>spam and fake CVs</strong> (-15). Catch 3 in a row for a <strong>x2 combo</strong>.</span></li>
+              </ul>
+              <button id="game-start-btn" class="btn btn-primary" type="button">Start round</button>
+              <p class="game-best-line" id="game-start-best" hidden></p>
+            </div>
+
+            <!-- Play -->
+            <div class="game-screen game-screen-play" id="game-screen-play" hidden>
+              <div class="game-hud">
+                <div class="game-stat" id="game-time-stat"><span class="game-label">Time</span><span class="game-val" id="game-time-val">30s</span></div>
+                <div class="game-stat"><span class="game-label">Score</span><span class="game-val" id="game-score-val">0</span></div>
+                <div class="game-stat"><span class="game-label">Combo</span><span class="game-val game-combo" id="game-combo-val">x1</span><span class="game-sub" id="game-streak-val">0/3</span></div>
+                <div class="game-stat"><span class="game-label">Best</span><span class="game-val" id="game-hud-best">0</span></div>
+                <button id="game-pause-btn" class="game-pause" type="button" aria-label="Pause game">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+                </button>
+              </div>
+              <div class="game-bar"><div class="game-bar-fill" id="game-bar-fill"></div></div>
+              <div class="game-stage">
+                <div class="game-field" id="game-playfield" tabindex="-1" aria-label="Game area. Tap the candidate cards as they float up."></div>
+                <div class="game-overlay" id="game-overlay" hidden>
+                  <div class="game-overlay-big" id="game-overlay-big">3</div>
+                  <button id="game-resume-btn" class="btn btn-primary btn-sm" type="button" hidden>Resume</button>
+                  <p class="game-overlay-sub" id="game-overlay-sub" hidden>or press Esc</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Over -->
+            <div class="game-screen" id="game-screen-over" hidden>
+              <div class="game-trophy" aria-hidden="true">🏆</div>
+              <h2 class="game-title">Round finished</h2>
+              <p class="game-rank" id="game-rank"></p>
+              <div class="game-new-best" id="game-new-best" hidden>New personal best</div>
+              <div class="game-summary">
+                <div class="game-card-sum"><span class="game-label">Final score</span><span class="game-big" id="game-final-score">0</span></div>
+                <div class="game-card-sum"><span class="game-label">Best score</span><span class="game-big game-big-best" id="game-best-score">0</span></div>
+              </div>
+              <div class="game-actions">
+                <button id="game-restart-btn" class="btn btn-primary" type="button">Play again</button>
+                <a href="{{ url_for('index') }}" class="btn btn-ghost">Back to home</a>
+              </div>
+            </div>
+
+            <p class="sr-only" id="game-sr-status" role="status" aria-live="polite"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ====================================================================
+           3. HELP PANEL & SHORTCUT NAVIGATION GRID
+           ==================================================================== -->
+      <section class="help-section" aria-labelledby="help-heading">
+        <div class="help-container">
+          
+          <div class="help-header-block">
+            <h2 id="help-heading" class="help-title">Jump to where you meant to go</h2>
+            <p class="help-desc">Select a core TalentSync destination below or filter shortcuts instantly.</p>
+          </div>
+
+          <!-- Live Filter Bar -->
+          <div class="filter-bar-wrapper">
+            <div class="filter-input-box">
+              <svg class="filter-search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input 
+                type="search" 
+                id="shortcut-filter-input" 
+                class="filter-input" 
+                placeholder="Filter destinations (press '/' to focus, 'Enter' to open, 'Esc' to clear)..."
+                aria-label="Filter quick navigation destinations"
+                autocomplete="off"
+                spellcheck="false"
+              />
+              <kbd class="filter-kbd" title="Press / on keyboard to focus">/</kbd>
+            </div>
+          </div>
+
+          <!-- 3-Column Shortcut Grid -->
+          {# Route endpoint placeholders: dashboard, candidates, jobs, interviews, reports, settings #}
+          <div class="shortcuts-grid" id="shortcuts-grid" role="list">
+            
+            <!-- Dashboard Card -->
+            <a href="{{ url_for('dashboard') }}" class="shortcut-card" role="listitem" data-keywords="dashboard analytics metrics overview stats hiring home insights">
+              <div class="shortcut-icon icon-dash" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="7" height="9"></rect>
+                  <rect x="14" y="3" width="7" height="5"></rect>
+                  <rect x="14" y="12" width="7" height="9"></rect>
+                  <rect x="3" y="16" width="7" height="5"></rect>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Dashboard</h3>
+                <p class="shortcut-desc">Access hiring pipeline analytics, active candidate volume, and real-time metrics.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+            <!-- Candidates Card -->
+            <a href="{{ url_for('candidates') }}" class="shortcut-card" role="listitem" data-keywords="candidates resumes screening applicants talent pool search profiles rank">
+              <div class="shortcut-icon icon-candidates" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Candidates</h3>
+                <p class="shortcut-desc">Search, filter, and review AI-parsed resume profiles across open pipelines.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+            <!-- Jobs Card -->
+            <a href="{{ url_for('jobs') }}" class="shortcut-card" role="listitem" data-keywords="jobs requisitions openings postings vacancies roles hiring specs">
+              <div class="shortcut-icon icon-jobs" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Job Openings</h3>
+                <p class="shortcut-desc">Manage job descriptions, recruitment pipelines, and AI scoring criteria.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+            <!-- Interviews Card -->
+            <a href="{{ url_for('interviews') }}" class="shortcut-card" role="listitem" data-keywords="interviews schedule calendar meetings assessments feedback bot questions">
+              <div class="shortcut-icon icon-interviews" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Interviews</h3>
+                <p class="shortcut-desc">Review automated interview schedules, feedback transcripts, and scores.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+            <!-- Reports Card -->
+            <a href="{{ url_for('reports') }}" class="shortcut-card" role="listitem" data-keywords="reports analytics exports compliance hiring diversity audit export performance">
+              <div class="shortcut-icon icon-reports" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="18" y1="20" x2="18" y2="10"></line>
+                  <line x1="12" y1="20" x2="12" y2="4"></line>
+                  <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Reports &amp; BI</h3>
+                <p class="shortcut-desc">Generate compliance audits, diversity analytics, and hiring funnel exports.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+            <!-- Settings Card -->
+            <a href="{{ url_for('settings') }}" class="shortcut-card" role="listitem" data-keywords="settings configuration preferences team members api keys billing integrations account">
+              <div class="shortcut-icon icon-settings" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="3"></circle>
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                </svg>
+              </div>
+              <div class="shortcut-content">
+                <h3 class="shortcut-title">Settings</h3>
+                <p class="shortcut-desc">Configure workspace security, team access, ATS webhooks, and AI models.</p>
+              </div>
+              <span class="shortcut-arrow" aria-hidden="true">&rarr;</span>
+            </a>
+
+          </div>
+
+          <!-- Empty State (Hidden by default) -->
+          <div id="shortcuts-empty-state" class="shortcuts-empty-state" hidden>
+            <div class="empty-icon" aria-hidden="true">🔍</div>
+            <p class="empty-title">No matching destinations found</p>
+            <p class="empty-desc">Try searching for keywords like "candidates", "jobs", "analytics", or "settings".</p>
+            <button id="clear-filter-btn" class="btn btn-ghost btn-sm" type="button">Clear search filter</button>
+          </div>
+
+        </div>
+      </section>
+    </main>
+
+    <!-- ====================================================================
+         4. FOOTER SECTION
+         ==================================================================== -->
+    <footer class="footer-section" role="contentinfo">
+      <div class="footer-container">
+        <div class="footer-brand">
+          <span>&copy; <span id="copyright-year">2025</span> TalentSync Inc. All rights reserved.</span>
+        </div>
+        {# Route endpoint placeholders: help, contact, privacy #}
+        <nav class="footer-links" aria-label="Footer Navigation">
+          <a href="{{ url_for('help') }}" class="footer-link">Help Centre</a>
+          <span class="footer-sep" aria-hidden="true">&bull;</span>
+          <a href="{{ url_for('contact') }}" class="footer-link">Contact Support</a>
+          <span class="footer-sep" aria-hidden="true">&bull;</span>
+          <a href="{{ url_for('privacy') }}" class="footer-link">Privacy Policy</a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Deferred 404 Interactivity Script -->
+  <script src="{{ url_for('static', filename='js/404.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/404-game.js') }}" defer></script>
+</body>
+</html>

@@ -268,6 +268,25 @@ const Router = {
   _hashPages: new Set(['cand', 'admin', 'platform-admin', 'landing', 'login', 'register', 'forgot', 'reset', 'verify', 'about', 'blog', 'careers', 'product', 'contact', 'legal']),
 
   go(page) {
+    // Role-based route guard
+    if (DB.currentUser) {
+      if (page === 'platform-admin' && DB.currentUser.role !== 'admin') {
+        Toast.show('Access denied. Platform Admin privileges required.', 'error');
+        const fallback = DB.currentUser.role === 'hr' ? 'admin' : 'cand';
+        return this.go(fallback);
+      }
+      if (page === 'admin' && DB.currentUser.role !== 'hr' && DB.currentUser.role !== 'admin') {
+        Toast.show('Access denied. HR privileges required.', 'error');
+        return this.go('cand');
+      }
+    } else {
+      const publicPages = ['landing', 'login', 'register', 'forgot', 'reset', 'verify', 'about', 'blog', 'careers', 'product', 'contact', 'legal'];
+      if (!publicPages.includes(page)) {
+        Toast.show('Please log in to continue.', 'warning');
+        return this.go('login');
+      }
+    }
+
     document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
     const el = document.getElementById('page-' + page);
     if (el) { el.classList.add('active'); window.scrollTo(0,0); }
@@ -293,12 +312,39 @@ const Router = {
   },
 
   inner(portal, section) {
+    // Role-based inner section guards
+    if (portal === 'cand' && section === 'pipeline') {
+      Toast.show('The AI/ML Pipeline is restricted to Platform Administrators.', 'warning');
+      section = 'dash';
+    }
+    if (portal === 'platform-admin' && (!DB.currentUser || DB.currentUser.role !== 'admin')) {
+      Toast.show('Access denied. Platform Admin privileges required.', 'error');
+      if (DB.currentUser) {
+        this.go(DB.currentUser.role === 'hr' ? 'admin' : 'cand');
+      } else {
+        this.go('login');
+      }
+      return;
+    }
+    if (portal === 'admin' && (!DB.currentUser || (DB.currentUser.role !== 'hr' && DB.currentUser.role !== 'admin'))) {
+      Toast.show('Access denied. HR privileges required.', 'error');
+      if (DB.currentUser) {
+        this.go('cand');
+      } else {
+        this.go('login');
+      }
+      return;
+    }
+
     document.querySelectorAll(`[data-portal="${portal}"]`).forEach(s => s.classList.add('hidden'));
     const el = document.getElementById(`${portal}-${section}`);
     if (el) el.classList.remove('hidden');
     this.innerPages[portal] = section;
     // Also update the hash to include the inner section
     history.replaceState(null, '', '#' + portal + '-' + section);
+    if (portal === 'cand' && section === 'settings') {
+      loadCandidateSettings();
+    }
     if (portal === 'cand' && section === 'dash' && typeof renderDashboardTopJobs === 'function') {
       renderDashboardTopJobs();
     }
@@ -320,6 +366,9 @@ const Router = {
       } else {
         fetchJobsFromServer();
       }
+    }
+    if (portal === 'cand' && section === 'notif' && typeof CandidateNotifCenter !== 'undefined') {
+      CandidateNotifCenter.fetchNotifications();
     }
   }
 };
@@ -652,9 +701,14 @@ const Auth = {
     if(newUserBanner) newUserBanner.classList.toggle('hidden', hasResume);
     if(resumePrompt)  resumePrompt.classList.toggle('hidden', hasResume);
 
-    // --- Init inner pages ---
-    Router.inner('cand', 'dash');
-    Router.inner('admin', 'dash');
+    // --- Init inner pages based on user role ---
+    if (user.role === 'admin') {
+      Router.inner('platform-admin', 'overview');
+    } else if (user.role === 'hr') {
+      Router.inner('admin', 'dash');
+    } else {
+      Router.inner('cand', 'dash');
+    }
   },
 
   setRole(portal, role, el) {
@@ -684,13 +738,22 @@ const Auth = {
           const hash = window.location.hash.replace('#', '');
           const portalPage = user.role === 'admin' ? 'platform-admin' : (user.role === 'hr' ? 'admin' : 'cand');
 
-          if (hash && (hash === portalPage || hash.startsWith(portalPage + '-'))) {
+          if (hash === 'cand-pipeline') {
+            // Block candidate-facing pipeline hash and redirect to candidate dashboard
+            Router.go('cand');
+            Router.inner('cand', 'dash');
+          } else if (hash && (hash === portalPage || hash.startsWith(portalPage + '-'))) {
             Router.go(portalPage);
             const prefix = portalPage + '-';
             if (hash.startsWith(prefix)) {
               const section = hash.substring(prefix.length);
               const sectionEl = document.getElementById(`${portalPage}-${section}`);
-              if (sectionEl) Router.inner(portalPage, section);
+              if (sectionEl) {
+                Router.inner(portalPage, section);
+                if (portalPage === 'platform-admin' && section === 'pipeline') {
+                  loadMLPipelineStatus();
+                }
+              }
             }
           } else {
             Router.go(portalPage);
@@ -2067,6 +2130,32 @@ function saveSettings() {
   Toast.show('Settings saved to device.', 'success');
 }
 
+function saveCandidateSettings(silent = false) {
+  const settings = {
+    email: document.getElementById('cand-set-email')?.checked ?? true,
+    sms: document.getElementById('cand-set-sms')?.checked ?? false,
+    jobAlerts: document.getElementById('cand-set-job-alerts')?.checked ?? true,
+    appStatus: document.getElementById('cand-set-app-status')?.checked ?? true,
+    digest: document.getElementById('cand-set-digest')?.checked ?? true,
+    profileVis: document.getElementById('cand-set-profile-vis')?.checked ?? true,
+    anonScreening: document.getElementById('cand-set-anon-screening')?.checked ?? false,
+    recruiterMsg: document.getElementById('cand-set-recruiter-msg')?.checked ?? true,
+    activeStatus: document.getElementById('cand-set-active-status')?.checked ?? true,
+    tfa: document.getElementById('cand-set-2fa')?.checked ?? false,
+    darkMode: document.getElementById('cand-set-dark-mode')?.checked ?? false,
+    compactCards: document.getElementById('cand-set-compact-cards')?.checked ?? false,
+    highContrast: document.getElementById('cand-set-high-contrast')?.checked ?? false,
+    lang: document.getElementById('cand-set-lang')?.value || 'en',
+    dateFmt: document.getElementById('cand-set-date-fmt')?.value || 'DD/MM/YYYY',
+    currency: document.getElementById('cand-set-currency')?.value || 'INR',
+    timezone: document.getElementById('cand-set-timezone')?.value || 'Asia/Kolkata'
+  };
+  localStorage.setItem('talentsync_cand_settings', JSON.stringify(settings));
+  if (!silent) {
+    Toast.show('Candidate settings saved successfully! ✓', 'success');
+  }
+}
+
 function switchSettingTab(tab, el) {
   document.querySelectorAll('#admin-settings .settings-nav-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
@@ -2075,13 +2164,77 @@ function switchSettingTab(tab, el) {
   if (target) target.classList.remove('hidden');
 }
 
+function switchCandSettingTab(tab, el) {
+  document.querySelectorAll('#cand-settings .settings-nav-item').forEach(i => i.classList.remove('active'));
+  if (el) el.classList.add('active');
+  document.querySelectorAll('#cand-settings .cand-set-tab-pane').forEach(p => p.classList.add('hidden'));
+  const target = document.getElementById('cand-set-tab-' + tab);
+  if (target) target.classList.remove('hidden');
+}
+
+function exportCandidateProfileData() {
+  const profileData = {
+    user: DB.currentUser || { name: 'Candidate User', email: 'candidate@talentsync.ai' },
+    profile: DB.currentProfile || {},
+    appliedJobs: DB.applications || [],
+    settings: JSON.parse(localStorage.getItem('talentsync_cand_settings') || '{}'),
+    exportTimestamp: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(profileData, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `talentsync_candidate_profile_${Date.now()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.show('Candidate profile data exported successfully! 📁', 'success');
+}
+
 function toggleDarkMode(isDark) {
   if (isDark) {
     document.body.classList.add('dark-mode');
   } else {
     document.body.classList.remove('dark-mode');
   }
+  const elAdmin = document.getElementById('set-dark-mode');
+  if (elAdmin) elAdmin.checked = isDark;
+  const elCand = document.getElementById('cand-set-dark-mode');
+  if (elCand) elCand.checked = isDark;
+
   saveSettings();
+  saveCandidateSettings(true);
+}
+
+function loadCandidateSettings() {
+  const saved = localStorage.getItem('talentsync_cand_settings');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      if (s.email !== undefined) { const el = document.getElementById('cand-set-email'); if(el) el.checked = s.email; }
+      if (s.sms !== undefined) { const el = document.getElementById('cand-set-sms'); if(el) el.checked = s.sms; }
+      if (s.jobAlerts !== undefined) { const el = document.getElementById('cand-set-job-alerts'); if(el) el.checked = s.jobAlerts; }
+      if (s.appStatus !== undefined) { const el = document.getElementById('cand-set-app-status'); if(el) el.checked = s.appStatus; }
+      if (s.digest !== undefined) { const el = document.getElementById('cand-set-digest'); if(el) el.checked = s.digest; }
+      if (s.profileVis !== undefined) { const el = document.getElementById('cand-set-profile-vis'); if(el) el.checked = s.profileVis; }
+      if (s.anonScreening !== undefined) { const el = document.getElementById('cand-set-anon-screening'); if(el) el.checked = s.anonScreening; }
+      if (s.recruiterMsg !== undefined) { const el = document.getElementById('cand-set-recruiter-msg'); if(el) el.checked = s.recruiterMsg; }
+      if (s.activeStatus !== undefined) { const el = document.getElementById('cand-set-active-status'); if(el) el.checked = s.activeStatus; }
+      if (s.tfa !== undefined) { const el = document.getElementById('cand-set-2fa'); if(el) el.checked = s.tfa; }
+      if (s.darkMode !== undefined) {
+        const el = document.getElementById('cand-set-dark-mode');
+        if(el) el.checked = s.darkMode;
+        if(s.darkMode) document.body.classList.add('dark-mode');
+      }
+      if (s.compactCards !== undefined) { const el = document.getElementById('cand-set-compact-cards'); if(el) el.checked = s.compactCards; }
+      if (s.highContrast !== undefined) { const el = document.getElementById('cand-set-high-contrast'); if(el) el.checked = s.highContrast; }
+      if (s.lang) { const el = document.getElementById('cand-set-lang'); if(el) el.value = s.lang; }
+      if (s.dateFmt) { const el = document.getElementById('cand-set-date-fmt'); if(el) el.value = s.dateFmt; }
+      if (s.currency) { const el = document.getElementById('cand-set-currency'); if(el) el.value = s.currency; }
+      if (s.timezone) { const el = document.getElementById('cand-set-timezone'); if(el) el.value = s.timezone; }
+    } catch(e){}
+  }
 }
 
 function loadSettings() {
@@ -2103,6 +2256,7 @@ function loadSettings() {
       }
     } catch(e){}
   }
+  loadCandidateSettings();
 }
 // Load on startup
 document.addEventListener('DOMContentLoaded', loadSettings);
@@ -2647,22 +2801,402 @@ function fetchCandidatesFromServer() {
   });
 }
 
-// Pull Notifications
+// ═══════════════════════════════════════════════════════════
+// CANDIDATE NOTIFICATION CENTER (Enterprise Grade)
+// ═══════════════════════════════════════════════════════════
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return '';
+  const cleanStr = String(dateStr).replace(/-/g, '/');
+  const date = new Date(cleanStr);
+  if (isNaN(date.getTime())) return dateStr;
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 60) return 'Just now';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHours = Math.floor(diffMin / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function navigateToNotifAction(targetHash, notifId) {
+  if (notifId && typeof CandidateNotifCenter !== 'undefined') {
+    CandidateNotifCenter.markRead(notifId, null, false);
+  }
+  const cleanTarget = String(targetHash || '').replace('#', '').trim();
+  if (cleanTarget === 'cand-applications' || cleanTarget === 'applications') {
+    Router.inner('cand', 'applications');
+    Sidebar.setActive(document.querySelector('#sb-cand [data-section=applications]'));
+  } else if (cleanTarget === 'cand-jobs' || cleanTarget === 'jobs') {
+    Router.inner('cand', 'jobs');
+    Sidebar.setActive(document.querySelector('#sb-cand [data-section=jobs]'));
+  } else if (cleanTarget === 'cand-ats' || cleanTarget === 'ats') {
+    Router.inner('cand', 'ats');
+    Sidebar.setActive(document.querySelector('#sb-cand [data-section=ats]'));
+  } else if (cleanTarget === 'cand-profile' || cleanTarget === 'profile') {
+    Router.inner('cand', 'profile');
+    Sidebar.setActive(document.querySelector('#sb-cand [data-section=profile]'));
+  } else if (cleanTarget) {
+    Router.go(cleanTarget);
+  }
+}
+
+const CandidateNotifCenter = {
+  state: {
+    category: 'all',
+    search: '',
+    notifications: [],
+    unreadCount: 0,
+    total: 0,
+    loading: false
+  },
+
+  searchDebounceTimer: null,
+
+  fetchNotifications(category, search) {
+    if (category !== undefined) this.state.category = category;
+    if (search !== undefined) this.state.search = search;
+
+    const catParam = encodeURIComponent(this.state.category || 'all');
+    const searchParam = encodeURIComponent(this.state.search || '');
+    this.state.loading = true;
+
+    const container = document.getElementById('cand-notif-list');
+    if (container && this.state.notifications.length === 0) {
+      container.innerHTML = `
+        <div style="padding:44px 20px;text-align:center;color:var(--text-3);font-size:13px;">
+          <i class="fas fa-circle-notch fa-spin" style="font-size:22px;color:var(--primary);margin-bottom:10px;display:block"></i>
+          Loading notifications...
+        </div>`;
+    }
+
+    fetch(`/api/notifications?category=${catParam}&search=${searchParam}`)
+      .then(r => {
+        if (r.status === 401) throw new Error('Unauthenticated');
+        return r.json();
+      })
+      .then(res => {
+        this.state.loading = false;
+        if (!res || !res.success) return;
+
+        this.state.notifications = res.notifications || [];
+        this.state.unreadCount = res.unread_count || 0;
+        this.state.total = res.total || 0;
+
+        // Keep DB.notifications in sync
+        DB.notifications = this.state.notifications.map(n => ({
+          id: n.id,
+          title: n.title,
+          msg: n.message,
+          time: n.created_at,
+          unread: n.is_read === 0
+        }));
+
+        this.render();
+        updateSidebarBadges();
+      })
+      .catch(err => {
+        this.state.loading = false;
+        console.error('Error fetching candidate notifications:', err);
+      });
+  },
+
+  render() {
+    const listEl = document.getElementById('cand-notif-list');
+    if (!listEl) return;
+
+    // Update unread count badge in header
+    const unreadBadge = document.getElementById('cand-notif-unread-badge');
+    if (unreadBadge) {
+      unreadBadge.textContent = `${this.state.unreadCount} Unread`;
+      unreadBadge.className = `badge ${this.state.unreadCount > 0 ? 'badge-primary' : 'badge-gray'}`;
+    }
+
+    const notifs = this.state.notifications;
+
+    if (!notifs || notifs.length === 0) {
+      listEl.innerHTML = this.renderEmptyState();
+      return;
+    }
+
+    listEl.innerHTML = notifs.map(n => this.renderCard(n)).join('');
+  },
+
+  renderEmptyState() {
+    const cat = this.state.category;
+    let title = "You're all caught up!";
+    let desc = "There are no notifications to show right now.";
+    let icon = "fa-bell-slash";
+
+    if (cat === 'unread') {
+      title = "No unread notifications";
+      desc = "You've read all your notifications.";
+      icon = "fa-check-circle";
+    } else if (cat === 'application') {
+      title = "No application updates yet";
+      desc = "We'll notify you whenever your application status changes.";
+      icon = "fa-paper-plane";
+    } else if (cat === 'match') {
+      title = "No new job matches";
+      desc = "Keep your resume updated to receive tailored job recommendations.";
+      icon = "fa-briefcase";
+    } else if (cat === 'view') {
+      title = "No profile views yet";
+      desc = "Recruiter profile views will appear here.";
+      icon = "fa-eye";
+    } else if (cat === 'system') {
+      title = "No system alerts";
+      desc = "Security, upload, and system events will appear here.";
+      icon = "fa-shield-alt";
+    }
+
+    return `
+      <div style="padding:44px 20px;text-align:center;color:var(--text-3);">
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--bg-2);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+          <i class="fas ${icon}" style="font-size:22px;opacity:0.5;color:var(--primary);"></i>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:var(--text-1);margin-bottom:5px;">${title}</div>
+        <p style="max-width:360px;margin:0 auto 16px auto;font-size:13px;line-height:1.5;">${desc}</p>
+        <div style="display:inline-flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+          <button class="btn btn-sm btn-primary" onclick="Router.inner('cand','jobs');Sidebar.setActive(document.querySelector('#sb-cand [data-section=jobs]'))"><i class="fas fa-briefcase"></i> Explore Live Jobs</button>
+          <button class="btn btn-sm btn-outline" onclick="Router.inner('cand','ats');Sidebar.setActive(document.querySelector('#sb-cand [data-section=ats]'))"><i class="fas fa-trophy"></i> Improve ATS Score</button>
+        </div>
+      </div>`;
+  },
+
+  renderCard(n) {
+    const isUnread = (n.is_read === 0 || n.is_read === false || n.unread === true);
+    const typeMeta = this.getTypeMeta(n.type, n.title);
+    const timeFormatted = formatRelativeTime(n.created_at);
+    const actionBtnHtml = this.renderActionBtn(n);
+
+    return `
+      <div class="notif-item ${isUnread ? 'unread' : ''}" id="notif-card-${n.id}">
+        <div class="notif-icon-wrap" style="background:${typeMeta.bg};color:${typeMeta.color}">
+          <i class="fas ${typeMeta.icon}"></i>
+        </div>
+
+        <div class="notif-content">
+          <div class="notif-top">
+            <span class="notif-type-badge" style="background:${typeMeta.badgeBg};color:${typeMeta.badgeColor}">
+              ${typeMeta.label}
+            </span>
+            <div style="display:flex;align-items:center;gap:8px;">
+              ${isUnread ? '<span class="unread-pill" title="Unread"></span>' : ''}
+              <span class="notif-item-time"><i class="far fa-clock"></i> ${timeFormatted}</span>
+            </div>
+          </div>
+
+          <div class="notif-item-title">
+            ${escapeHTML(n.title)}
+          </div>
+          
+          <div class="notif-item-msg">
+            ${escapeHTML(n.message)}
+          </div>
+
+          <div class="notif-footer">
+            <div class="notif-actions-group">
+              ${actionBtnHtml}
+            </div>
+
+            <div style="display:inline-flex;align-items:center;gap:6px;">
+              ${isUnread ? `
+                <button class="notif-icon-btn" title="Mark notification as read" onclick="CandidateNotifCenter.markRead(${n.id}, event)">
+                  <i class="fas fa-check"></i>
+                </button>` : ''}
+              <button class="notif-icon-btn delete-btn" title="Delete notification" onclick="CandidateNotifCenter.delete(${n.id}, event)">
+                <i class="fas fa-trash-alt"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  },
+
+  getTypeMeta(type, title) {
+    const t = String(type || '').toLowerCase();
+    const ttl = String(title || '').toLowerCase();
+
+    if (t === 'application' || ttl.includes('application') || ttl.includes('shortlist') || ttl.includes('interview')) {
+      return {
+        label: 'Application',
+        icon: 'fa-paper-plane',
+        bg: '#eff6ff',
+        color: '#1d4ed8',
+        badgeBg: 'rgba(29,78,216,0.1)',
+        badgeColor: '#1d4ed8'
+      };
+    }
+    if (t === 'match' || ttl.includes('match') || ttl.includes('job') || ttl.includes('recommend')) {
+      return {
+        label: 'Job Match',
+        icon: 'fa-briefcase',
+        bg: '#f0fdf4',
+        color: '#15803d',
+        badgeBg: 'rgba(21,128,61,0.1)',
+        badgeColor: '#15803d'
+      };
+    }
+    if (t === 'view' || t === 'profile_view' || ttl.includes('view') || ttl.includes('recruiter')) {
+      return {
+        label: 'Profile View',
+        icon: 'fa-eye',
+        bg: '#fdf4ff',
+        color: '#7e22ce',
+        badgeBg: 'rgba(126,34,206,0.1)',
+        badgeColor: '#7e22ce'
+      };
+    }
+    if (t === 'security' || ttl.includes('password') || ttl.includes('login') || ttl.includes('security')) {
+      return {
+        label: 'Security',
+        icon: 'fa-shield-alt',
+        bg: '#fff1f2',
+        color: '#be123c',
+        badgeBg: 'rgba(190,18,60,0.1)',
+        badgeColor: '#be123c'
+      };
+    }
+    return {
+      label: 'System',
+      icon: 'fa-bell',
+      bg: '#f8fafc',
+      color: '#475569',
+      badgeBg: 'rgba(71,85,105,0.1)',
+      badgeColor: '#475569'
+    };
+  },
+
+  renderActionBtn(n) {
+    const actType = n.action_type || '';
+    const actTarget = n.action_target || '';
+    const t = String(n.type || '').toLowerCase();
+    const ttl = String(n.title || '').toLowerCase();
+
+    if (actType === 'view_application' || t === 'application' || ttl.includes('application')) {
+      return `<button class="notif-action-btn btn-outline" onclick="navigateToNotifAction('${actTarget || '#cand-applications'}', ${n.id})"><i class="fas fa-external-link-alt"></i> Track Application</button>`;
+    }
+    if (actType === 'view_jobs' || t === 'match' || ttl.includes('job') || ttl.includes('match')) {
+      return `<button class="notif-action-btn btn-outline" onclick="navigateToNotifAction('${actTarget || '#cand-jobs'}', ${n.id})"><i class="fas fa-search"></i> View Matching Jobs</button>`;
+    }
+    if (actType === 'view_ats' || ttl.includes('resume') || ttl.includes('ats')) {
+      return `<button class="notif-action-btn btn-outline" onclick="navigateToNotifAction('${actTarget || '#cand-ats'}', ${n.id})"><i class="fas fa-chart-line"></i> View ATS Breakdown</button>`;
+    }
+    if (actType === 'view_profile' || t === 'view' || ttl.includes('profile')) {
+      return `<button class="notif-action-btn btn-outline" onclick="navigateToNotifAction('${actTarget || '#cand-profile'}', ${n.id})"><i class="fas fa-user-edit"></i> Enhance Profile</button>`;
+    }
+    return '';
+  },
+
+  filter(category, btnEl) {
+    this.state.category = category;
+    if (btnEl) {
+      document.querySelectorAll('#cand-notif-tabs .notif-tab').forEach(t => t.classList.remove('active'));
+      btnEl.classList.add('active');
+    }
+    this.fetchNotifications(category, this.state.search);
+  },
+
+  search(val) {
+    clearTimeout(this.searchDebounceTimer);
+    this.searchDebounceTimer = setTimeout(() => {
+      this.state.search = val.trim();
+      this.fetchNotifications(this.state.category, this.state.search);
+    }, 250);
+  },
+
+  markRead(notifId, event, showToast = true) {
+    if (event) event.stopPropagation();
+
+    fetch(`/api/notifications/${notifId}/read`, { method: 'POST' })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || !res.success) return;
+
+        const item = this.state.notifications.find(x => x.id === notifId);
+        if (item) item.is_read = 1;
+
+        this.state.unreadCount = res.unread_count !== undefined ? res.unread_count : Math.max(0, this.state.unreadCount - 1);
+        this.render();
+        updateSidebarBadges();
+
+        if (showToast) Toast.show('Notification marked as read.', 'info');
+      })
+      .catch(err => console.error('Error marking notification read:', err));
+  },
+
+  delete(notifId, event) {
+    if (event) event.stopPropagation();
+
+    fetch(`/api/notifications/${notifId}`, { method: 'DELETE' })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || !res.success) {
+          Toast.show(res.message || 'Could not delete notification.', 'error');
+          return;
+        }
+
+        this.state.notifications = this.state.notifications.filter(x => x.id !== notifId);
+        this.state.unreadCount = res.unread_count !== undefined ? res.unread_count : this.state.unreadCount;
+        this.render();
+        updateSidebarBadges();
+
+        Toast.show('Notification deleted.', 'info');
+      })
+      .catch(err => console.error('Error deleting notification:', err));
+  },
+
+  markAllRead() {
+    fetch('/api/notifications/read-all', { method: 'POST' })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || !res.success) return;
+
+        this.state.notifications.forEach(n => n.is_read = 1);
+        this.state.unreadCount = 0;
+        this.render();
+        updateSidebarBadges();
+
+        Toast.show('All notifications marked as read.', 'success');
+      })
+      .catch(err => console.error('Error marking all read:', err));
+  },
+
+  clearRead() {
+    fetch('/api/notifications/clear', { method: 'DELETE' })
+      .then(r => r.json())
+      .then(res => {
+        if (!res || !res.success) return;
+
+        // Keep unread (is_read === 0) only
+        this.state.notifications = this.state.notifications.filter(n => n.is_read === 0);
+        this.render();
+        updateSidebarBadges();
+
+        Toast.show(`Cleared ${res.deleted_count || 0} read notifications.`, 'info');
+      })
+      .catch(err => console.error('Error clearing read notifications:', err));
+  }
+};
+
+// Global Bridge Helpers for UI Template
+function filterNotifications(cat, el) { CandidateNotifCenter.filter(cat, el); }
+function handleNotificationSearch(val) { CandidateNotifCenter.search(val); }
+function markAllNotificationsRead() { CandidateNotifCenter.markAllRead(); }
+function clearReadNotifications() { CandidateNotifCenter.clearRead(); }
+function markNotificationRead(id, ev) { CandidateNotifCenter.markRead(id, ev); }
+function deleteNotification(id, ev) { CandidateNotifCenter.delete(id, ev); }
+
+// Global fetch helper
 function fetchNotificationsFromServer(userId) {
-  fetch(`/api/notifications/${userId}`).then(r=>r.json()).then(data=>{
-    DB.notifications = data.map(n => ({
-      id: n.id,
-      title: n.title,
-      msg: n.message,
-      time: n.created_at,
-      icon: n.type === 'success' ? 'fa-check-circle' : (n.type === 'error' ? 'fa-times-circle' : 'fa-bell'),
-      iconBg: n.type === 'success' ? '#dcfce7' : (n.type === 'error' ? '#fee2e2' : '#eff6ff'),
-      iconColor: n.type === 'success' ? '#16a34a' : (n.type === 'error' ? '#dc2626' : '#1e40af'),
-      unread: n.is_read === 0
-    }));
-    UI.renderNotifications(DB.currentUser?.role === 'hr' ? 'admin' : 'cand');
-    updateSidebarBadges();
-  });
+  if (typeof CandidateNotifCenter !== 'undefined') {
+    CandidateNotifCenter.fetchNotifications();
+  }
 }
 
 // Pull ALL live stats and update admin dashboard numbers
@@ -2772,10 +3306,11 @@ function fetchAdminStats() {
     if (avgAtsEl) avgAtsEl.textContent = d.avg_ats_score;
     
     // Bind all analytics stats by ID
-    setEl('stat-analytics-avg-ats',      d.avg_ats_score);
-    setEl('stat-analytics-top-skill',    d.top_skill_demanded || (d.top_skills[0]?.skill || 'Python'));
-    setEl('stat-analytics-accept-rate',  d.acceptance_rate + '%');
-    setEl('stat-analytics-active-jobs',  d.active_jobs);
+    setEl('stat-analytics-avg-ats',        d.avg_ats_score || 0);
+    setEl('stat-analytics-time-shortlist', d.time_to_shortlist || '2.4h');
+    setEl('stat-analytics-top-skill',      d.top_skill_demanded || (d.top_skills && d.top_skills[0]?.skill) || 'Python');
+    setEl('stat-analytics-accept-rate',    (d.acceptance_rate !== undefined ? d.acceptance_rate : 0) + '%');
+    setEl('stat-analytics-active-jobs',    d.active_jobs || 0);
     
     // Job postings header: "X active positions"
     const jobsHeader = document.getElementById('admin-jobs-header-count');
@@ -2933,22 +3468,24 @@ function renderDashboardTopJobs() {
 // Pull live candidate stats for the logged-in user
 function fetchCandidateStats(userId) {
   fetch(`/api/candidate/stats/${userId}`).then(r=>r.json()).then(d=>{
-    const score = d.ats_score || 0;
+    const hasResume = Boolean(d.has_resume);
+    const score = hasResume ? (d.ats_score || 0) : 0;
+    const skillsCount = hasResume ? (d.skills_count || (d.skills ? d.skills.length : 0)) : 0;
+    
     // Stat cards
-    setEl('cand-stat-ats',          score);
-    setEl('cand-stat-skills',       d.skills_count || 0);
-    // Real ML matched jobs count — use cached result count if available, else DB total
-    const realMatchedCount = (_mlJobsCache && _mlJobsCache.length > 0) ? _mlJobsCache.length : (d.job_matches || 0);
+    setEl('cand-stat-ats',          score > 0 ? score : '--');
+    setEl('cand-stat-skills',       skillsCount);
+    // Real ML matched jobs count — only populated when candidate has uploaded resume with skills
+    const realMatchedCount = hasResume ? ((_mlJobsCache && _mlJobsCache.length > 0) ? _mlJobsCache.length : (d.job_matches || 0)) : 0;
     setEl('cand-stat-matches',      realMatchedCount);
     setEl('cand-stat-apps',         d.applications || 0);
-    setEl('cand-analytics-stat-ats', score);
+    setEl('cand-analytics-stat-ats', score > 0 ? score : '--');
     // ATS display in welcome banner + mini donut + dashboard ATS
-    setEl('cand-ats-display', score);
-    setEl('ats-score-big-num', score);
-    setEl('cand-ats-mini-num', score || '--');
+    setEl('cand-ats-display', score > 0 ? score : '--');
+    setEl('ats-score-big-num', score > 0 ? score : '--');
+    setEl('cand-ats-mini-num', score > 0 ? score : '--');
     const svg = document.querySelector('.score-svg');
     if(svg) svg.setAttribute('data-score', score);
-    
 
     // Profile Views — real from DB (0 means no HR has viewed your profile yet)
     const realViews = d.profile_views !== undefined ? d.profile_views : 0;
@@ -2962,16 +3499,25 @@ function fetchCandidateStats(userId) {
 
     // Matched keywords
     const atsMatchedContainer = document.getElementById('ats-matched-keywords');
-    if(atsMatchedContainer && d.skills) {
-      atsMatchedContainer.innerHTML = d.skills.map(s => `<span class="skill-tag skill-match">${s} ✓</span>`).join('');
+    if (atsMatchedContainer) {
+      if (hasResume && d.skills && d.skills.length > 0) {
+        atsMatchedContainer.innerHTML = d.skills.map(s => `<span class="skill-tag skill-match">${s} ✓</span>`).join('');
+      } else {
+        atsMatchedContainer.innerHTML = '<p class="text-muted text-sm" style="color:var(--text-3);padding:6px 0;">No resume uploaded yet. Upload your resume to extract skills.</p>';
+      }
     }
     
     // Missing keywords
     const missingContainer = document.getElementById('cand-missing-keywords');
     const missingCount = document.getElementById('cand-missing-count');
-    if(missingContainer && d.missing_skills) {
-      missingContainer.innerHTML = d.missing_skills.map(s => `<span class="skill-tag skill-missing">${s} ✗</span>`).join('');
-      if(missingCount) missingCount.textContent = `${d.missing_skills.length} Missing`;
+    if (missingContainer) {
+      if (hasResume && d.missing_skills && d.missing_skills.length > 0) {
+        missingContainer.innerHTML = d.missing_skills.map(s => `<span class="skill-tag skill-missing">${s} ✗</span>`).join('');
+        if (missingCount) missingCount.textContent = `${d.missing_skills.length} Missing`;
+      } else {
+        missingContainer.innerHTML = '<p class="text-muted text-sm" style="color:var(--text-3);padding:6px 0;">Upload your resume to see missing keyword recommendations.</p>';
+        if (missingCount) missingCount.textContent = '0 Missing';
+      }
     }
 
     // Top Jobs in Dashboard
@@ -2984,12 +3530,71 @@ function fetchCandidateStats(userId) {
         datasets:[{ data:[score, 100-score], backgroundColor:['#1260cc','#e6edf7'], borderWidth:0, cutout:'78%' }] },
       options:{ responsive:true, plugins:{ legend:{display:false}, tooltip:{enabled:false} }}
     });
-    // Toggle new-user vs returning-user banners
-    const hasResume = score > 0;
-    const newBanner     = document.getElementById('new-user-banner');
-    const returningBanner = document.getElementById('resume-upload-prompt');
-    if(newBanner)       newBanner.classList.toggle('hidden', hasResume);
-    if(returningBanner) returningBanner.classList.toggle('hidden', !hasResume);
+    // Dynamic Weekly Profile Views & Activity Timeline
+    const timelineCanvas = document.getElementById('cand-timeline');
+    if (timelineCanvas) {
+      const dayLabels = (d.day_labels && d.day_labels.length === 7) ? d.day_labels : ['6d ago', '5d ago', '4d ago', '3d ago', '2d ago', 'Yesterday', 'Today'];
+      const dailyViews = (d.views_daily && d.views_daily.length === 7) ? d.views_daily : [0, 0, 0, 0, 0, 0, 0];
+      const dailyApps  = (d.apps_daily && d.apps_daily.length === 7) ? d.apps_daily : [0, 0, 0, 0, 0, 0, 0];
+
+      Charts.create('cand-timeline', {
+        type: 'line',
+        data: {
+          labels: dayLabels,
+          datasets: [
+            {
+              label: 'Profile Views',
+              data: dailyViews,
+              borderColor: '#1260cc',
+              backgroundColor: 'rgba(18,96,204,.12)',
+              borderWidth: 2.5,
+              fill: true,
+              tension: 0.35,
+              pointBackgroundColor: '#1260cc',
+              pointRadius: 4,
+              pointHoverRadius: 6
+            },
+            {
+              label: 'Applications Submitted',
+              data: dailyApps,
+              borderColor: '#00c9a7',
+              backgroundColor: 'rgba(0,201,167,.08)',
+              borderWidth: 2,
+              borderDash: [5, 5],
+              fill: false,
+              tension: 0.35,
+              pointBackgroundColor: '#00c9a7',
+              pointRadius: 3,
+              pointHoverRadius: 5
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { font: { family: 'DM Sans', size: 12 }, padding: 12, usePointStyle: true }
+            },
+            tooltip: {
+              mode: 'index',
+              intersect: false
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0, stepSize: 1, font: { size: 11 } },
+              grid: { color: '#f0f4f9' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { font: { size: 12 } }
+            }
+          }
+        }
+      });
+    }
 
     // Dynamic Candidate Charts
     if (d.market_trends) {
@@ -3492,11 +4097,18 @@ function renderResumeIntelligence(intel, resumeMeta = {}) {
 
 // ── ML Pipeline Status ──────────────────────────────────
 function loadMLPipelineStatus() {
+  if (DB.currentUser && DB.currentUser.role !== 'admin') {
+    console.warn('Unauthorized access to ML Pipeline status');
+    return;
+  }
   const btn = document.getElementById('pipeline-refresh-btn');
   if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...'; }
 
   fetch('/api/ml/status')
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
     .then(data => {
       // Pipeline Status
       const isReady = data.status === 'ready';
@@ -3546,8 +4158,8 @@ function loadMLPipelineStatus() {
 
       // Live jobs count from DB
       fetch('/api/admin/jobs').then(r=>r.json()).then(jobs => {
-        setEl('ml-live-jobs', jobs.length || '--');
-      });
+        setEl('ml-live-jobs', (jobs && jobs.length) || '--');
+      }).catch(() => {});
 
       if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
     })
@@ -3736,6 +4348,10 @@ window.fetchNotificationsFromServer = fetchNotificationsFromServer;
 window.fetchCandidateStats = fetchCandidateStats;
 window.setEl = setEl;
 window.switchSettingTab = switchSettingTab;
+window.switchCandSettingTab = switchCandSettingTab;
+window.saveCandidateSettings = saveCandidateSettings;
+window.loadCandidateSettings = loadCandidateSettings;
+window.exportCandidateProfileData = exportCandidateProfileData;
 window.toggleDarkMode = toggleDarkMode;
 window.toggleMobileMenu = toggleMobileMenu;
 window.closeMobileMenuAndScroll = closeMobileMenuAndScroll;
@@ -4317,6 +4933,28 @@ function fetchPlatformAdminAnalytics() {
     });
 }
 
+function getAuditSeverity(action, sourceTable) {
+  const act = String(action || '').toLowerCase();
+  const src = String(sourceTable || '').toLowerCase();
+
+  // CRITICAL severity (Red)
+  if (act.includes('delete') || act.includes('role') || act.includes('escalat') ||
+      act.includes('deactivat') || act.includes('lockout') || act.includes('destroy') ||
+      act.includes('drop') || act.includes('purge') || act.includes('revoke')) {
+    return '<span class="badge badge-danger" style="font-size:11px;font-weight:700">CRITICAL</span>';
+  }
+
+  // WARNING severity (Amber / Orange)
+  if (act.includes('fail') || act.includes('warn') || act.includes('outlier') ||
+      act.includes('flag') || act.includes('degrad') || act.includes('attempt') ||
+      act.includes('denied') || act.includes('unauthorized') || act.includes('reset')) {
+    return '<span class="badge badge-warning" style="font-size:11px;font-weight:700">WARNING</span>';
+  }
+
+  // INFO severity (Teal)
+  return '<span class="badge badge-teal" style="font-size:11px;font-weight:700">INFO</span>';
+}
+
 function fetchPlatformAdminRecentActivity() {
   const tbody = document.getElementById('pa-dash-activity-tbody');
   fetch('/api/platform-admin/audit?limit=6')
@@ -4325,7 +4963,7 @@ function fetchPlatformAdminRecentActivity() {
       if (!res || !res.success || !tbody) return;
       const events = res.data.events || [];
       if (events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-3)">No system events recorded yet.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-3)">No system events recorded yet.</td></tr>';
         return;
       }
       tbody.innerHTML = events.map(e => {
@@ -4335,9 +4973,11 @@ function fetchPlatformAdminRecentActivity() {
         } else {
           detailsFormatted = escapeHTML(String(e.details || ''));
         }
+        const severityBadge = getAuditSeverity(e.action, e.source_table);
         return `
           <tr>
             <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${e.id}</td>
+            <td>${severityBadge}</td>
             <td><span class="badge badge-primary" style="font-size:11px">${escapeHTML(e.source_table)}</span></td>
             <td style="font-size:12px;color:var(--text-3)">${e.timestamp ? new Date(e.timestamp).toLocaleString() : 'N/A'}</td>
             <td style="font-weight:600;font-size:13px">${escapeHTML(e.actor || 'System')}</td>
@@ -4348,7 +4988,7 @@ function fetchPlatformAdminRecentActivity() {
       }).join('');
     })
     .catch(() => {
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger)">Error loading activity feed.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger)">Error loading activity feed.</td></tr>';
     });
 }
 
@@ -5318,9 +5958,12 @@ function fetchPlatformAdminAudit(page = 1) {
             detailsFormatted = escapeHTML(String(e.details || ''));
           }
 
+          const severityBadge = getAuditSeverity(e.action, e.source_table);
+
           return `
             <tr>
               <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${e.id}</td>
+              <td>${severityBadge}</td>
               <td><span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(e.source_table)}</span></td>
               <td style="font-size:12px;color:var(--text-3)">${e.timestamp ? new Date(e.timestamp).toLocaleString() : 'N/A'}</td>
               <td style="font-weight:600;font-size:13px">${escapeHTML(e.actor || 'System')}</td>
@@ -5333,7 +5976,7 @@ function fetchPlatformAdminAudit(page = 1) {
     })
     .catch(err => {
       console.error('Error fetching audit logs:', err);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger)">Error loading audit records.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger)">Error loading audit records.</td></tr>';
     });
 }
 
@@ -5345,8 +5988,47 @@ function changePlatformAuditPage(delta) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SECTION 6: SYSTEM
+// SECTION 6: SYSTEM & AUTO REFRESH
 // ═══════════════════════════════════════════════════════════
+
+let _paAutoRefreshTimer = null;
+
+function togglePlatformAdminAutoRefresh(enabled) {
+  if (_paAutoRefreshTimer) {
+    clearInterval(_paAutoRefreshTimer);
+    _paAutoRefreshTimer = null;
+  }
+
+  const indicator = document.getElementById('pa-system-live-indicator');
+  if (enabled) {
+    if (indicator) {
+      indicator.innerHTML = '<span style="color:#10b981">● Auto-refresh: <strong>ON (30s)</strong></span>';
+    }
+    _paAutoRefreshTimer = setInterval(() => {
+      const isPlatformAdmin = Router.currentPage === 'platform-admin';
+      if (!isPlatformAdmin) return;
+
+      const activeSub = Router.innerPages['platform-admin'];
+      if (activeSub === 'overview') {
+        fetchPlatformAdminAnalytics();
+        fetchPlatformAdminRecentActivity();
+      } else if (activeSub === 'system') {
+        fetchPlatformAdminSystemHealth();
+        fetchPlatformAdminIntegrations();
+      } else if (activeSub === 'security-audit') {
+        fetchPlatformAdminSecurity();
+      } else if (activeSub === 'pipeline') {
+        loadMLPipelineStatus();
+      }
+    }, 30000);
+    showToast('Platform diagnostic auto-refresh enabled (30s interval).', 'success');
+  } else {
+    if (indicator) {
+      indicator.innerHTML = '<span style="color:var(--text-3)">○ Auto-refresh: <strong>OFF</strong></span>';
+    }
+    showToast('Platform diagnostic auto-refresh paused.', 'info');
+  }
+}
 
 function fetchPlatformAdminSystemHealth() {
   const grid = document.getElementById('pa-system-health-grid');
@@ -5459,9 +6141,84 @@ function fetchPlatformAdminIntegrations() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// SECTION 7: AI/ML PIPELINE CONTROLS
+// ═══════════════════════════════════════════════════════════
+
+function flushMLCache() {
+  if (!confirm('Are you sure you want to flush in-memory ML model caches and recommendation vectors?')) {
+    return;
+  }
+  const btn = document.getElementById('pipeline-flush-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Flushing...'; }
+
+  fetch('/api/ml/cache/flush', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-broom"></i> Flush Cache'; }
+      if (res && res.success) {
+        showToast(res.message || 'ML cache successfully flushed.', 'success');
+        loadMLPipelineStatus();
+      } else {
+        showToast((res && res.message) || 'Failed to flush ML cache.', 'error');
+      }
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-broom"></i> Flush Cache'; }
+      showToast('Network error while flushing ML cache.', 'error');
+    });
+}
+
+function triggerMLTraining() {
+  if (!confirm('Start backend ML pipeline retraining on full corpus? This runs asynchronously on the server.')) {
+    return;
+  }
+  const btn = document.getElementById('pipeline-retrain-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retraining...'; }
+
+  fetch('/api/ml/train', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skip_ner: false })
+  })
+    .then(r => r.json())
+    .then(res => {
+      showToast(res.message || 'Model training task started.', 'info');
+      // Poll progress every 3 seconds until completed
+      const pollTimer = setInterval(() => {
+        fetch('/api/ml/status')
+          .then(r => r.json())
+          .then(data => {
+            if (!data.training_running) {
+              clearInterval(pollTimer);
+              if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
+              if (data.last_training && data.last_training.success) {
+                showToast(`Training complete in ${data.last_training.elapsed_s}s!`, 'success');
+              } else if (data.last_training && data.last_training.error) {
+                showToast(`Training failed: ${data.last_training.error}`, 'error');
+              }
+              loadMLPipelineStatus();
+            }
+          })
+          .catch(() => {
+            clearInterval(pollTimer);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
+          });
+      }, 3000);
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
+      showToast('Failed to trigger ML training.', 'error');
+    });
+}
+
+// ═══════════════════════════════════════════════════════════
 // GLOBAL EXPORTS
 // ═══════════════════════════════════════════════════════════
 window.PlatformAdminState            = PlatformAdminState;
+window.getAuditSeverity              = getAuditSeverity;
 window.switchPaJobsAppsTab           = switchPaJobsAppsTab;
 window.switchPaSecAuditTab           = switchPaSecAuditTab;
 window.switchPaSystemTab             = switchPaSystemTab;
@@ -5500,6 +6257,20 @@ window.fetchPlatformAdminOutliers     = fetchPlatformAdminOutliers;
 window.fetchPlatformAdminAudit       = fetchPlatformAdminAudit;
 window.changePlatformAuditPage       = changePlatformAuditPage;
 
-// Section 6
+// Section 6 & 7
+window.togglePlatformAdminAutoRefresh = togglePlatformAdminAutoRefresh;
 window.fetchPlatformAdminSystemHealth = fetchPlatformAdminSystemHealth;
 window.fetchPlatformAdminIntegrations = fetchPlatformAdminIntegrations;
+window.flushMLCache                  = flushMLCache;
+window.triggerMLTraining             = triggerMLTraining;
+window.loadMLPipelineStatus          = loadMLPipelineStatus;
+
+// Candidate Notification Center
+window.CandidateNotifCenter          = CandidateNotifCenter;
+window.filterNotifications           = filterNotifications;
+window.handleNotificationSearch      = handleNotificationSearch;
+window.markAllNotificationsRead      = markAllNotificationsRead;
+window.clearReadNotifications        = clearReadNotifications;
+window.markNotificationRead          = markNotificationRead;
+window.deleteNotification            = deleteNotification;
+window.navigateToNotifAction         = navigateToNotifAction;

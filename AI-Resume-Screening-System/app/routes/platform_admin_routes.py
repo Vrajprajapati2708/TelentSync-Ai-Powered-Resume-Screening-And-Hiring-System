@@ -13,6 +13,7 @@ from app.controllers.platform_admin_controller import (
     activate_platform_user,
     deactivate_platform_user,
     change_platform_user_role,
+    delete_platform_user,
     get_platform_analytics,
     get_platform_login_attempts,
     get_platform_outliers,
@@ -130,6 +131,23 @@ def change_role(user_id: int):
     if admin_user_id is None:
         return jsonify({'success': False, 'message': 'Unauthorized session.'}), 401
     success, message, status_code = change_platform_user_role(user_id, new_role, int(admin_user_id))
+    return jsonify({'success': success, 'message': message}), status_code
+
+
+@platform_admin_bp.route('/users/<int:user_id>', methods=['DELETE'])
+@login_required
+@role_required('admin')
+@limiter.limit("15 per minute")
+def delete_user(user_id: int):
+    """
+    DELETE /api/platform-admin/users/<user_id>
+    Permanently deletes a user account with cascading cleanup and audit logging.
+    Enforces final-admin and self-deletion safeguards.
+    """
+    admin_user_id = session.get('user_id')
+    if admin_user_id is None:
+        return jsonify({'success': False, 'message': 'Unauthorized session.'}), 401
+    success, message, status_code = delete_platform_user(user_id, int(admin_user_id))
     return jsonify({'success': success, 'message': message}), status_code
 
 
@@ -392,3 +410,99 @@ def system_integrations():
     """
     result = get_platform_integrations()
     return jsonify(result), 200
+
+
+# ── 9. Platform Data Export (JSON / CSV) ─────────────────────
+
+@platform_admin_bp.route('/export', methods=['GET'])
+@login_required
+@role_required('admin')
+@limiter.limit("5 per minute")
+def export_platform_data():
+    """
+    GET /api/platform-admin/export?format=json|csv&type=all|users|jobs|applications|audit
+    Secured platform data export for authorized backup and compliance.
+    """
+    import csv
+    import io
+    import json
+    from flask import Response
+    from app.database.connection import get_db
+
+    export_format = request.args.get('format', 'json').strip().lower()
+    export_type = request.args.get('type', 'all').strip().lower()
+
+    if export_format not in ('json', 'csv'):
+        return jsonify({'success': False, 'message': 'Unsupported export format. Allowed formats: json, csv.'}), 400
+
+    if export_type not in ('all', 'users', 'jobs', 'applications', 'audit'):
+        return jsonify({'success': False, 'message': 'Unsupported export type. Allowed types: all, users, jobs, applications, audit.'}), 400
+
+    # Record export action to audit log
+    admin_id = session.get('user_id')
+    ip_addr = request.remote_addr or '127.0.0.1'
+
+    with get_db() as conn:
+        users = [dict(row) for row in conn.execute("SELECT id, name, email, role, phone, location, ats_score, is_verified, created_at FROM users").fetchall()]
+        jobs = [dict(row) for row in conn.execute("SELECT id, title, company, location, type, salary, status, created_at FROM jobs").fetchall()]
+        applications = [dict(row) for row in conn.execute("SELECT id, user_id, job_id, match_score, status, applied_at FROM applications").fetchall()]
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'export_platform_data', ?, ?, datetime('now'))",
+                (admin_id, f"format={export_format}, type={export_type}", ip_addr)
+            )
+            if hasattr(conn, 'commit'):
+                conn.commit()
+        except Exception:
+            pass
+
+        try:
+            audit = [dict(row) for row in conn.execute("SELECT id, user_id, action, details, ip_address, timestamp FROM audit_logs ORDER BY id DESC LIMIT 500").fetchall()]
+        except Exception:
+            audit = []
+
+    if export_format == 'csv':
+        output = io.StringIO()
+        writer = csv.writer(output)
+        if export_type == 'users':
+            writer.writerow(['ID', 'Name', 'Email', 'Role', 'Phone', 'Location', 'ATS Score', 'Verified', 'Created At'])
+            for u in users:
+                writer.writerow([u.get('id'), u.get('name'), u.get('email'), u.get('role'), u.get('phone'), u.get('location'), u.get('ats_score'), u.get('is_verified'), u.get('created_at')])
+        elif export_type == 'jobs':
+            writer.writerow(['ID', 'Title', 'Company', 'Location', 'Type', 'Salary', 'Status', 'Created At'])
+            for j in jobs:
+                writer.writerow([j.get('id'), j.get('title'), j.get('company'), j.get('location'), j.get('type'), j.get('salary'), j.get('status'), j.get('created_at')])
+        elif export_type == 'applications':
+            writer.writerow(['ID', 'User ID', 'Job ID', 'Match Score', 'Status', 'Applied At'])
+            for a in applications:
+                writer.writerow([a.get('id'), a.get('user_id'), a.get('job_id'), a.get('match_score'), a.get('status'), a.get('applied_at')])
+        else:
+            writer.writerow(['Audit ID', 'User ID', 'Action', 'Details', 'IP Address', 'Timestamp'])
+            for l in audit:
+                writer.writerow([l.get('id'), l.get('user_id'), l.get('action'), l.get('details'), l.get('ip_address'), l.get('timestamp')])
+
+        csv_data = output.getvalue()
+        return Response(
+            csv_data,
+            mimetype='text/csv',
+            headers={'Content-Disposition': f'attachment;filename=talentsync_platform_export_{export_type}.csv'}
+        )
+
+    export_payload = {
+        'success': True,
+        'export_timestamp': request.date or 'now',
+        'data': {
+            'users': users,
+            'jobs': jobs,
+            'applications': applications,
+            'audit_logs': audit
+        }
+    }
+    return Response(
+        json.dumps(export_payload, indent=2, default=str),
+        mimetype='application/json',
+        headers={'Content-Disposition': 'attachment;filename=talentsync_platform_backup.json'}
+    )

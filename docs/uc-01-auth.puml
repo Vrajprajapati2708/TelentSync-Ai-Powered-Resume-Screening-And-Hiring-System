@@ -1,0 +1,69 @@
+@startuml
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam roundCorner 10
+
+skinparam nodesep 40
+skinparam ranksep 90
+skinparam linetype polyline
+skinparam padding 6
+
+skinparam rectangle {
+    BorderColor #0E2621
+    BackgroundColor #FFFFFF
+    RoundCorner 12
+}
+
+skinparam usecase {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    ArrowColor #0E2621
+}
+
+skinparam actor {
+    BackgroundColor #E59074
+    BorderColor #0E2621
+}
+
+left to right direction
+
+' Actors
+actor "Candidate\n(Job Seeker)" as Cand
+actor "HR Recruiter\n(Hiring Manager)" as HR
+actor "Platform Admin\n(System Administrator)" as Admin
+
+Cand -[hidden]down-> HR
+HR -[hidden]down-> Admin
+
+rectangle "HireAI (TalentSync) — Authentication Subsystem" as System {
+    rectangle "== Shared Authentication Flow ==" as Zone_Auth #F1F5F9 {
+        ' Column 1: Main Use Cases
+        usecase "UC1: Register Account" as UC_Reg
+        usecase "UC2: Login" as UC_Login
+        UC_Reg -[hidden]down-> UC_Login
+
+        ' Column 2: Sub Use Cases
+        usecase "UC1.1: Verify Email (OTP)" as UC_Verify
+        usecase "UC2.1: Reset Password" as UC_Reset
+        UC_Verify -[hidden]down-> UC_Reset
+
+        UC_Reg .right.> UC_Verify : <<include>>
+        UC_Reset .left.> UC_Login : <<extend>>\n[on forgotten password]
+    }
+}
+
+actor "Email Service\n(SMTP)" as Email <<External System>>
+
+Cand --> UC_Reg
+Cand --> UC_Login
+
+HR --> UC_Reg
+HR --> UC_Login
+
+Admin --> UC_Login
+
+UC_Verify -right-> Email
+
+@enduml

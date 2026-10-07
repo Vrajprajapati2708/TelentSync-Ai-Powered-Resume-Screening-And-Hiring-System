@@ -208,10 +208,12 @@ def register_user(
 
             # Welcome notification
             conn.execute(
-                "INSERT INTO notifications (user_id, title, message, type, created_at) VALUES (?, ?, ?, ?, ?)",
+                """INSERT INTO notifications 
+                   (user_id, title, message, type, action_type, action_target, metadata, created_at)
+                   VALUES (?, ?, ?, 'system', 'view_profile', '#cand-profile', '{}', ?)""",
                 (user_id, 'Welcome to TalentSync! 🎉',
-                 'Account created. Please verify your email address.',
-                 'info', datetime.now().strftime('%Y-%m-%d %H:%M'))
+                 'Account created. Please verify your email address to get started.',
+                 datetime.now().strftime('%Y-%m-%d %H:%M'))
             )
             conn.commit()
 
@@ -364,6 +366,19 @@ def reset_password_with_token(raw_token: str, new_password: str) -> dict:
         conn.execute("UPDATE users SET password=? WHERE id=?", (hashed_password, user_id))
         # Mark token as used
         conn.execute("UPDATE password_reset_tokens SET is_used=1 WHERE id=?", (token_rec['id'],))
+        
+        # Security notification (safe: no hashes, tokens, or passwords stored)
+        conn.execute(
+            """INSERT INTO notifications 
+               (user_id, title, message, type, action_type, action_target, metadata, created_at)
+               VALUES (?, ?, ?, 'security', 'none', '', '{}', ?)""",
+            (
+                user_id,
+                'Password Reset Successfully 🔒',
+                'Your account password was updated. If you did not make this change, please contact support immediately.',
+                datetime.now().strftime('%Y-%m-%d %H:%M')
+            )
+        )
         conn.commit()
 
     logger.info(f"Password successfully reset for user_id={user_id}")

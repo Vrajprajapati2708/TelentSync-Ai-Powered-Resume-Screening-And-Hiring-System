@@ -87,7 +87,22 @@
         </div>
       </div>
       <div class="hero-image">
-        <img src="static/img/hero_img.png" alt="AI Recruitment Dashboard">
+        <div class="hero-video-container">
+          <div class="hero-video-ambient" aria-hidden="true"></div>
+          <div class="hero-video-frame">
+            <video 
+              class="hero-video" 
+              autoplay 
+              loop 
+              muted 
+              playsinline 
+              preload="metadata">
+              <source src="static/video/hero_video.mp4" type="video/mp4">
+              <source src="static/video/Holographic_resume_scanning_soft…_1080p_20261007000451.mp4" type="video/mp4">
+              <img src="static/img/hero_img.png" alt="TalentSync AI Resume Screening Platform">
+            </video>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -659,7 +674,7 @@
           <span class="sb-badge" id="badge-cand-upload" style="display:none">0</span>
         </div>
         <div class="sb-item" data-section="analysis" onclick="Sidebar.setActive(this);Router.inner('cand','analysis')">
-          <i class="fas fa-file-search"></i> Resume Analysis
+          <i class="fas fa-file-alt"></i> Resume Analysis
         </div>
         <div class="sb-item" data-section="ats" onclick="Sidebar.setActive(this);Router.inner('cand','ats')">
           <i class="fas fa-trophy"></i> ATS Score
@@ -670,9 +685,6 @@
         </div>
         <div class="sb-item" data-section="analytics" onclick="Sidebar.setActive(this);Router.inner('cand','analytics')">
           <i class="fas fa-chart-bar"></i> My Analytics
-        </div>
-        <div class="sb-item" data-section="pipeline" onclick="Sidebar.setActive(this);Router.inner('cand','pipeline');loadMLPipelineStatus()">
-          <i class="fas fa-brain"></i> AI/ML Pipeline
         </div>
         <div class="sb-section-label">Account</div>
         <div class="sb-item" data-section="profile" onclick="Sidebar.setActive(this);Router.inner('cand','profile')">
@@ -1146,163 +1158,6 @@
           </div>
         </div>
 
-        <!-- ── CAND: AI/ML Pipeline ── -->
-        <div id="cand-pipeline" data-portal="cand" class="hidden">
-          <!-- Pipeline Header -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
-            <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">AI/ML Pipeline</div>
-              <div class="text-muted text-sm">Real-time status of all machine learning models powering TalentSync</div>
-            </div>
-            <button class="btn btn-primary" onclick="loadMLPipelineStatus()" id="pipeline-refresh-btn">
-              <i class="fas fa-sync-alt"></i> Refresh Status
-            </button>
-          </div>
-
-          <!-- Pipeline Status Cards -->
-          <div class="stats-grid mb-2">
-            <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Pipeline Status</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-heartbeat" style="color:#16a34a"></i></div></div>
-              <div class="stat-value" id="ml-pipeline-status" style="color:#16a34a">Loading...</div>
-              <div class="stat-change up" id="ml-pipeline-status-sub">checking models...</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">TF-IDF Vocabulary</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-book" style="color:var(--primary)"></i></div></div>
-              <div class="stat-value" id="ml-vocab-size">--</div>
-              <div class="stat-change up">unique terms (unigrams + bigrams)</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Training Corpus</div><div class="stat-icon" style="background:#fdf4ff"><i class="fas fa-database" style="color:#7c3aed"></i></div></div>
-              <div class="stat-value" id="ml-corpus-size">--</div>
-              <div class="stat-change up" id="ml-corpus-detail">documents trained on</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Hit Rate (Top-5)</div><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-bullseye" style="color:#d97706"></i></div></div>
-              <div class="stat-value" id="ml-hit-rate" style="color:#16a34a">--</div>
-              <div class="stat-change up">recommendation accuracy</div>
-            </div>
-          </div>
-
-          <!-- Pipeline Architecture Diagram -->
-          <div class="card mb-2">
-            <div class="card-header"><span class="card-title"><i class="fas fa-project-diagram" style="color:var(--primary);margin-right:8px"></i>Pipeline Architecture — Live Flow</span></div>
-            <div class="card-body" style="padding:24px">
-              <div id="pipeline-flow" style="display:flex;align-items:center;gap:0;overflow-x:auto;padding:16px 0;flex-wrap:wrap;justify-content:center">
-                <!-- Stage 1 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(59,130,246,.3)"><i class="fas fa-file-pdf"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">PDF Upload</div>
-                  <div style="font-size:11px;color:#64748b">Resume Parser</div>
-                </div>
-                <div style="font-size:24px;color:#3b82f6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
-                <!-- Stage 2 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(139,92,246,.3)"><i class="fas fa-broom"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Preprocessing</div>
-                  <div style="font-size:11px;color:#64748b">Clean & Tokenize</div>
-                </div>
-                <div style="font-size:24px;color:#8b5cf6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
-                <!-- Stage 3 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(245,158,11,.3)"><i class="fas fa-tags"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Skill Extraction</div>
-                  <div style="font-size:11px;color:#64748b" id="ml-extraction-method">spaCy NER + Regex</div>
-                </div>
-                <div style="font-size:24px;color:#f59e0b;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
-                <!-- Stage 4 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(16,185,129,.3)"><i class="fas fa-trophy"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">ATS Scoring</div>
-                  <div style="font-size:11px;color:#64748b">Section Heuristic</div>
-                </div>
-                <div style="font-size:24px;color:#10b981;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
-                <!-- Stage 5 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(239,68,68,.3)"><i class="fas fa-brain"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">TF-IDF Matching</div>
-                  <div style="font-size:11px;color:#64748b">Cosine Similarity</div>
-                </div>
-                <div style="font-size:24px;color:#ef4444;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
-                <!-- Stage 6 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(6,182,212,.3)"><i class="fas fa-list-ol"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Job Rankings</div>
-                  <div style="font-size:11px;color:#64748b">Hybrid Score</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Model Details Grid -->
-          <div class="dash-grid">
-            <!-- TF-IDF Recommender Card -->
-            <div class="card">
-              <div class="card-header">
-                <span class="card-title"><i class="fas fa-vector-square" style="color:#3b82f6;margin-right:8px"></i>TF-IDF Recommender Model</span>
-                <span class="badge badge-success" id="ml-tfidf-badge">Loading...</span>
-              </div>
-              <div class="card-body">
-                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
-                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">scikit-learn TfidfVectorizer</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Vocabulary Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-vocab">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">N-gram Range</td><td style="font-weight:600;padding:6px 12px">Unigrams + Bigrams (1, 2)</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Scoring Formula</td><td style="font-weight:600;padding:6px 12px">40% TF-IDF Cosine + 60% Skill Overlap</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Sublinear TF</td><td style="font-weight:600;padding:6px 12px">✅ Enabled (log normalization)</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-1)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit1">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-3)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit3">--</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-5)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit5">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Corpus Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-corpus">--</td></tr>
-                </table>
-              </div>
-            </div>
-
-            <!-- spaCy NER Card -->
-            <div class="card">
-              <div class="card-header">
-                <span class="card-title"><i class="fas fa-tag" style="color:#8b5cf6;margin-right:8px"></i>spaCy NER Skill Extractor</span>
-                <span class="badge badge-success" id="ml-ner-badge">Loading...</span>
-              </div>
-              <div class="card-body">
-                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
-                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">spaCy v3 Named Entity Recognition</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Entity Label</td><td style="font-weight:600;padding:6px 12px">SKILL</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Best F1 Score</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-ner-f1">--</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Training Epochs</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-epochs">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Fallback</td><td style="font-weight:600;padding:6px 12px">Regex boundary matching</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Extraction Method</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-method">--</td></tr>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- Training Dataset Info -->
-          <div class="card mt-2">
-            <div class="card-header">
-              <span class="card-title"><i class="fas fa-layer-group" style="color:#f59e0b;margin-right:8px"></i>Training Dataset</span>
-            </div>
-            <div class="card-body">
-              <div class="stats-grid">
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:var(--primary)" id="ml-dataset-resumes">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Synthetic Resumes</div>
-                </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#8b5cf6" id="ml-dataset-jobs">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Job Descriptions</div>
-                </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#f59e0b" id="ml-dataset-ner">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">NER Training Samples</div>
-                </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#16a34a" id="ml-live-jobs">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Live Jobs in DB</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- ── CAND: Profile ── -->
         <div id="cand-profile" data-portal="cand" class="hidden">
           <div class="profile-hero">
@@ -1425,55 +1280,298 @@
           </div>
         </div>
 
-        <!-- ── CAND: Notifications ── -->
+        <!-- ── CAND: Notifications (Enterprise Notification Center) ── -->
         <div id="cand-notif" data-portal="cand" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Notifications</div>
-            <button class="btn btn-outline btn-sm" onclick="markAllRead('cand')"><i class="fas fa-check-double"></i> Mark All Read</button>
+          <!-- Notification Center Header -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px;">
+            <div>
+              <div style="display:flex;align-items:center;gap:12px;">
+                <h2 style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;margin:0;color:var(--text-1);">Notifications</h2>
+                <span id="cand-notif-unread-badge" class="badge badge-primary" style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;">0 Unread</span>
+              </div>
+              <p style="color:var(--text-3);font-size:13px;margin:4px 0 0 0;">Stay updated on your job applications, profile views, ATS scores, and recruiter messages.</p>
+            </div>
+            
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <button class="btn btn-outline btn-sm" id="cand-notif-btn-mark-all" onclick="markAllNotificationsRead()" title="Mark all notifications as read">
+                <i class="fas fa-check-double"></i> Mark All as Read
+              </button>
+              <button class="btn btn-outline btn-sm" id="cand-notif-btn-clear-read" onclick="clearReadNotifications()" title="Clear read notifications from inbox">
+                <i class="fas fa-trash-alt"></i> Clear Read
+              </button>
+            </div>
           </div>
-          <div class="card"><div id="cand-notif-list" class="notif-list"></div></div>
+
+          <!-- Controls Bar: Category Filters & Search -->
+          <div class="card" style="padding:14px 18px;margin-bottom:18px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;">
+              <!-- Category Tabs -->
+              <div class="notif-tabs" id="cand-notif-tabs">
+                <button class="notif-tab active" data-cat="all" onclick="filterNotifications('all', this)"><i class="fas fa-inbox"></i> All</button>
+                <button class="notif-tab" data-cat="application" onclick="filterNotifications('application', this)"><i class="fas fa-paper-plane"></i> Applications</button>
+                <button class="notif-tab" data-cat="match" onclick="filterNotifications('match', this)"><i class="fas fa-briefcase"></i> Job Matches</button>
+                <button class="notif-tab" data-cat="view" onclick="filterNotifications('view', this)"><i class="fas fa-eye"></i> Profile Views</button>
+                <button class="notif-tab" data-cat="system" onclick="filterNotifications('system', this)"><i class="fas fa-shield-alt"></i> System &amp; Security</button>
+                <button class="notif-tab" data-cat="unread" onclick="filterNotifications('unread', this)"><i class="fas fa-envelope-open-text"></i> Unread Only</button>
+              </div>
+
+              <!-- Search Input -->
+              <div style="position:relative;min-width:220px;max-width:300px;flex:1;">
+                <i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:13px;"></i>
+                <input type="text" id="cand-notif-search" class="form-control form-control-sm" placeholder="Search notifications..." style="padding-left:34px;" oninput="handleNotificationSearch(this.value)">
+              </div>
+            </div>
+          </div>
+
+          <!-- Notification Feed Container -->
+          <div class="card" style="padding:0;overflow:hidden;">
+            <div id="cand-notif-list" class="notif-list">
+              <!-- Dynamically populated via renderCandidateNotificationCenter() -->
+            </div>
+          </div>
         </div>
 
         <!-- ── CAND: Settings ── -->
         <div id="cand-settings" data-portal="cand" class="hidden">
-          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:22px">Settings</div>
+          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:22px">Candidate Settings</div>
           <div class="settings-layout">
-            <div class="card" style="padding:16px">
+            <div class="card" style="padding:16px; align-self: start;">
               <div class="settings-nav">
-                <div class="settings-nav-item active" onclick="document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')"><i class="fas fa-bell"></i>Notifications</div>
-                <div class="settings-nav-item" onclick="document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')"><i class="fas fa-shield-alt"></i>Privacy</div>
-                <div class="settings-nav-item" onclick="document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')"><i class="fas fa-eye"></i>Appearance</div>
-                <div class="settings-nav-item" onclick="document.querySelectorAll('.settings-nav-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')"><i class="fas fa-language"></i>Language</div>
+                <div class="settings-nav-item active" onclick="switchCandSettingTab('notif', this)"><i class="fas fa-bell"></i>Notifications</div>
+                <div class="settings-nav-item" onclick="switchCandSettingTab('privacy', this)"><i class="fas fa-shield-alt"></i>Privacy &amp; Visibility</div>
+                <div class="settings-nav-item" onclick="switchCandSettingTab('security', this)"><i class="fas fa-lock"></i>Security &amp; Passwords</div>
+                <div class="settings-nav-item" onclick="switchCandSettingTab('appearance', this)"><i class="fas fa-palette"></i>Appearance</div>
+                <div class="settings-nav-item" onclick="switchCandSettingTab('language', this)"><i class="fas fa-globe"></i>Language &amp; Region</div>
               </div>
             </div>
+
             <div class="card">
-              <div class="card-header"><span class="card-title">Notification Preferences</span></div>
-              <div class="card-body">
-                <div style="display:flex;flex-direction:column;gap:20px">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div><div style="font-size:14px;font-weight:600">Email Notifications</div><div style="font-size:13px;color:var(--text-3)">Get job matches and updates via email</div></div>
-                    <label class="toggle-switch"><input id="toggle-email" type="checkbox" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
+              <!-- Settings Tab: Notifications -->
+              <div id="cand-set-tab-notif" class="cand-set-tab-pane">
+                <div class="card-header"><span class="card-title">Notification Preferences</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Email Notifications</div>
+                        <div style="font-size:13px;color:var(--text-3)">Get job matches, application updates, and interview invites via email</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-email" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">SMS Alerts</div>
+                        <div style="font-size:13px;color:var(--text-3)">Receive critical recruiter updates &amp; interview reminders via SMS</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-sms" type="checkbox" onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">AI Job Match Alerts</div>
+                        <div style="font-size:13px;color:var(--text-3)">Notify me when newly posted jobs match my skills &gt; 80%</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-job-alerts" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Application Status Alerts</div>
+                        <div style="font-size:13px;color:var(--text-3)">Real-time notifications when HR reviews or shortlists your resume</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-app-status" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Weekly TalentSync Digest</div>
+                        <div style="font-size:13px;color:var(--text-3)">Curated weekly summary of hiring trends, ATS score tips &amp; profile views</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-digest" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
                   </div>
-                  <hr class="divider" style="margin:0">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div><div style="font-size:14px;font-weight:600">SMS Alerts</div><div style="font-size:13px;color:var(--text-3)">Get important alerts via SMS</div></div>
-                    <label class="toggle-switch"><input id="toggle-sms" type="checkbox" onchange="saveSettings()"><span class="toggle-slider"></span></label>
+                  <div style="margin-top:24px">
+                    <button class="btn btn-primary" onclick="saveCandidateSettings()"><i class="fas fa-save"></i> Save Notification Preferences</button>
                   </div>
-                  <hr class="divider" style="margin:0">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div><div style="font-size:14px;font-weight:600">Job Match Alerts</div><div style="font-size:13px;color:var(--text-3)">Notify me when new jobs match my profile</div></div>
-                    <label class="toggle-switch"><input id="toggle-jobs" type="checkbox" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
-                  </div>
-                  <hr class="divider" style="margin:0">
-                  <div style="display:flex;justify-content:space-between;align-items:center">
-                    <div><div style="font-size:14px;font-weight:600">Profile Visibility</div><div style="font-size:13px;color:var(--text-3)">Allow HR teams to find and view my profile</div></div>
-                    <label class="toggle-switch"><input id="toggle-profile" type="checkbox" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
-                  </div>
-                </div>
-                <div style="margin-top:24px">
-                  <button class="btn btn-primary" onclick="saveSettings()"><i class="fas fa-save"></i> Save All Settings</button>
                 </div>
               </div>
+
+              <!-- Settings Tab: Privacy & Visibility -->
+              <div id="cand-set-tab-privacy" class="cand-set-tab-pane hidden">
+                <div class="card-header"><span class="card-title">Privacy &amp; Visibility</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Public Talent Pool Visibility</div>
+                        <div style="font-size:13px;color:var(--text-3)">Allow verified HR teams and recruiters to discover your resume profile</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-profile-vis" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Anonymous AI Screening</div>
+                        <div style="font-size:13px;color:var(--text-3)">Mask personal identifiers (name, photo, location) during initial AI ranking</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-anon-screening" type="checkbox" onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Direct Recruiter Messages</div>
+                        <div style="font-size:13px;color:var(--text-3)">Permit recruiters to send interview invites directly to your inbox</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-recruiter-msg" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Actively Looking Badge</div>
+                        <div style="font-size:13px;color:var(--text-3)">Show "Open to Work" status indicator to hiring teams</div>
+                      </div>
+                      <label class="toggle-switch"><input id="cand-set-active-status" type="checkbox" checked onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="background:var(--surface-2);border-radius:12px;padding:16px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                      <div>
+                        <div style="font-size:14px;font-weight:600"><i class="fas fa-file-export" style="color:var(--primary);margin-right:8px"></i>Export Profile Data</div>
+                        <div style="font-size:13px;color:var(--text-3)">Download a copy of your parsed resumes, skills, and application logs</div>
+                      </div>
+                      <button class="btn btn-outline btn-sm" onclick="exportCandidateProfileData()"><i class="fas fa-download"></i> Export Data (JSON)</button>
+                    </div>
+                  </div>
+                  <div style="margin-top:24px">
+                    <button class="btn btn-primary" onclick="saveCandidateSettings()"><i class="fas fa-save"></i> Save Privacy Settings</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Tab: Security & Passwords -->
+              <div id="cand-set-tab-security" class="cand-set-tab-pane hidden">
+                <div class="card-header"><span class="card-title">Security &amp; Authentication</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:20px;max-width:480px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Two-Factor Authentication (2FA)</div>
+                        <div style="font-size:13px;color:var(--text-3)">Require one-time verification codes during sensitive logins</div>
+                      </div>
+                      <label class="toggle-switch"><input type="checkbox" id="cand-set-2fa" onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <div style="background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px">
+                      <i class="fas fa-shield-alt" style="font-size:20px;color:var(--success)"></i>
+                      <div>
+                        <div style="font-size:13px;font-weight:700;color:var(--success)">Account Protected</div>
+                        <div style="font-size:12px;color:var(--text-2)">Standard candidate security tier active with encrypted sessions.</div>
+                      </div>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="font-size:15px;font-weight:700;font-family:'Syne',sans-serif">Change Password</div>
+                    <div class="form-group">
+                      <label class="form-label">Current Password</label>
+                      <input id="cand-cur-pwd" class="form-control" type="password" placeholder="••••••••">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">New Password</label>
+                      <input id="cand-new-pwd" class="form-control" type="password" placeholder="Min 10 characters">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Confirm New Password</label>
+                      <input id="cand-conf-pwd" class="form-control" type="password" placeholder="Repeat new password">
+                    </div>
+                    <div>
+                      <button class="btn btn-navy" onclick="changePwd('cand')"><i class="fas fa-key"></i> Update Password</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Tab: Appearance -->
+              <div id="cand-set-tab-appearance" class="cand-set-tab-pane hidden">
+                <div class="card-header"><span class="card-title">Appearance &amp; Display</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:20px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Dark Mode</div>
+                        <div style="font-size:13px;color:var(--text-3)">Switch to sleek high-contrast dark theme</div>
+                      </div>
+                      <label class="toggle-switch"><input type="checkbox" id="cand-set-dark-mode" onchange="toggleDarkMode(this.checked)"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">Compact Job Cards</div>
+                        <div style="font-size:13px;color:var(--text-3)">Fit more job recommendations on screen with streamlined density</div>
+                      </div>
+                      <label class="toggle-switch"><input type="checkbox" id="cand-set-compact-cards" onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div>
+                        <div style="font-size:14px;font-weight:600">High Contrast Highlights</div>
+                        <div style="font-size:13px;color:var(--text-3)">Elevate match badge saturation and border readability</div>
+                      </div>
+                      <label class="toggle-switch"><input type="checkbox" id="cand-set-high-contrast" onchange="saveCandidateSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                  </div>
+                  <div style="margin-top:24px">
+                    <button class="btn btn-primary" onclick="saveCandidateSettings()"><i class="fas fa-save"></i> Save Display Settings</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Tab: Language & Region -->
+              <div id="cand-set-tab-language" class="cand-set-tab-pane hidden">
+                <div class="card-header"><span class="card-title">Language &amp; Regional Preferences</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:18px;max-width:480px">
+                    <div class="form-group">
+                      <label class="form-label">Primary Interface Language</label>
+                      <select id="cand-set-lang" class="form-control" onchange="saveCandidateSettings()">
+                        <option value="en">English (US / UK)</option>
+                        <option value="hi">Hindi (हिन्दी)</option>
+                        <option value="es">Spanish (Español)</option>
+                        <option value="fr">French (Français)</option>
+                        <option value="de">German (Deutsch)</option>
+                        <option value="ja">Japanese (日本語)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Date Format</label>
+                      <select id="cand-set-date-fmt" class="form-control" onchange="saveCandidateSettings()">
+                        <option value="DD/MM/YYYY">DD/MM/YYYY (e.g. 07/10/2026)</option>
+                        <option value="MM/DD/YYYY">MM/DD/YYYY (e.g. 10/07/2026)</option>
+                        <option value="YYYY-MM-DD">YYYY-MM-DD (e.g. 2026-10-07)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Preferred Currency Display</label>
+                      <select id="cand-set-currency" class="form-control" onchange="saveCandidateSettings()">
+                        <option value="INR">INR - Indian Rupee (₹)</option>
+                        <option value="USD">USD - US Dollar ($)</option>
+                        <option value="EUR">EUR - Euro (€)</option>
+                        <option value="GBP">GBP - British Pound (£)</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Timezone</label>
+                      <select id="cand-set-timezone" class="form-control" onchange="saveCandidateSettings()">
+                        <option value="Asia/Kolkata">Asia/Kolkata (IST - UTC+5:30)</option>
+                        <option value="America/New_York">America/New York (EST/EDT)</option>
+                        <option value="Europe/London">Europe/London (GMT/BST)</option>
+                        <option value="UTC">UTC (Coordinated Universal Time)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style="margin-top:24px">
+                    <button class="btn btn-primary" onclick="saveCandidateSettings()"><i class="fas fa-save"></i> Save Regional Preferences</button>
+                  </div>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -1714,10 +1812,26 @@
         <!-- ── ADMIN: Analytics ── -->
         <div id="admin-analytics" data-portal="admin" class="hidden">
           <div class="stats-grid mb-2">
-            <div class="stat-card"><div class="stat-top"><div class="stat-label">Avg ATS Score</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-star" style="color:var(--primary)"></i></div></div><div class="stat-value">72.4</div><div class="stat-change up">↑ +3.2 this month</div></div>
-            <div class="stat-card"><div class="stat-top"><div class="stat-label">Time to Shortlist</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-clock" style="color:#16a34a"></i></div></div><div class="stat-value">2.4h</div><div class="stat-change up">↓ -60% vs manual</div></div>
-            <div class="stat-card"><div class="stat-top"><div class="stat-label">Top Skill Demanded</div><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-code" style="color:#d97706"></i></div></div><div class="stat-value" style="font-size:20px">Python</div><div class="stat-change flat">78% job posts</div></div>
-            <div class="stat-card"><div class="stat-top"><div class="stat-label">Acceptance Rate</div><div class="stat-icon" style="background:#f5f3ff"><i class="fas fa-percentage" style="color:#7c3aed"></i></div></div><div class="stat-value">19%</div><div class="stat-change up">↑ +2% this month</div></div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Avg ATS Score</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-star" style="color:var(--primary)"></i></div></div>
+              <div class="stat-value" id="stat-analytics-avg-ats">--</div>
+              <div class="stat-change up"><i class="fas fa-arrow-up"></i> Live calculated</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Time to Shortlist</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-clock" style="color:#16a34a"></i></div></div>
+              <div class="stat-value" id="stat-analytics-time-shortlist">2.4h</div>
+              <div class="stat-change up"><i class="fas fa-arrow-down"></i> -60% vs manual screening</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Top Skill Demanded</div><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-code" style="color:#d97706"></i></div></div>
+              <div class="stat-value" id="stat-analytics-top-skill" style="font-size:20px">--</div>
+              <div class="stat-change flat">From candidate resumes</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Acceptance Rate</div><div class="stat-icon" style="background:#f5f3ff"><i class="fas fa-percentage" style="color:#7c3aed"></i></div></div>
+              <div class="stat-value" id="stat-analytics-accept-rate">--</div>
+              <div class="stat-change up"><i class="fas fa-check-circle"></i> Shortlisted ratio</div>
+            </div>
           </div>
           <div class="charts-grid">
             <div class="card"><div class="card-header"><span class="card-title">ATS Score Distribution</span></div><div class="card-body"><canvas id="admin-ats-dist"></canvas></div></div>
@@ -2047,6 +2161,9 @@
         <div class="sb-item" data-section="resumes" onclick="Sidebar.setActive(this);Router.inner('platform-admin','resumes');fetchPlatformAdminResumes(1)">
           <i class="fas fa-file-alt"></i> Resumes
         </div>
+        <div class="sb-item" data-section="pipeline" onclick="Sidebar.setActive(this);Router.inner('platform-admin','pipeline');loadMLPipelineStatus()">
+          <i class="fas fa-brain"></i> AI/ML Pipeline
+        </div>
         <div class="sb-item" data-section="security-audit" onclick="Sidebar.setActive(this);Router.inner('platform-admin','security-audit');fetchPlatformAdminSecurity()">
           <i class="fas fa-shield-alt"></i> Security &amp; Audit
         </div>
@@ -2220,6 +2337,7 @@
                 <thead>
                   <tr>
                     <th>Ref</th>
+                    <th>Severity</th>
                     <th>Source</th>
                     <th>Timestamp</th>
                     <th>User / Actor</th>
@@ -2228,7 +2346,7 @@
                   </tr>
                 </thead>
                 <tbody id="pa-dash-activity-tbody">
-                  <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-3)">Loading activity feed...</td></tr>
+                  <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-3)">Loading activity feed...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2652,6 +2770,7 @@
                 <thead>
                   <tr>
                     <th>Ref ID</th>
+                    <th>Severity</th>
                     <th>Source Table</th>
                     <th>Timestamp</th>
                     <th>User / Entity</th>
@@ -2660,7 +2779,7 @@
                   </tr>
                 </thead>
                 <tbody id="pa-audit-tbody">
-                  <tr><td colspan="6" style="text-align:center;padding:24px">Loading audit events...</td></tr>
+                  <tr><td colspan="7" style="text-align:center;padding:24px">Loading audit events...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -2684,13 +2803,22 @@
 
         <!-- ── SECTION 6: SYSTEM ── -->
         <div id="platform-admin-system" data-portal="platform-admin" class="hidden">
-          <div style="display:flex;gap:8px;margin-bottom:18px">
-            <button class="tab-btn active" id="pa-tab-btn-health" onclick="switchPaSystemTab('health')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-heartbeat" style="margin-right:6px"></i> Health Probes
-            </button>
-            <button class="tab-btn" id="pa-tab-btn-integrations" onclick="switchPaSystemTab('integrations')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-plug" style="margin-right:6px"></i> Integrations
-            </button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;gap:8px">
+              <button class="tab-btn active" id="pa-tab-btn-health" onclick="switchPaSystemTab('health')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-heartbeat" style="margin-right:6px"></i> Health Probes
+              </button>
+              <button class="tab-btn" id="pa-tab-btn-integrations" onclick="switchPaSystemTab('integrations')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-plug" style="margin-right:6px"></i> Integrations
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <div style="display:flex;align-items:center;gap:8px;background:var(--surface);padding:6px 12px;border:1px solid var(--border);border-radius:8px">
+                <span style="font-size:12px;font-weight:600;color:var(--text-2)"><i class="fas fa-clock" style="color:var(--primary);margin-right:4px"></i> Auto-Refresh (30s)</span>
+                <label class="toggle-switch"><input type="checkbox" id="pa-system-auto-refresh" onchange="togglePlatformAdminAutoRefresh(this.checked)"><span class="toggle-slider"></span></label>
+              </div>
+              <a href="/api/platform-admin/export?format=json" class="btn btn-sm btn-outline" download><i class="fas fa-download"></i> Export Data (JSON)</a>
+            </div>
           </div>
 
           <!-- Tab 1: Health Probes -->
@@ -2730,6 +2858,171 @@
             <div class="dash-grid" id="pa-system-integrations-grid">
               <!-- Rendered dynamically by fetchPlatformAdminIntegrations() -->
               <div class="card"><div style="padding:24px;text-align:center;color:var(--text-3)">Loading integrations...</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── SECTION: PLATFORM ADMIN AI/ML PIPELINE ── -->
+        <div id="platform-admin-pipeline" data-portal="platform-admin" class="hidden">
+          <!-- Pipeline Header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">AI/ML Pipeline</div>
+              <div class="text-muted text-sm">Monitor TalentSync's resume intelligence, matching, scoring, and recommendation infrastructure.</div>
+            </div>
+            <div style="display:flex;gap:10px;flex-wrap:wrap">
+              <button class="btn btn-outline" onclick="flushMLCache()" id="pipeline-flush-btn">
+                <i class="fas fa-broom"></i> Flush Cache
+              </button>
+              <button class="btn btn-outline" onclick="triggerMLTraining()" id="pipeline-retrain-btn">
+                <i class="fas fa-cogs"></i> Retrain Model
+              </button>
+              <button class="btn btn-primary" onclick="loadMLPipelineStatus()" id="pipeline-refresh-btn">
+                <i class="fas fa-sync-alt"></i> Refresh Status
+              </button>
+            </div>
+          </div>
+
+          <!-- Pipeline Status Cards -->
+          <div class="stats-grid mb-2">
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Pipeline Status</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-heartbeat" style="color:#16a34a"></i></div></div>
+              <div class="stat-value" id="ml-pipeline-status" style="color:#16a34a">Loading...</div>
+              <div class="stat-change up" id="ml-pipeline-status-sub">checking models...</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">TF-IDF Vocabulary</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-book" style="color:var(--primary)"></i></div></div>
+              <div class="stat-value" id="ml-vocab-size">--</div>
+              <div class="stat-change up">unique terms (unigrams + bigrams)</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Training Corpus</div><div class="stat-icon" style="background:#fdf4ff"><i class="fas fa-database" style="color:#7c3aed"></i></div></div>
+              <div class="stat-value" id="ml-corpus-size">--</div>
+              <div class="stat-change up" id="ml-corpus-detail">documents trained on</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top"><div class="stat-label">Hit Rate (Top-5)</div><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-bullseye" style="color:#d97706"></i></div></div>
+              <div class="stat-value" id="ml-hit-rate" style="color:#16a34a">--</div>
+              <div class="stat-change up">recommendation accuracy</div>
+            </div>
+          </div>
+
+          <!-- Pipeline Architecture Diagram -->
+          <div class="card mb-2">
+            <div class="card-header"><span class="card-title"><i class="fas fa-project-diagram" style="color:var(--primary);margin-right:8px"></i>Pipeline Architecture — Live Flow</span></div>
+            <div class="card-body" style="padding:24px">
+              <div id="pipeline-flow" style="display:flex;align-items:center;gap:0;overflow-x:auto;padding:16px 0;flex-wrap:wrap;justify-content:center">
+                <!-- Stage 1 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(59,130,246,.3)"><i class="fas fa-file-pdf"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">PDF Upload</div>
+                  <div style="font-size:11px;color:#64748b">Resume Parser</div>
+                </div>
+                <div style="font-size:24px;color:#3b82f6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <!-- Stage 2 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(139,92,246,.3)"><i class="fas fa-broom"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Preprocessing</div>
+                  <div style="font-size:11px;color:#64748b">Clean &amp; Tokenize</div>
+                </div>
+                <div style="font-size:24px;color:#8b5cf6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <!-- Stage 3 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(245,158,11,.3)"><i class="fas fa-tags"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Skill Extraction</div>
+                  <div style="font-size:11px;color:#64748b" id="ml-extraction-method">spaCy NER + Regex</div>
+                </div>
+                <div style="font-size:24px;color:#f59e0b;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <!-- Stage 4 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(16,185,129,.3)"><i class="fas fa-trophy"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">ATS Scoring</div>
+                  <div style="font-size:11px;color:#64748b">Section Heuristic</div>
+                </div>
+                <div style="font-size:24px;color:#10b981;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <!-- Stage 5 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(239,68,68,.3)"><i class="fas fa-brain"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">TF-IDF Matching</div>
+                  <div style="font-size:11px;color:#64748b">Cosine Similarity</div>
+                </div>
+                <div style="font-size:24px;color:#ef4444;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <!-- Stage 6 -->
+                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
+                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(6,182,212,.3)"><i class="fas fa-list-ol"></i></div>
+                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Job Rankings</div>
+                  <div style="font-size:11px;color:#64748b">Hybrid Score</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Details Grid -->
+          <div class="dash-grid">
+            <!-- TF-IDF Recommender Card -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title"><i class="fas fa-vector-square" style="color:#3b82f6;margin-right:8px"></i>TF-IDF Recommender Model</span>
+                <span class="badge badge-success" id="ml-tfidf-badge">Loading...</span>
+              </div>
+              <div class="card-body">
+                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
+                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">scikit-learn TfidfVectorizer</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Vocabulary Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-vocab">--</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">N-gram Range</td><td style="font-weight:600;padding:6px 12px">Unigrams + Bigrams (1, 2)</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Scoring Formula</td><td style="font-weight:600;padding:6px 12px">40% TF-IDF Cosine + 60% Skill Overlap</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">Sublinear TF</td><td style="font-weight:600;padding:6px 12px">✅ Enabled (log normalization)</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-1)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit1">--</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-3)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit3">--</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-5)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit5">--</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">Corpus Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-corpus">--</td></tr>
+                </table>
+              </div>
+            </div>
+
+            <!-- spaCy NER Card -->
+            <div class="card">
+              <div class="card-header">
+                <span class="card-title"><i class="fas fa-tag" style="color:#8b5cf6;margin-right:8px"></i>spaCy NER Skill Extractor</span>
+                <span class="badge badge-success" id="ml-ner-badge">Loading...</span>
+              </div>
+              <div class="card-body">
+                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
+                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">spaCy v3 Named Entity Recognition</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Entity Label</td><td style="font-weight:600;padding:6px 12px">SKILL</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">Best F1 Score</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-ner-f1">--</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Training Epochs</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-epochs">--</td></tr>
+                  <tr><td style="color:#64748b;padding:6px 12px">Fallback</td><td style="font-weight:600;padding:6px 12px">Regex boundary matching</td></tr>
+                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Extraction Method</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-method">--</td></tr>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Training Dataset Info -->
+          <div class="card mt-2">
+            <div class="card-header">
+              <span class="card-title"><i class="fas fa-layer-group" style="color:#f59e0b;margin-right:8px"></i>Training Dataset</span>
+            </div>
+            <div class="card-body">
+              <div class="stats-grid">
+                <div style="text-align:center;padding:16px">
+                  <div style="font-size:28px;font-weight:800;color:var(--primary)" id="ml-dataset-resumes">--</div>
+                  <div style="font-size:13px;color:#64748b;margin-top:4px">Synthetic Resumes</div>
+                </div>
+                <div style="text-align:center;padding:16px">
+                  <div style="font-size:28px;font-weight:800;color:#8b5cf6" id="ml-dataset-jobs">--</div>
+                  <div style="font-size:13px;color:#64748b;margin-top:4px">Job Descriptions</div>
+                </div>
+                <div style="text-align:center;padding:16px">
+                  <div style="font-size:28px;font-weight:800;color:#f59e0b" id="ml-dataset-ner">--</div>
+                  <div style="font-size:13px;color:#64748b;margin-top:4px">NER Training Samples</div>
+                </div>
+                <div style="text-align:center;padding:16px">
+                  <div style="font-size:28px;font-weight:800;color:#16a34a" id="ml-live-jobs">--</div>
+                  <div style="font-size:13px;color:#64748b;margin-top:4px">Live Jobs in DB</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

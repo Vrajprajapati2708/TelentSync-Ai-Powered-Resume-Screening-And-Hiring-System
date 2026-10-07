@@ -1,0 +1,77 @@
+@startuml
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam roundCorner 10
+
+skinparam nodesep 40
+skinparam ranksep 90
+skinparam linetype polyline
+skinparam padding 6
+
+skinparam rectangle {
+    BorderColor #0E2621
+    BackgroundColor #FFFFFF
+    RoundCorner 12
+}
+
+skinparam usecase {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    ArrowColor #0E2621
+}
+
+skinparam actor {
+    BackgroundColor #E59074
+    BorderColor #0E2621
+}
+
+left to right direction
+
+actor "HR Recruiter\n(Hiring Manager)" as HR
+actor "Email Service\n(SMTP)" as Email <<External System>>
+
+rectangle "HireAI (TalentSync) — HR Recruiter Subsystem" as System {
+    rectangle "== HR Recruiter Flow ==" as Zone_HR #FFF7ED {
+        ' Column 1: Main Use Cases (Workflow Order)
+        usecase "UC8: Post Job Vacancy" as UC_Post
+        usecase "UC9: View Ranked Applicants" as UC_Rank
+        usecase "UC10: Update Application Status" as UC_Status
+        usecase "UC11: View Hiring Analytics" as UC_Analytics
+
+        UC_Post -[hidden]down-> UC_Rank
+        UC_Rank -[hidden]down-> UC_Status
+        UC_Status -[hidden]down-> UC_Analytics
+
+        ' Column 2: Sub Use Cases
+        usecase "UC8.1: Define Required Skills" as UC_Reqs
+        usecase "UC9.1: AI Match Leaderboard" as UC_Leader
+        usecase "UC9.2: Inspect Outlier Profiles" as UC_Inspect
+        usecase "UC9.3: Filter by Clusters (K-Means)" as UC_Cluster
+        usecase "UC10.1: Send Status Notification" as UC_Notify
+
+        UC_Reqs -[hidden]down-> UC_Leader
+        UC_Leader -[hidden]down-> UC_Inspect
+        UC_Inspect -[hidden]down-> UC_Cluster
+        UC_Cluster -[hidden]down-> UC_Notify
+
+        ' Internal Relationships
+        UC_Post .right.> UC_Reqs : <<include>>
+        UC_Rank .right.> UC_Leader : <<include>>
+        UC_Inspect .left.> UC_Rank : <<extend>>\n[if outlier flagged]
+        UC_Cluster .left.> UC_Rank : <<extend>>\n[optional filter]
+        UC_Status .right.> UC_Notify : <<include>>
+    }
+}
+
+' HR Recruiter Associations
+HR --> UC_Post
+HR --> UC_Rank
+HR --> UC_Status
+HR --> UC_Analytics
+
+' External System Link
+UC_Notify -right-> Email
+
+@enduml

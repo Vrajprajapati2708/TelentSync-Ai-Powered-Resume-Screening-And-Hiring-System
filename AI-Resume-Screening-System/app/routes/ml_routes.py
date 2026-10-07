@@ -8,6 +8,7 @@
 # ============================================================
 
 import threading
+from typing import Any, Dict
 from flask import Blueprint, jsonify, request
 from app.ml.ml_pipeline import get_pipeline_status, run_full_pipeline
 from app.utils.logger import get_logger
@@ -19,15 +20,18 @@ logger = get_logger(__name__)
 ml_bp = Blueprint("ml", __name__, url_prefix="/api/ml")
 
 # Track background training status
-_training_status = {"running": False, "last_result": None}
+_training_status: Dict[str, Any] = {"running": False, "last_result": None}
 
 
 @ml_bp.route("/status", methods=["GET"])
+@login_required
+@role_required('admin')
 def ml_status():
     """
     GET /api/ml/status
 
     Returns the training status and metadata for all ML models.
+    Platform Admin only.
 
     Response:
         {
@@ -52,7 +56,7 @@ def ml_status():
 
 @ml_bp.route("/train", methods=["POST"])
 @login_required
-@role_required('hr')
+@role_required('admin')
 @limiter.limit("2 per hour")
 def trigger_training():
     """
@@ -108,7 +112,7 @@ def trigger_training():
 
 @ml_bp.route("/pipeline", methods=["POST"])
 @login_required
-@role_required('hr')
+@role_required('admin')
 def run_pipeline():
     """
     POST /api/ml/pipeline
@@ -136,3 +140,22 @@ def run_pipeline():
     except Exception as e:
         logger.error(f"/api/ml/pipeline error: {e}")
         return jsonify({"error": str(e)}), 500
+
+
+@ml_bp.route("/cache/flush", methods=["POST"])
+@login_required
+@role_required('admin')
+def flush_cache():
+    """
+    POST /api/ml/cache/flush
+    Flushes cached ML model weights and memory caches.
+    Platform Admin only.
+    """
+    try:
+        from app.ml.recommendation.tfidf_model import clear_tfidf_cache
+        clear_tfidf_cache()
+        logger.info("Platform Admin flushed ML in-memory caches.")
+        return jsonify({"success": True, "message": "ML in-memory vectorizer and inference caches successfully flushed."}), 200
+    except Exception as e:
+        logger.error(f"/api/ml/cache/flush error: {e}")
+        return jsonify({"success": False, "message": str(e)}), 500

@@ -58,34 +58,58 @@ def candidate_stats(user_id):
         ).fetchone()[0]
 
         # Daily profile views for last 7 days (for the chart)
-        day_names   = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        weekday_map = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        day_labels  = []
         views_daily = []
+        apps_daily  = []
         for i in range(6, -1, -1):  # 6 days ago → today
-            day = (datetime.datetime.now() - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
+            dt = datetime.datetime.now() - datetime.timedelta(days=i)
+            day = dt.strftime('%Y-%m-%d')
+            label = 'Today' if i == 0 else weekday_map[dt.weekday()]
+            day_labels.append(label)
             cnt = conn.execute(
                 "SELECT COUNT(*) FROM notifications WHERE user_id=? AND type='profile_view' AND created_at LIKE ?",
                 (user_id, day + '%')
             ).fetchone()[0]
             views_daily.append(cnt)
-        # Also collect daily application counts for the same 7 days
-        apps_daily = []
-        for i in range(6, -1, -1):
-            day = (datetime.datetime.now() - datetime.timedelta(days=i)).strftime('%Y-%m-%d')
-            cnt = conn.execute(
+
+            app_cnt = conn.execute(
                 "SELECT COUNT(*) FROM applications WHERE user_id=? AND applied_at LIKE ?",
                 (user_id, day + '%')
             ).fetchone()[0]
-            apps_daily.append(cnt)
+            apps_daily.append(app_cnt)
 
-        skills = [s.strip() for s in (u.get('skills') or '').split(',') if s.strip()]
-        base_score = u.get('ats_score') or 0
+        skills_raw = conn.execute(
+            "SELECT skills FROM users WHERE role='candidate' AND skills != ''"
+        ).fetchall()
+        skill_counts = {}
+        for row in skills_raw:
+            for s_val in row[0].split(','):
+                s_val = s_val.strip()
+                if s_val:
+                    skill_counts[s_val] = skill_counts.get(s_val, 0) + 1
+        top_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)[:8]
 
-        radar_skills = skills[:6]
+        resume_count = conn.execute("SELECT COUNT(*) FROM resumes WHERE user_id=?", (user_id,)).fetchone()[0]
+        has_resume = bool(resume_count > 0)
+
+        # If user has no resume in database, ensure score and skills are strictly 0 / empty
+        if not has_resume:
+            skills = []
+            base_score = 0
+            missing = []
+        else:
+            skills = [s.strip() for s in (u.get('skills') or '').split(',') if s.strip()]
+            base_score = u.get('ats_score') or 0
+            candidate_skills_lower = [s.lower() for s in skills]
+            missing = [s for s, _ in top_skills if s.lower() not in candidate_skills_lower]
+
+        radar_skills = skills[:6] if skills else []
         if len(radar_skills) < 6:
             radar_skills += ['Communication', 'Teamwork', 'Problem Solving',
                              'Adaptability', 'Leadership', 'Agile'][:6 - len(radar_skills)]
 
-        radar_levels   = [base_score] * len(radar_skills)
+        radar_levels   = [base_score] * len(radar_skills) if has_resume else [0] * len(radar_skills)
         radar_required = [75] * len(radar_skills)
 
         ats_ranges = {'0-20': 0, '21-40': 0, '41-60': 0, '61-70': 0, '71-80': 0, '81-90': 0, '91-100': 0}
@@ -100,22 +124,10 @@ def candidate_stats(user_id):
             elif s_val <= 90: ats_ranges['81-90'] += 1
             else:             ats_ranges['91-100'] += 1
 
-        skills_raw = conn.execute(
-            "SELECT skills FROM users WHERE role='candidate' AND skills != ''"
-        ).fetchall()
-        skill_counts = {}
-        for row in skills_raw:
-            for s_val in row[0].split(','):
-                s_val = s_val.strip()
-                if s_val:
-                    skill_counts[s_val] = skill_counts.get(s_val, 0) + 1
-        top_skills = sorted(skill_counts.items(), key=lambda x: x[1], reverse=True)[:8]
-
         # Total candidates with any skills (for % calculation)
         total_candidates_with_skills = len(skills_raw) or 1
 
         # Real market demand % per skill: what % of candidates on platform have this skill
-        # Capped between 5–98 to avoid 0% or 100% extremes
         skill_demand_pct = {
             s: min(98, max(5, round((c / total_candidates_with_skills) * 100)))
             for s, c in skill_counts.items()
@@ -144,23 +156,26 @@ def candidate_stats(user_id):
             except Exception:
                 pass
 
-        candidate_skills_lower = [s.lower() for s in skills]
-        missing = [s for s, _ in top_skills if s.lower() not in candidate_skills_lower]
+        if has_resume and not missing:
+            candidate_skills_lower = [s.lower() for s in skills]
+            missing = [s for s, _ in top_skills if s.lower() not in candidate_skills_lower]
 
     return jsonify({
+        'has_resume':           has_resume,
         'ats_score':            base_score,
         'skills_count':         len(skills),
         'skills':               skills,
-        'missing_skills':       missing[:4],
+        'missing_skills':       missing[:4] if has_resume else [],
         'skill_demand_pct':     skill_demand_pct,
         'profile_views':        profile_views,
         'profile_views_weekly': profile_views_weekly,
         'views_daily':          views_daily,
         'apps_daily':           apps_daily,
-        'day_names':            day_names,
+        'day_names':            weekday_map,
+        'day_labels':           day_labels,
         'applications':         apps,
         'shortlisted':          shortlisted,
-        'job_matches':          total_jobs,
+        'job_matches':          total_jobs if has_resume else 0,
         'radar': {
             'labels':   radar_skills,
             'levels':   radar_levels,
@@ -212,34 +227,5 @@ def user_profile(user_id):
                 user_id
             )
         )
-        conn.commit()
-    return jsonify({'success': True})
-
-
-@user_bp.route('/notifications/<int:user_id>', methods=['GET'])
-@login_required
-def get_notifications(user_id):
-    """GET /api/notifications/<user_id> — owner only."""
-    denied = _owns_or_403(user_id)
-    if denied:
-        return denied
-
-    with get_db() as conn:
-        nots = conn.execute(
-            "SELECT * FROM notifications WHERE user_id=? ORDER BY id DESC", (user_id,)
-        ).fetchall()
-    return jsonify([dict(n) for n in nots])
-
-
-@user_bp.route('/notifications/<int:user_id>/read', methods=['POST'])
-@login_required
-def read_notifications(user_id):
-    """POST /api/notifications/<user_id>/read — owner only."""
-    denied = _owns_or_403(user_id)
-    if denied:
-        return denied
-
-    with get_db() as conn:
-        conn.execute("UPDATE notifications SET is_read=1 WHERE user_id=?", (user_id,))
         conn.commit()
     return jsonify({'success': True})

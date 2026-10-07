@@ -1,0 +1,192 @@
+@startuml
+skinparam style strictuml
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam packageFontSize 12
+skinparam classFontSize 11
+
+skinparam nodesep 60
+skinparam ranksep 70
+skinparam linetype polyline
+
+skinparam class {
+    BackgroundColor #FFFFFF
+    BorderColor #0E2621
+    ArrowColor #0E2621
+    HeaderBackgroundColor #F1F5F9
+}
+
+skinparam enum {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    HeaderBackgroundColor #E2E8F0
+}
+
+title HIREAI (TalentSync) — Main Core Domain Class Diagram
+
+' ==============================================================
+' DOMAIN ENUMS
+' ==============================================================
+package "Domain Enumerations" #F8FAFC {
+    enum UserRole <<enumeration>> {
+        candidate
+        hr
+        admin
+    }
+
+    enum ApplicationStatus <<enumeration>> {
+        Reviewing
+        Shortlisted
+        Pending
+        Rejected
+    }
+
+    enum JobStatus <<enumeration>> {
+        Active
+        Closed
+        Draft
+    }
+}
+
+' ==============================================================
+' CORE DOMAIN CLASSES (MAIN SYSTEM ENTITIES)
+' ==============================================================
+package "Core Domain Entities" #FAFAFA {
+
+    class User {
+        + id : int <<PK>>
+        + name : string
+        + email : string
+        + password : string
+        + role : UserRole
+        + is_verified : int
+        + skills : string
+        + ats_score : int
+        + is_outlier : int
+        + cluster_label : string
+        + created_at : DateTime
+        --
+        + is_candidate() : bool
+        + is_hr() : bool
+        + is_admin() : bool
+    }
+
+    class Resume {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + original_name : string
+        + file_path : string
+        + file_hash : string
+        + ats_score : int
+        + extracted_skills : string
+        + structured_json : string
+        + uploaded_at : DateTime
+        --
+        + has_structured_json() : bool
+    }
+
+    class Job {
+        + id : int <<PK>>
+        + hr_id : int <<FK>>
+        + title : string
+        + company : string
+        + location : string
+        + skills : string
+        + description : string
+        + status : JobStatus
+        + created_at : DateTime
+        --
+        + is_active() : bool
+    }
+
+    class ExternalJob {
+        + id : int <<PK>>
+        + external_id : string
+        + provider : string
+        + title : string
+        + company : string
+        + location : string
+        + skills : string
+        + apply_url : string
+        + status : JobStatus
+        --
+        + is_remote() : bool
+    }
+
+    class Application {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK>>
+        + match_score : int
+        + status : ApplicationStatus
+        + applied_at : DateTime
+        --
+        + is_shortlisted() : bool
+        + can_transition(new_status) : bool
+    }
+
+    class ApplicationStatusHistory {
+        + id : int <<PK>>
+        + application_id : int <<FK>>
+        + status : ApplicationStatus
+        + notes : string
+        + updated_at : DateTime
+        --
+        + record_transition()
+    }
+
+    class RecommendationHistory {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK, nullable>>
+        + external_id : string <<nullable>>
+        + match_score : int
+        + matched_skills : string
+        + missing_skills : string
+        + recommended_at : DateTime
+        --
+        + get_match_summary()
+    }
+
+    class SavedJob {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK, nullable>>
+        + external_id : string <<nullable>>
+        + saved_at : DateTime
+        --
+        + is_external() : bool
+    }
+}
+
+' ==============================================================
+' RELATIONSHIPS & MULTIPLICITY
+' ==============================================================
+User "1" *-- "0..*" Resume : owns >
+User "1" -- "0..*" Job : posts >
+User "1" -- "0..*" Application : submits >
+Job "1" -- "0..*" Application : receives >
+
+Application "1" *-- "1..*" ApplicationStatusHistory : logs history >
+
+User "1" -- "0..*" SavedJob : bookmarks >
+User "1" -- "0..*" RecommendationHistory : receives >
+
+SavedJob "0..*" ..> "0..1" Job : references
+SavedJob "0..*" ..> "0..1" ExternalJob : references
+
+RecommendationHistory "0..*" ..> "0..1" Job : references
+RecommendationHistory "0..*" ..> "0..1" ExternalJob : references
+
+' Enum dependencies
+User .right.> UserRole
+Job .up.> JobStatus
+ExternalJob .up.> JobStatus
+Application .up.> ApplicationStatus
+ApplicationStatusHistory .up.> ApplicationStatus
+
+@enduml

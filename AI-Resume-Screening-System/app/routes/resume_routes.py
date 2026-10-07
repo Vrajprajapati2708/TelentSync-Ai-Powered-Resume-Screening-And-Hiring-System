@@ -393,7 +393,7 @@ def apply_job():
         return jsonify({'success': False, 'message': 'Invalid job ID for internal job'}), 400
 
     with get_db() as conn:
-        job = conn.execute("SELECT id FROM jobs WHERE id=?", (internal_job_id,)).fetchone()
+        job = conn.execute("SELECT id, title, company FROM jobs WHERE id=?", (internal_job_id,)).fetchone()
         if not job:
             return jsonify({'success': False, 'message': 'Job not found'}), 404
 
@@ -405,9 +405,25 @@ def apply_job():
             return jsonify({'success': False, 'message': 'Already applied!'})
 
         match_score = int(data.get('match_score', 0))
+        cur_time = datetime.now().strftime('%Y-%m-%d %H:%M')
         conn.execute(
             "INSERT INTO applications (user_id, job_id, match_score, applied_at) VALUES (?, ?, ?, ?)",
-            (user_id, internal_job_id, match_score, datetime.now().strftime('%Y-%m-%d %H:%M'))
+            (user_id, internal_job_id, match_score, cur_time)
+        )
+        job_title = job['title'] if 'title' in job.keys() else 'Job'
+        job_company = job['company'] if 'company' in job.keys() else ''
+        company_str = f" at {job_company}" if job_company else ""
+        conn.execute(
+            """INSERT INTO notifications 
+               (user_id, title, message, type, action_type, action_target, metadata, created_at)
+               VALUES (?, ?, ?, 'application', 'view_application', '#cand-applications', ?, ?)""",
+            (
+                user_id,
+                'Application Submitted 🚀',
+                f'Your application for {job_title}{company_str} was submitted successfully.',
+                json.dumps({'job_id': internal_job_id, 'match_score': match_score, 'status': 'Reviewing'}),
+                cur_time
+            )
         )
         conn.commit()
 

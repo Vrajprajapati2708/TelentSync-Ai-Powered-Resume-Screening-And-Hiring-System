@@ -1,0 +1,1019 @@
+================================================================================
+                    HIREAI (TALENTSYNC) SYSTEM CLASS DIAGRAM
+================================================================================
+System: HireAI (TalentSync) — AI-Powered Resume Screening & Hiring System
+Specification: UML 2.5 Object-Oriented Standard & Database Schema Blueprint
+Source of Truth: Production Codebase (schema.sql, controllers, routes, ml, services)
+File: class_diagram.txt
+================================================================================
+
+TABLE OF CONTENTS:
+1. Overview of Core System Architecture & Main Tables
+2. SQL Schema of Main Database Tables (DDL & Constraints)
+3. Domain Class Specifications (Attributes, Types & Implemented Methods)
+4. Database Relationship & Foreign Key Mapping (Table Level)
+5. Object-Oriented Class Relationships & Multiplicity (UML Level)
+6. Complete Syntax-Valid Mermaid.js Class Diagram Code
+7. Complete Syntax-Valid PlantUML Class Diagram Code
+8. Key Architectural Guidelines & Rules
+
+================================================================================
+1. OVERVIEW OF CORE SYSTEM ARCHITECTURE & MAIN TABLES
+================================================================================
+
+HireAI / TalentSync operates on a candidate-job matching and applicant tracking
+system (ATS) architecture. The application is driven by 11 core database tables:
+
+1. users                      -> User (Candidate, HR/Recruiter, Admin)
+2. jobs                       -> Job (Internal job vacancies)
+3. external_jobs              -> ExternalJob (Live vacancies fetched via Adzuna API)
+4. resumes                    -> Resume (Uploaded PDF/DOCX metadata & parsed JSON)
+5. applications               -> Application (Central Candidate-to-Job application link)
+6. application_status         -> ApplicationStatusHistory (Audit log of application status changes)
+7. saved_jobs                 -> SavedJob (Candidate bookmarked vacancies)
+8. recommendation_history     -> RecommendationHistory (AI match calculations log)
+9. notifications              -> Notification (In-app alerts for status & profile views)
+10. email_verification_tokens -> EmailVerificationToken (One-time SHA-256 account verification)
+11. password_reset_tokens     -> PasswordResetToken (One-time SHA-256 password recovery)
+
+Domain Enumerations:
+- UserRole:          'candidate', 'hr', 'admin'
+- ApplicationStatus: 'Reviewing', 'Shortlisted', 'Pending', 'Rejected'
+- JobStatus:          'Active', 'Closed', 'Draft'
+- ResumeStatus:       'uploaded', 'processing', 'processed', 'failed'
+- NotificationType:   'info', 'success', 'error', 'warning', 'profile_view'
+
+
+================================================================================
+2. SQL SCHEMA OF MAIN DATABASE TABLES (DDL & CONSTRAINTS)
+================================================================================
+
+-- 1. USERS TABLE (Identity, Authentication & Candidate Profile)
+CREATE TABLE users (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    name           TEXT    NOT NULL,
+    email          TEXT    UNIQUE NOT NULL,
+    password       TEXT    NOT NULL,
+    role           TEXT    NOT NULL DEFAULT 'candidate', -- 'candidate' | 'hr' | 'admin'
+    is_verified    INTEGER DEFAULT 0,                    -- 0 = unverified/inactive, 1 = verified/active
+    skills         TEXT    DEFAULT '',                   -- Comma-separated extracted skills
+    ats_score      INTEGER DEFAULT 0,                    -- Overall ATS compatibility score (0-100)
+    phone          TEXT    DEFAULT '',
+    location       TEXT    DEFAULT '',
+    linkedin       TEXT    DEFAULT '',
+    github         TEXT    DEFAULT '',
+    summary        TEXT    DEFAULT '',
+    education      TEXT    DEFAULT '',
+    is_outlier     INTEGER DEFAULT 0,                    -- 0 = normal, 1 = flagged suspicious
+    cluster_label  TEXT    DEFAULT 'Unclustered',        -- ML cluster category
+    created_at     TEXT    DEFAULT (datetime('now'))
+);
+
+-- 2. JOBS TABLE (Internal Employer Postings)
+CREATE TABLE jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    company     TEXT    NOT NULL,
+    location    TEXT    DEFAULT '',
+    type        TEXT    DEFAULT 'Full-time',             -- Full-time, Part-time, Contract, Internship
+    salary      TEXT    DEFAULT '',                      -- e.g. "8-14 LPA"
+    skills      TEXT    DEFAULT '',                      -- Required skill keywords
+    description TEXT    DEFAULT '',
+    status      TEXT    DEFAULT 'Active',                -- Active, Closed, Draft
+    created_at  TEXT    DEFAULT (datetime('now'))
+);
+
+-- 3. EXTERNAL_JOBS TABLE (Live Aggregated Jobs from Adzuna API)
+CREATE TABLE external_jobs (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    external_id     TEXT    UNIQUE NOT NULL,             -- Provider prefixed ID (e.g. adzuna_123456)
+    provider        TEXT    NOT NULL,                    -- 'Adzuna'
+    title           TEXT    NOT NULL,
+    company         TEXT    NOT NULL,
+    company_id      TEXT    DEFAULT '',
+    company_logo    TEXT    DEFAULT '',
+    industry        TEXT    DEFAULT '',
+    location        TEXT    DEFAULT '',
+    country         TEXT    DEFAULT '',
+    latitude        REAL    DEFAULT 0.0,
+    longitude       REAL    DEFAULT 0.0,
+    salary_min      REAL    DEFAULT 0.0,
+    salary_max      REAL    DEFAULT 0.0,
+    currency        TEXT    DEFAULT 'INR',
+    employment_type TEXT    DEFAULT '',
+    experience      TEXT    DEFAULT '',
+    remote          INTEGER DEFAULT 0,                   -- 0 = onsite, 1 = remote
+    description     TEXT    DEFAULT '',
+    skills          TEXT    DEFAULT '',
+    benefits        TEXT    DEFAULT '',
+    education       TEXT    DEFAULT '',
+    posted_date     TEXT    DEFAULT '',
+    expires_date    TEXT    DEFAULT '',
+    apply_url       TEXT    DEFAULT '',                  -- Direct redirect URL for application
+    source_url      TEXT    DEFAULT '',
+    language        TEXT    DEFAULT 'en',
+    status          TEXT    DEFAULT 'Active',
+    created_at      TEXT    DEFAULT (datetime('now'))
+);
+
+-- 4. RESUMES TABLE (Uploaded Resumes, Disk Pointers & Parsed Intelligence)
+CREATE TABLE resumes (
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id          INTEGER NOT NULL,
+    original_name    TEXT    NOT NULL,                   -- Original client filename
+    stored_filename  TEXT    UNIQUE NOT NULL,            -- UUID secure filename on persistent disk
+    file_path        TEXT    NOT NULL,                   -- Absolute local storage path
+    file_hash        TEXT    NOT NULL,                   -- SHA-256 binary hash for deduplication
+    file_size_bytes  INTEGER NOT NULL,
+    mime_type        TEXT    NOT NULL,                   -- application/pdf, application/vnd.openxmlformats...
+    parsed_text      TEXT    DEFAULT '',                 -- Extracted text from PDF/DOCX
+    word_count       INTEGER DEFAULT 0,
+    ats_score        INTEGER DEFAULT 0,                  -- ATS score calculated at upload
+    extracted_skills TEXT    DEFAULT '',                 -- Extracted comma-separated skills
+    structured_json  TEXT    DEFAULT '',                 -- Full canonical JSON (contact, exp, edu, skills)
+    status           TEXT    DEFAULT 'processed',        -- uploaded | processing | processed | failed
+    version          INTEGER DEFAULT 1,
+    uploaded_at      TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 5. APPLICATIONS TABLE (Core Candidate-to-Job Transaction Join)
+CREATE TABLE applications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    job_id      INTEGER NOT NULL,
+    match_score INTEGER DEFAULT 0,                       -- AI match score computed at application time
+    status      TEXT    DEFAULT 'Reviewing',             -- Reviewing | Shortlisted | Pending | Rejected
+    applied_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(job_id)  REFERENCES jobs(id)  ON DELETE CASCADE,
+    UNIQUE(user_id, job_id)
+);
+
+-- 6. APPLICATION_STATUS TABLE (Status Transition History & Recruiter Notes)
+CREATE TABLE application_status (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    application_id  INTEGER NOT NULL,
+    status          TEXT    NOT NULL,                    -- Target status
+    notes           TEXT    DEFAULT '',                  -- Recruiter decision comments
+    updated_at      TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(application_id) REFERENCES applications(id) ON DELETE CASCADE
+);
+
+-- 7. SAVED_JOBS TABLE (Candidate Bookmarks)
+CREATE TABLE saved_jobs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    job_id      INTEGER,                                 -- Nullable reference to internal jobs(id)
+    external_id TEXT,                                    -- Nullable reference to external_jobs(external_id)
+    saved_at    TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 8. RECOMMENDATION_HISTORY TABLE (AI Match Calculation Snapshots)
+CREATE TABLE recommendation_history (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    job_id          INTEGER,                             -- Nullable reference to internal jobs(id)
+    external_id     TEXT,                                -- Nullable reference to external_jobs(external_id)
+    match_score     INTEGER DEFAULT 0,                   -- Match score (0-100)
+    matched_skills  TEXT    DEFAULT '',                  -- Overlapping skills
+    missing_skills  TEXT    DEFAULT '',                  -- Skill gaps to acquire
+    recommended_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 9. NOTIFICATIONS TABLE (User Alerts & System Updates)
+CREATE TABLE notifications (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    title       TEXT    NOT NULL,
+    message     TEXT    DEFAULT '',
+    type        TEXT    DEFAULT 'info',                  -- info | success | error | warning | profile_view
+    is_read     INTEGER DEFAULT 0,                       -- 0 = unread, 1 = read
+    created_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 10. EMAIL_VERIFICATION_TOKENS TABLE (Account Activation)
+CREATE TABLE email_verification_tokens (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    token_hash  TEXT    UNIQUE NOT NULL,                 -- SHA-256 hash of random 32-byte URL-safe token
+    expires_at  TEXT    NOT NULL,                        -- 24 hours expiry timestamp
+    is_used     INTEGER DEFAULT 0,                       -- 0 = unused, 1 = consumed
+    created_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 11. PASSWORD_RESET_TOKENS TABLE (Password Recovery)
+CREATE TABLE password_reset_tokens (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    token_hash  TEXT    UNIQUE NOT NULL,                 -- SHA-256 hash of random 32-byte URL-safe token
+    expires_at  TEXT    NOT NULL,                        -- 15 minutes expiry timestamp
+    is_used     INTEGER DEFAULT 0,                       -- 0 = unused, 1 = consumed
+    created_at  TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+
+================================================================================
+3. DOMAIN CLASS SPECIFICATIONS (ATTRIBUTES, TYPES & IMPLEMENTED METHODS)
+================================================================================
+
+--------------------------------------------------------------------------------
+Class: User
+Package: Identity & Authentication Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + name : string
+  + email : string
+  + password : string
+  + role : UserRole
+  + is_verified : int
+  + skills : string
+  + ats_score : int
+  + phone : string
+  + location : string
+  + linkedin : string
+  + github : string
+  + summary : string
+  + education : string
+  + is_outlier : int
+  + cluster_label : string
+  + created_at : DateTime
+
+Methods:
+  + is_candidate() : bool
+  + is_hr() : bool
+  + is_admin() : bool
+
+--------------------------------------------------------------------------------
+Class: Job
+Package: Jobs & Applications Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + title : string
+  + company : string
+  + location : string
+  + type : string
+  + salary : string
+  + skills : string
+  + description : string
+  + status : JobStatus
+  + created_at : DateTime
+
+Methods:
+  + is_active() : bool
+
+--------------------------------------------------------------------------------
+Class: ExternalJob
+Package: Jobs & Applications Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + external_id : string
+  + provider : string
+  + title : string
+  + company : string
+  + location : string
+  + country : string
+  + salary_min : float
+  + salary_max : float
+  + currency : string
+  + remote : int
+  + description : string
+  + skills : string
+  + apply_url : string
+  + posted_date : string
+  + status : JobStatus
+
+Methods:
+  + is_remote() : bool
+
+--------------------------------------------------------------------------------
+Class: Resume
+Package: Resume & ATS Intelligence Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + original_name : string
+  + stored_filename : string
+  + file_path : string
+  + file_hash : string
+  + file_size_bytes : int
+  + mime_type : string
+  + parsed_text : string
+  + word_count : int
+  + ats_score : int
+  + extracted_skills : string
+  + structured_json : string
+  + status : ResumeStatus
+  + version : int
+  + uploaded_at : DateTime
+
+Methods:
+  + has_structured_json() : bool
+
+--------------------------------------------------------------------------------
+Class: Application
+Package: Jobs & Applications Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + job_id : int <<FK>>
+  + match_score : int
+  + status : ApplicationStatus
+  + applied_at : DateTime
+
+Methods:
+  + is_shortlisted() : bool
+  + can_transition(new_status : ApplicationStatus) : bool
+
+--------------------------------------------------------------------------------
+Class: ApplicationStatusHistory
+Package: Jobs & Applications Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + application_id : int <<FK>>
+  + status : ApplicationStatus
+  + notes : string
+  + updated_at : DateTime
+
+Methods:
+  + record_transition()
+
+--------------------------------------------------------------------------------
+Class: SavedJob
+Package: Candidate Engagement Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + job_id : int <<FK, nullable>>
+  + external_id : string <<nullable>>
+  + saved_at : DateTime
+
+Methods:
+  + is_external() : bool
+
+--------------------------------------------------------------------------------
+Class: RecommendationHistory
+Package: Candidate Engagement Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + job_id : int <<FK, nullable>>
+  + external_id : string <<nullable>>
+  + match_score : int
+  + matched_skills : string
+  + missing_skills : string
+  + recommended_at : DateTime
+
+Methods:
+  + get_match_summary()
+
+--------------------------------------------------------------------------------
+Class: Notification
+Package: Candidate Engagement Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + title : string
+  + message : string
+  + type : NotificationType
+  + is_read : int
+  + created_at : DateTime
+
+Methods:
+  + mark_as_read()
+
+--------------------------------------------------------------------------------
+Class: EmailVerificationToken
+Package: Identity & Authentication Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + token_hash : string
+  + expires_at : DateTime
+  + is_used : int
+  + created_at : DateTime
+
+Methods:
+  + is_valid() : bool
+
+--------------------------------------------------------------------------------
+Class: PasswordResetToken
+Package: Identity & Authentication Domain
+--------------------------------------------------------------------------------
+Attributes:
+  + id : int <<PK>>
+  + user_id : int <<FK>>
+  + token_hash : string
+  + expires_at : DateTime
+  + is_used : int
+  + created_at : DateTime
+
+Methods:
+  + is_valid() : bool
+
+
+================================================================================
+4. DATABASE RELATIONSHIP & FOREIGN KEY MAPPING (TABLE LEVEL)
+================================================================================
+
++----------------------------+-----------+----------------------+--------------------+--------------------+
+| Origin Table               | FK Column | Target Table         | Target PK Column   | On Delete Action   |
++----------------------------+-----------+----------------------+--------------------+--------------------+
+| resumes                    | user_id   | users                | id                 | CASCADE            |
+| applications               | user_id   | users                | id                 | CASCADE            |
+| applications               | job_id    | jobs                 | id                 | CASCADE            |
+| application_status         | application_id | applications    | id                 | CASCADE            |
+| saved_jobs                 | user_id   | users                | id                 | CASCADE            |
+| saved_jobs (optional ref)  | job_id    | jobs                 | id                 | SET NULL / NOOP    |
+| saved_jobs (optional ref)  | external_id | external_jobs      | external_id        | SET NULL / NOOP    |
+| recommendation_history     | user_id   | users                | id                 | CASCADE            |
+| recommendation_history     | job_id    | jobs                 | id                 | SET NULL / NOOP    |
+| recommendation_history     | external_id | external_jobs      | external_id        | SET NULL / NOOP    |
+| notifications              | user_id   | users                | id                 | CASCADE            |
+| email_verification_tokens  | user_id   | users                | id                 | CASCADE            |
+| password_reset_tokens      | user_id   | users                | id                 | CASCADE            |
++----------------------------+-----------+----------------------+--------------------+--------------------+
+
+
+================================================================================
+5. OBJECT-ORIENTED CLASS RELATIONSHIPS & MULTIPLICITY (UML LEVEL)
+================================================================================
+
+UML Strict Rules Applied:
+- Composition (*--): The filled diamond is ALWAYS on the OWNER/PARENT side.
+- Directed Association (-->): Used when one entity references another without owning its lifecycle.
+- Cardinality Notation: 1 (Exactly one), 0..1 (Zero or one), 0..* (Zero or many).
+
+1. User  "1" *-- "0..*" Resume
+   - Type: Composition (Owner = User)
+   - Reason: A user owns their uploaded resumes; deleting a user destroys all resumes.
+
+2. User  "1" *-- "0..*" Application
+   - Type: Composition (Owner = User)
+   - Reason: A user submits applications; deleting the candidate profile removes applications.
+
+3. Job   "1" <-- "0..*" Application
+   - Type: Directed Association
+   - Reason: A job receives applications from many candidates; the job does not own the user.
+
+4. Application "1" *-- "0..*" ApplicationStatusHistory
+   - Type: Composition (Owner = Application)
+   - Reason: Status transition history records belong strictly to the application instance.
+
+5. User  "1" *-- "0..*" SavedJob
+   - Type: Composition (Owner = User)
+   - Reason: Saved job bookmarks belong strictly to the saving user.
+
+6. SavedJob "0..*" --> "0..1" Job
+   - Type: Directed Association (Nullable Reference)
+   - Reason: Bookmark optionally points to an internal job (job_id is nullable).
+
+7. SavedJob "0..*" --> "0..1" ExternalJob
+   - Type: Directed Association (Nullable Reference)
+   - Reason: Bookmark optionally points to an external job (external_id is nullable).
+
+8. User  "1" --> "0..*" RecommendationHistory
+   - Type: Directed Association
+   - Reason: System logs match calculations for a user; weak reference.
+
+9. RecommendationHistory "0..*" --> "0..1" Job
+   - Type: Directed Association (Nullable Reference)
+   - Reason: Recommended target can be an internal job vacancy.
+
+10. RecommendationHistory "0..*" --> "0..1" ExternalJob
+    - Type: Directed Association (Nullable Reference)
+    - Reason: Recommended target can be an external job vacancy.
+
+11. User "1" *-- "0..*" Notification
+    - Type: Composition (Owner = User)
+    - Reason: Notifications belong strictly to the recipient user.
+
+12. User "1" *-- "0..*" EmailVerificationToken
+    - Type: Composition (Owner = User)
+    - Reason: One-time verification tokens belong exclusively to the registered user.
+
+13. User "1" *-- "0..*" PasswordResetToken
+    - Type: Composition (Owner = User)
+    - Reason: One-time reset tokens belong exclusively to the requesting user.
+
+
+================================================================================
+6. COMPLETE SYNTAX-VALID MERMAID.JS CLASS DIAGRAM CODE
+================================================================================
+
+```mermaid
+classDiagram
+    direction TB
+
+    %% ==========================================
+    %% ENUMERATIONS
+    %% ==========================================
+    class UserRole {
+        <<enumeration>>
+        candidate
+        hr
+        admin
+    }
+
+    class ApplicationStatus {
+        <<enumeration>>
+        Reviewing
+        Shortlisted
+        Pending
+        Rejected
+    }
+
+    class JobStatus {
+        <<enumeration>>
+        Active
+        Closed
+        Draft
+    }
+
+    class ResumeStatus {
+        <<enumeration>>
+        uploaded
+        processing
+        processed
+        failed
+    }
+
+    class NotificationType {
+        <<enumeration>>
+        info
+        success
+        error
+        warning
+        profile_view
+    }
+
+    %% ==========================================
+    %% MAIN DOMAIN ENTITIES
+    %% ==========================================
+    class User {
+        +int id
+        +string name
+        +string email
+        +string password
+        +UserRole role
+        +int is_verified
+        +string skills
+        +int ats_score
+        +string phone
+        +string location
+        +string linkedin
+        +string github
+        +string summary
+        +string education
+        +int is_outlier
+        +string cluster_label
+        +DateTime created_at
+        +is_candidate() bool
+        +is_hr() bool
+        +is_admin() bool
+    }
+
+    class Job {
+        +int id
+        +string title
+        +string company
+        +string location
+        +string type
+        +string salary
+        +string skills
+        +string description
+        +JobStatus status
+        +DateTime created_at
+        +is_active() bool
+    }
+
+    class ExternalJob {
+        +int id
+        +string external_id
+        +string provider
+        +string title
+        +string company
+        +string location
+        +string country
+        +float salary_min
+        +float salary_max
+        +string currency
+        +int remote
+        +string description
+        +string skills
+        +string apply_url
+        +string posted_date
+        +JobStatus status
+        +is_remote() bool
+    }
+
+    class Resume {
+        +int id
+        +int user_id
+        +string original_name
+        +string stored_filename
+        +string file_path
+        +string file_hash
+        +int file_size_bytes
+        +string mime_type
+        +string parsed_text
+        +int word_count
+        +int ats_score
+        +string extracted_skills
+        +string structured_json
+        +ResumeStatus status
+        +int version
+        +DateTime uploaded_at
+        +has_structured_json() bool
+    }
+
+    class Application {
+        +int id
+        +int user_id
+        +int job_id
+        +int match_score
+        +ApplicationStatus status
+        +DateTime applied_at
+        +is_shortlisted() bool
+        +can_transition(new_status) bool
+    }
+
+    class ApplicationStatusHistory {
+        +int id
+        +int application_id
+        +ApplicationStatus status
+        +string notes
+        +DateTime updated_at
+        +record_transition()
+    }
+
+    class SavedJob {
+        +int id
+        +int user_id
+        +int job_id
+        +string external_id
+        +DateTime saved_at
+        +is_external() bool
+    }
+
+    class RecommendationHistory {
+        +int id
+        +int user_id
+        +int job_id
+        +string external_id
+        +int match_score
+        +string matched_skills
+        +string missing_skills
+        +DateTime recommended_at
+        +get_match_summary()
+    }
+
+    class Notification {
+        +int id
+        +int user_id
+        +string title
+        +string message
+        +NotificationType type
+        +int is_read
+        +DateTime created_at
+        +mark_as_read()
+    }
+
+    class EmailVerificationToken {
+        +int id
+        +int user_id
+        +string token_hash
+        +DateTime expires_at
+        +int is_used
+        +DateTime created_at
+        +is_valid() bool
+    }
+
+    class PasswordResetToken {
+        +int id
+        +int user_id
+        +string token_hash
+        +DateTime expires_at
+        +int is_used
+        +DateTime created_at
+        +is_valid() bool
+    }
+
+    %% ==========================================
+    %% RELATIONSHIPS & MULTIPLICITY
+    %% ==========================================
+    User "1" *-- "0..*" Resume : owns
+    User "1" *-- "0..*" Application : submits
+    User "1" *-- "0..*" SavedJob : saves
+    User "1" *-- "0..*" Notification : receives
+    User "1" *-- "0..*" EmailVerificationToken : verifies_with
+    User "1" *-- "0..*" PasswordResetToken : resets_with
+    User "1" --> "0..*" RecommendationHistory : recommended_for
+
+    Job "1" <-- "0..*" Application : receives
+    Application "1" *-- "0..*" ApplicationStatusHistory : tracks_history
+
+    SavedJob "0..*" --> "0..1" Job : bookmarks_internal
+    SavedJob "0..*" --> "0..1" ExternalJob : bookmarks_external
+
+    RecommendationHistory "0..*" --> "0..1" Job : targets_internal
+    RecommendationHistory "0..*" --> "0..1" ExternalJob : targets_external
+```
+
+
+================================================================================
+7. COMPLETE SYNTAX-VALID PLANTUML CLASS DIAGRAM CODE
+================================================================================
+
+```plantuml
+@startuml
+skinparam style strictuml
+skinparam classAttributeIconSize 0
+skinparam monochrome false
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam defaultFontName "Segoe UI", Arial, sans-serif
+skinparam defaultFontSize 11
+skinparam packageFontSize 12
+skinparam classFontSize 11
+
+title HIREAI (TalentSync) — Main Database & Domain Class Diagram
+
+' ==============================================================
+' DOMAIN ENUMS
+' ==============================================================
+package "Domain Enums" #F8FAFC {
+    enum UserRole {
+        candidate
+        hr
+        admin
+    }
+
+    enum ApplicationStatus {
+        Reviewing
+        Shortlisted
+        Pending
+        Rejected
+    }
+
+    enum JobStatus {
+        Active
+        Closed
+        Draft
+    }
+
+    enum ResumeStatus {
+        uploaded
+        processing
+        processed
+        failed
+    }
+
+    enum NotificationType {
+        info
+        success
+        error
+        warning
+        profile_view
+    }
+}
+
+' ==============================================================
+' IDENTITY & SECURITY
+' ==============================================================
+package "Identity & Authentication" #FEF2F2 {
+    class User {
+        + id : int <<PK>>
+        + name : string
+        + email : string
+        + password : string
+        + role : UserRole
+        + is_verified : int
+        + skills : string
+        + ats_score : int
+        + phone : string
+        + location : string
+        + linkedin : string
+        + github : string
+        + summary : string
+        + education : string
+        + is_outlier : int
+        + cluster_label : string
+        + created_at : DateTime
+        + is_candidate() : bool
+        + is_hr() : bool
+        + is_admin() : bool
+    }
+
+    class EmailVerificationToken {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + token_hash : string
+        + expires_at : DateTime
+        + is_used : int
+        + created_at : DateTime
+        + is_valid() : bool
+    }
+
+    class PasswordResetToken {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + token_hash : string
+        + expires_at : DateTime
+        + is_used : int
+        + created_at : DateTime
+        + is_valid() : bool
+    }
+}
+
+' ==============================================================
+' RESUME & ATS
+' ==============================================================
+package "Resume & ATS Intelligence" #EFF6FF {
+    class Resume {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + original_name : string
+        + stored_filename : string
+        + file_path : string
+        + file_hash : string
+        + file_size_bytes : int
+        + mime_type : string
+        + parsed_text : string
+        + word_count : int
+        + ats_score : int
+        + extracted_skills : string
+        + structured_json : string
+        + status : ResumeStatus
+        + version : int
+        + uploaded_at : DateTime
+        + has_structured_json() : bool
+    }
+}
+
+' ==============================================================
+' JOBS & APPLICATIONS
+' ==============================================================
+package "Jobs & Applications" #F0FDF4 {
+    class Job {
+        + id : int <<PK>>
+        + title : string
+        + company : string
+        + location : string
+        + type : string
+        + salary : string
+        + skills : string
+        + description : string
+        + status : JobStatus
+        + created_at : DateTime
+        + is_active() : bool
+    }
+
+    class ExternalJob {
+        + id : int <<PK>>
+        + external_id : string
+        + provider : string
+        + title : string
+        + company : string
+        + location : string
+        + country : string
+        + salary_min : float
+        + salary_max : float
+        + currency : string
+        + remote : int
+        + description : string
+        + skills : string
+        + apply_url : string
+        + posted_date : string
+        + status : JobStatus
+        + is_remote() : bool
+    }
+
+    class Application {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK>>
+        + match_score : int
+        + status : ApplicationStatus
+        + applied_at : DateTime
+        + is_shortlisted() : bool
+        + can_transition(new_status : ApplicationStatus) : bool
+    }
+
+    class ApplicationStatusHistory {
+        + id : int <<PK>>
+        + application_id : int <<FK>>
+        + status : ApplicationStatus
+        + notes : string
+        + updated_at : DateTime
+        + record_transition()
+    }
+}
+
+' ==============================================================
+' ENGAGEMENT & TRACKING
+' ==============================================================
+package "Engagement & History" #FAF5FF {
+    class SavedJob {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK, nullable>>
+        + external_id : string <<nullable>>
+        + saved_at : DateTime
+        + is_external() : bool
+    }
+
+    class RecommendationHistory {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + job_id : int <<FK, nullable>>
+        + external_id : string <<nullable>>
+        + match_score : int
+        + matched_skills : string
+        + missing_skills : string
+        + recommended_at : DateTime
+        + get_match_summary()
+    }
+
+    class Notification {
+        + id : int <<PK>>
+        + user_id : int <<FK>>
+        + title : string
+        + message : string
+        + type : NotificationType
+        + is_read : int
+        + created_at : DateTime
+        + mark_as_read()
+    }
+}
+
+' ==============================================================
+' RELATIONSHIPS & MULTIPLICITY
+' ==============================================================
+User "1" *-- "0..*" Resume : owns
+User "1" *-- "0..*" Application : submits
+User "1" *-- "0..*" SavedJob : saves
+User "1" *-- "0..*" Notification : receives
+User "1" *-- "0..*" EmailVerificationToken : verifies_with
+User "1" *-- "0..*" PasswordResetToken : resets_with
+User "1" --> "0..*" RecommendationHistory : recommended_for
+
+Job "1" <-- "0..*" Application : receives
+Application "1" *-- "0..*" ApplicationStatusHistory : tracks_history
+
+SavedJob "0..*" --> "0..1" Job : bookmarks_internal
+SavedJob "0..*" --> "0..1" ExternalJob : bookmarks_external
+
+RecommendationHistory "0..*" --> "0..1" Job : targets_internal
+RecommendationHistory "0..*" --> "0..1" ExternalJob : targets_external
+
+@enduml
+```
+
+
+================================================================================
+8. KEY ARCHITECTURAL GUIDELINES & RULES
+================================================================================
+
+1. ApplicationStatus vs. ApplicationStatusHistory:
+   - ApplicationStatus is strictly an enumeration with 4 domain states:
+     'Reviewing', 'Shortlisted', 'Pending', 'Rejected'.
+   - ApplicationStatusHistory is the database audit class representing table
+     'application_status' with columns id, application_id, status, notes, updated_at.
+   - There is NO naming collision.
+
+2. Candidate Profile on User:
+   - In this implementation, candidate attributes (skills, ats_score, education,
+     phone, location, linkedin, github, summary, is_outlier, cluster_label)
+     reside directly on the User entity.
+   - No separate CandidateProfile entity exists in this database version.
+
+3. ExternalJob vs. Job:
+   - ExternalJob is a separate table/class and does NOT inherit from Job.
+   - Polymorphic handling is performed dynamically at the application layer.
+
+4. Composition Diamonds:
+   - Composition diamonds (*--) are placed strictly on the OWNER side:
+     User owns Resume, Application, SavedJob, Notification, and Tokens.
+     Application owns ApplicationStatusHistory.
+   - SavedJob and RecommendationHistory maintain directed associations (-->)
+     to Job and ExternalJob with optional multiplicity (0..1).
+
+================================================================================
+END OF FILE: class_diagram.txt
+================================================================================

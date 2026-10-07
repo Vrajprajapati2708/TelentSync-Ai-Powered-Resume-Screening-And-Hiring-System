@@ -1,0 +1,216 @@
+@startuml
+skinparam actorStyle awesome
+skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam defaultFontName Arial
+skinparam roundCorner 10
+
+skinparam nodesep 40
+skinparam ranksep 90
+skinparam linetype polyline
+skinparam padding 6
+
+skinparam rectangle {
+    BorderColor #0E2621
+    BackgroundColor #FFFFFF
+    RoundCorner 12
+}
+
+skinparam usecase {
+    BackgroundColor #F8FAFC
+    BorderColor #0E2621
+    ArrowColor #0E2621
+}
+
+skinparam actor {
+    BackgroundColor #E59074
+    BorderColor #0E2621
+}
+
+left to right direction
+
+' ===================================================
+' ACTORS (FAR LEFT)
+' ===================================================
+actor "Candidate\n(Job Seeker)" as Cand
+actor "HR Recruiter\n(Hiring Manager)" as HR
+actor "Platform Admin\n(System Administrator)" as Admin
+
+Cand -[hidden]down-> HR
+HR -[hidden]down-> Admin
+
+' ===================================================
+' SYSTEM BOUNDARY WITH STRUCTURED ZONES
+' ===================================================
+rectangle "HireAI (TalentSync) Platform" as System {
+
+    ' --- ZONE 1: SHARED AUTHENTICATION ---
+    rectangle "== Shared Authentication Flow ==" as Zone_Auth #F1F5F9 {
+        ' Column 1: Main Use Cases
+        usecase "UC1: Register Account" as UC_Reg
+        usecase "UC2: Login" as UC_Login
+        UC_Reg -[hidden]down-> UC_Login
+
+        ' Column 2: Sub Use Cases
+        usecase "UC1.1: Verify Email (OTP)" as UC_Verify
+        usecase "UC2.1: Reset Password" as UC_Reset
+        UC_Verify -[hidden]down-> UC_Reset
+
+        UC_Reg .right.> UC_Verify : <<include>>
+        UC_Reset .left.> UC_Login : <<extend>>\n[on forgotten password]
+    }
+
+    ' --- ZONE 2: CANDIDATE FLOW ---
+    rectangle "== Candidate Flow ==" as Zone_Cand #ECFDF5 {
+        ' Column 1: Main Use Cases (Workflow Order)
+        usecase "UC3: Upload Resume" as UC_Upload
+        usecase "UC4: View Candidate Dashboard" as UC_Dash
+        usecase "UC5: Discover Job Matches" as UC_Match
+        usecase "UC6: Apply for Job" as UC_Apply
+        usecase "UC7: Track Application Status" as UC_Track
+
+        UC_Upload -[hidden]down-> UC_Dash
+        UC_Dash -[hidden]down-> UC_Match
+        UC_Match -[hidden]down-> UC_Apply
+        UC_Apply -[hidden]down-> UC_Track
+
+        ' Column 2: Sub Use Cases
+        usecase "UC3.1: Parse Resume & Extract Skills" as UC_Parse
+        usecase "UC3.2: Compute ATS Score" as UC_ATS
+        usecase "UC3.3: Flag Keyword-Stuffing Outlier" as UC_Outlier
+        usecase "UC4.1: View Skill Gap Feedback" as UC_Gaps
+        usecase "UC4.2: Download ATS Report (PDF)" as UC_PDF
+        usecase "UC5.1: Search Live External Jobs" as UC_AdzunaSearch
+        usecase "UC6.1: Calculate Match Score" as UC_Score
+
+        UC_Parse -[hidden]down-> UC_ATS
+        UC_ATS -[hidden]down-> UC_Outlier
+        UC_Outlier -[hidden]down-> UC_Gaps
+        UC_Gaps -[hidden]down-> UC_PDF
+        UC_PDF -[hidden]down-> UC_AdzunaSearch
+        UC_AdzunaSearch -[hidden]down-> UC_Score
+
+        ' Internal Relationships
+        UC_Upload .right.> UC_Parse : <<include>>
+        UC_Parse .down.> UC_ATS : <<include>>
+        UC_Outlier .left.> UC_ATS : <<extend>>\n[score > 95% / anomaly]
+
+        UC_Dash .right.> UC_Gaps : <<include>>
+        UC_PDF .left.> UC_Dash : <<extend>>\n[on user request]
+
+        UC_AdzunaSearch .left.> UC_Match : <<extend>>\n[toggle external]
+        UC_Apply .right.> UC_Score : <<include>>
+    }
+
+    ' --- ZONE 3: HR RECRUITER FLOW ---
+    rectangle "== HR Recruiter Flow ==" as Zone_HR #FFF7ED {
+        ' Column 1: Main Use Cases (Workflow Order)
+        usecase "UC8: Post Job Vacancy" as UC_Post
+        usecase "UC9: View Ranked Applicants" as UC_Rank
+        usecase "UC10: Update Application Status" as UC_Status
+        usecase "UC11: View Hiring Analytics" as UC_Analytics
+
+        UC_Post -[hidden]down-> UC_Rank
+        UC_Rank -[hidden]down-> UC_Status
+        UC_Status -[hidden]down-> UC_Analytics
+
+        ' Column 2: Sub Use Cases
+        usecase "UC8.1: Define Required Skills" as UC_Reqs
+        usecase "UC9.1: AI Match Leaderboard" as UC_Leader
+        usecase "UC9.2: Inspect Outlier Profiles" as UC_Inspect
+        usecase "UC9.3: Filter by Clusters (K-Means)" as UC_Cluster
+        usecase "UC10.1: Send Status Notification" as UC_Notify
+
+        UC_Reqs -[hidden]down-> UC_Leader
+        UC_Leader -[hidden]down-> UC_Inspect
+        UC_Inspect -[hidden]down-> UC_Cluster
+        UC_Cluster -[hidden]down-> UC_Notify
+
+        ' Internal Relationships
+        UC_Post .right.> UC_Reqs : <<include>>
+        UC_Rank .right.> UC_Leader : <<include>>
+        UC_Inspect .left.> UC_Rank : <<extend>>\n[if outlier flagged]
+        UC_Cluster .left.> UC_Rank : <<extend>>\n[optional filter]
+        UC_Status .right.> UC_Notify : <<include>>
+    }
+
+    ' --- ZONE 4: PLATFORM ADMIN FLOW ---
+    rectangle "== Platform Admin Flow ==" as Zone_Admin #EFF6FF {
+        ' Column 1: Main Use Cases (Workflow Order)
+        usecase "UC12: Manage User Accounts" as UC_AdmUsers
+        usecase "UC13: Audit Security & ML Outliers" as UC_AdmSec
+        usecase "UC14: Monitor Platform Health" as UC_Health
+        usecase "UC15: View System Audit Logs" as UC_AuditLogs
+
+        UC_AdmUsers -[hidden]down-> UC_AdmSec
+        UC_AdmSec -[hidden]down-> UC_Health
+        UC_Health -[hidden]down-> UC_AuditLogs
+
+        ' Column 2: Sub Use Cases
+        usecase "UC12.1: Deactivate / Ban Malicious User" as UC_Ban
+        usecase "UC13.1: Inspect IsolationForest Flags" as UC_AuditML
+        usecase "UC13.2: Monitor Failed Logins" as UC_Logins
+        usecase "UC14.1: Check External API Health" as UC_APIHealth
+
+        UC_Ban -[hidden]down-> UC_AuditML
+        UC_AuditML -[hidden]down-> UC_Logins
+        UC_Logins -[hidden]down-> UC_APIHealth
+
+        ' Internal Relationships
+        UC_Ban .left.> UC_AdmUsers : <<extend>>\n[on rule violation]
+        UC_AdmSec .right.> UC_AuditML : <<include>>
+        UC_AdmSec .right.> UC_Logins : <<include>>
+        UC_Health .right.> UC_APIHealth : <<include>>
+    }
+}
+
+' Stacking Zones Top to Bottom
+Zone_Auth -[hidden]down-> Zone_Cand
+Zone_Cand -[hidden]down-> Zone_HR
+Zone_HR -[hidden]down-> Zone_Admin
+
+' ===================================================
+' EXTERNAL SYSTEMS (FAR RIGHT)
+' ===================================================
+actor "Email Service\n(SMTP)" as Email <<External System>>
+actor "Adzuna Job API\n(Live Jobs)" as Adzuna <<External System>>
+
+Email -[hidden]down-> Adzuna
+
+' ===================================================
+' ACTOR ASSOCIATIONS (ONLY TO MAIN COLUMN 1 UCs)
+' ===================================================
+' Candidate
+Cand --> UC_Reg
+Cand --> UC_Login
+Cand --> UC_Upload
+Cand --> UC_Dash
+Cand --> UC_Match
+Cand --> UC_Apply
+Cand --> UC_Track
+
+' HR Recruiter
+HR --> UC_Reg
+HR --> UC_Login
+HR --> UC_Post
+HR --> UC_Rank
+HR --> UC_Status
+HR --> UC_Analytics
+
+' Platform Admin
+Admin --> UC_Login
+Admin --> UC_AdmUsers
+Admin --> UC_AdmSec
+Admin --> UC_Health
+Admin --> UC_AuditLogs
+
+' ===================================================
+' EXTERNAL SYSTEM LINKS
+' ===================================================
+UC_Verify -right-> Email
+UC_Notify -right-> Email
+
+UC_AdzunaSearch -right-> Adzuna
+UC_APIHealth -right-> Adzuna
+
+@enduml

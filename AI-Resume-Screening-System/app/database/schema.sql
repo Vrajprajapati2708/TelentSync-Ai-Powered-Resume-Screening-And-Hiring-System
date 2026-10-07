@@ -114,13 +114,17 @@ CREATE TABLE IF NOT EXISTS applications (
 );
 
 CREATE TABLE IF NOT EXISTS notifications (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     INTEGER NOT NULL,
-    title       TEXT    NOT NULL,
-    message     TEXT    DEFAULT '',
-    type        TEXT    DEFAULT 'info',  -- 'info'|'success'|'error'|'warning'
-    is_read     INTEGER DEFAULT 0,
-    created_at  TEXT    DEFAULT (datetime('now')),
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id       INTEGER NOT NULL,
+    title         TEXT    NOT NULL,
+    message       TEXT    DEFAULT '',
+    type          TEXT    DEFAULT 'info',  -- 'application'|'match'|'view'|'system'|'security'|'info'|'success'|'warning'|'error'
+    is_read       INTEGER DEFAULT 0,
+    action_type   TEXT    DEFAULT 'none',  -- 'view_application'|'view_jobs'|'view_ats'|'view_profile'|'none'
+    action_target TEXT    DEFAULT '',      -- '#cand-applications'|'#cand-jobs'|'#cand-ats'|'#cand-profile'
+    metadata      TEXT    DEFAULT '{}',
+    created_at    TEXT    DEFAULT (datetime('now')),
+    updated_at    TEXT    DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

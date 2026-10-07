@@ -342,8 +342,46 @@ class TestPhase4EmailMlOcrRegression(unittest.TestCase):
     # GAP-13: ML Dependency & Model Hardening Tests
     # ============================================================
 
+    def test_gap13_ml_status_unauthenticated_returns_401(self):
+        """GET /api/ml/status requires authentication and returns 401 for unauthenticated requests."""
+        res = self.client.get("/api/ml/status")
+        self.assertEqual(res.status_code, 401)
+
+    def test_gap13_ml_endpoints_candidate_forbidden_returns_403(self):
+        """Candidate users cannot access ML status, training controls, or raw pipeline inference."""
+        email = f"cand_ml_{int(time.time()*1000)}@test.com"
+        register_user("Cand ML", email, "ValidPassword10!", "candidate", is_verified=1)
+        login_res = self.client.post("/api/auth/login", json={"email": email, "password": "ValidPassword10!"})
+        self.assertEqual(login_res.status_code, 200)
+
+        # 1. Status endpoint forbidden
+        status_res = self.client.get("/api/ml/status")
+        self.assertEqual(status_res.status_code, 403)
+
+        # 2. Train endpoint forbidden
+        train_res = self.client.post("/api/ml/train", json={})
+        self.assertEqual(train_res.status_code, 403)
+
+        # 3. Pipeline endpoint forbidden
+        pipe_res = self.client.post("/api/ml/pipeline", json={"resume_text": "Sample"})
+        self.assertEqual(pipe_res.status_code, 403)
+
     def test_gap13_ml_status_endpoint_structure(self):
-        """GET /api/ml/status returns version info, health, and sanitized relative paths."""
+        """GET /api/ml/status returns version info, health, and sanitized relative paths for Platform Admin."""
+        admin_email = f"admin_ml_{int(time.time()*1000)}@test.com"
+        from werkzeug.security import generate_password_hash
+        hashed = generate_password_hash("ValidPassword10!")
+        with get_db() as conn:
+            cur = conn.execute(
+                "INSERT INTO users (name, email, password, role, is_verified) VALUES (?, ?, ?, 'admin', 1)",
+                ("Admin ML", admin_email, hashed)
+            )
+            admin_id = cur.lastrowid
+            conn.commit()
+
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = admin_id
+
         res = self.client.get("/api/ml/status")
         self.assertEqual(res.status_code, 200)
         data = res.get_json()

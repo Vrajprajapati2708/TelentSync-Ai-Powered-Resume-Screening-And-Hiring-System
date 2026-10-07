@@ -235,6 +235,21 @@ def process_resume_upload(file, user_id: int | None = None) -> dict:
                     "UPDATE users SET skills=?, ats_score=? WHERE id=?",
                     (skills_str, ats_score, user_id)
                 )
+
+                # 6c. Insert event notification
+                cur_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+                conn.execute(
+                    """INSERT INTO notifications 
+                       (user_id, title, message, type, action_type, action_target, metadata, created_at)
+                       VALUES (?, ?, ?, 'system', 'view_ats', '#cand-ats', ?, ?)""",
+                    (
+                        user_id,
+                        'Resume Processed & Scored ✨',
+                        f"Your resume was analyzed with an ATS Score of {ats_score}/100 and {len(skills_list)} extracted skills.",
+                        json.dumps({'resume_id': resume_id, 'ats_score': ats_score, 'skills_count': len(skills_list)}),
+                        cur_time
+                    )
+                )
                 conn.commit()
 
             logger.info(f"Resume uploaded & inserted: resume_id={resume_id}, user_id={user_id}, score={ats_score}")
