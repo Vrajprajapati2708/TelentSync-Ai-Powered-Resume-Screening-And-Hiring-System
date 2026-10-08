@@ -6127,8 +6127,86 @@ function fetchPlatformAdminRecentActivity() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SECTION 2: USERS
+// SECTION 2: USERS & GOVERNANCE
 // ═══════════════════════════════════════════════════════════
+
+let _paUserSearchTimer = null;
+
+function onPaUserSearch(val) {
+  clearTimeout(_paUserSearchTimer);
+  _paUserSearchTimer = setTimeout(() => {
+    fetchPlatformAdminUsers(1);
+  }, 300);
+}
+
+function filterPlatformUsersByTab(tab, el) {
+  // Update active styling on tabs
+  document.querySelectorAll('#platform-admin-users .tab-btn').forEach(btn => btn.classList.remove('active'));
+  if (el) {
+    el.classList.add('active');
+  } else {
+    const targetBtn = document.getElementById(`pa-user-tab-${tab}`);
+    if (targetBtn) targetBtn.classList.add('active');
+  }
+
+  const roleSelect = document.getElementById('pa-user-role-filter');
+  const statusSelect = document.getElementById('pa-user-status-filter');
+
+  if (tab === 'all') {
+    if (roleSelect) roleSelect.value = '';
+    if (statusSelect) statusSelect.value = '';
+  } else if (tab === 'candidate') {
+    if (roleSelect) roleSelect.value = 'candidate';
+    if (statusSelect) statusSelect.value = '';
+  } else if (tab === 'hr') {
+    if (roleSelect) roleSelect.value = 'hr';
+    if (statusSelect) statusSelect.value = '';
+  } else if (tab === 'admin') {
+    if (roleSelect) roleSelect.value = 'admin';
+    if (statusSelect) statusSelect.value = '';
+  } else if (tab === 'inactive') {
+    if (roleSelect) roleSelect.value = '';
+    if (statusSelect) statusSelect.value = 'inactive';
+  }
+
+  fetchPlatformAdminUsers(1);
+}
+
+function resetPlatformUserFilters() {
+  const searchInput = document.getElementById('pa-user-search');
+  const roleSelect   = document.getElementById('pa-user-role-filter');
+  const statusSelect = document.getElementById('pa-user-status-filter');
+  const verifSelect  = document.getElementById('pa-user-verification-filter');
+
+  if (searchInput) searchInput.value = '';
+  if (roleSelect) roleSelect.value = '';
+  if (statusSelect) statusSelect.value = '';
+  if (verifSelect) verifSelect.value = '';
+
+  // Reset tab to 'all'
+  document.querySelectorAll('#platform-admin-users .tab-btn').forEach(btn => btn.classList.remove('active'));
+  const allTab = document.getElementById('pa-user-tab-all');
+  if (allTab) allTab.classList.add('active');
+
+  fetchPlatformAdminUsers(1);
+  Toast.show('User directory filters have been reset.', 'info');
+}
+
+function syncPlatformUserTabCounters() {
+  fetch('/api/platform-admin/analytics')
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.success && res.data && res.data.users) {
+        const u = res.data.users;
+        setEl('pa-user-count-all', u.total || 0);
+        setEl('pa-user-count-cand', (u.by_role && u.by_role.candidate) || 0);
+        setEl('pa-user-count-hr', (u.by_role && u.by_role.hr) || 0);
+        setEl('pa-user-count-admin', (u.by_role && u.by_role.admin) || 0);
+        setEl('pa-user-count-inactive', u.inactive || 0);
+      }
+    })
+    .catch(() => {});
+}
 
 function fetchPlatformAdminUsers(page = 1) {
   PlatformAdminState.usersPage = page;
@@ -6146,6 +6224,9 @@ function fetchPlatformAdminUsers(page = 1) {
   if (tbody) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading platform users...</td></tr>';
   }
+
+  // Update tab counts in parallel
+  syncPlatformUserTabCounters();
 
   const params = new URLSearchParams({ page: page, limit: 10 });
   if (q) params.set('search', q);
@@ -6175,7 +6256,7 @@ function fetchPlatformAdminUsers(page = 1) {
       if (nextBtn) nextBtn.disabled = pagination.page >= pagination.pages;
 
       if (users.length === 0) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-user-slash" style="font-size:24px;margin-bottom:8px;display:block"></i>No users found matching current filters.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--text-3)"><i class="fas fa-user-slash" style="font-size:28px;margin-bottom:10px;display:block;opacity:0.5"></i>No users found matching current filters.</td></tr>';
         return;
       }
 
@@ -6183,7 +6264,16 @@ function fetchPlatformAdminUsers(page = 1) {
         tbody.innerHTML = users.map(u => {
           const avatar = (u.name || '??').slice(0, 2).toUpperCase();
           const bg = UI.avatarColor(u.name || '');
-          const roleBadgeColor = u.role === 'admin' ? 'badge-primary' : (u.role === 'hr' ? 'badge-success' : 'badge-info');
+          
+          let roleBadge = '';
+          if (u.role === 'admin') {
+            roleBadge = '<span class="badge" style="background:#e0e7ff;color:#4338ca;border:1px solid #c7d2fe;font-size:11px;font-weight:700"><i class="fas fa-user-shield" style="margin-right:3px"></i> Admin</span>';
+          } else if (u.role === 'hr') {
+            roleBadge = '<span class="badge" style="background:#dcfce7;color:#15803d;border:1px solid #bbf7d0;font-size:11px;font-weight:700"><i class="fas fa-user-tie" style="margin-right:3px"></i> HR Recruiter</span>';
+          } else {
+            roleBadge = '<span class="badge" style="background:#e0f2fe;color:#0369a1;border:1px solid #bae6fd;font-size:11px;font-weight:700"><i class="fas fa-user-graduate" style="margin-right:3px"></i> Candidate</span>';
+          }
+
           const verifBadge = u.is_verified
             ? '<span class="badge badge-success" style="font-size:11px"><i class="fas fa-check-circle"></i> Verified</span>'
             : '<span class="badge badge-gray" style="font-size:11px"><i class="fas fa-clock"></i> Unverified</span>';
@@ -6196,27 +6286,37 @@ function fetchPlatformAdminUsers(page = 1) {
 
           return `
             <tr>
-              <td style="font-weight:600;color:var(--text-3);font-size:12px">#${u.id}</td>
+              <td style="font-weight:700;color:var(--text-3);font-size:12px">#${u.id}</td>
               <td>
                 <div style="display:flex;align-items:center;gap:10px">
-                  <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0">${escapeHTML(avatar)}</div>
+                  <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0;font-weight:700">${escapeHTML(avatar)}</div>
                   <div>
-                    <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(u.name)} ${isCurrentUser ? '<span class="badge badge-gray" style="font-size:10px;padding:2px 6px">You</span>' : ''}</div>
+                    <div style="font-weight:700;font-size:13px;color:var(--text)">
+                      ${escapeHTML(u.name)} ${isCurrentUser ? '<span class="badge badge-primary" style="font-size:10px;padding:2px 6px;margin-left:4px">You</span>' : ''}
+                      ${u.is_outlier ? '<span class="badge badge-danger" style="font-size:10px;padding:1px 5px;margin-left:4px" title="Anomaly Flag Active">⚠️ Flagged</span>' : ''}
+                    </div>
                     <div style="font-size:11px;color:var(--text-3)">${escapeHTML(u.email)}</div>
                   </div>
                 </div>
               </td>
-              <td><span class="badge ${roleBadgeColor}" style="text-transform:capitalize;font-size:11px">${escapeHTML(u.role)}</span></td>
+              <td>${roleBadge}</td>
               <td>${verifBadge}</td>
               <td>${statusBadge}</td>
               <td><span class="badge ${UI.atsBadge(u.ats_score || 0)}" style="font-size:11px">${u.ats_score || 0}/100</span></td>
               <td style="font-size:12px;color:var(--text-2)">${escapeHTML(u.location || 'Not set')}</td>
               <td style="font-size:12px;color:var(--text-3)">${createdDate}</td>
               <td style="font-size:12px">${lastLoginText}</td>
-              <td style="text-align:right">
-                <button class="btn btn-sm btn-outline" onclick="openPlatformUserModal(${u.id})">
-                  <i class="fas fa-user-cog"></i> Manage
-                </button>
+              <td style="text-align:right;white-space:nowrap">
+                <div style="display:inline-flex;gap:6px;align-items:center">
+                  <button class="btn btn-sm btn-outline" onclick="openPlatformUserModal(${u.id})" title="Manage User Permissions &amp; Profile">
+                    <i class="fas fa-user-cog"></i> Manage
+                  </button>
+                  ${!isCurrentUser ? (
+                    u.is_active
+                      ? `<button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:4px 8px" onclick="quickTogglePlatformUserStatus(${u.id}, true)" title="Deactivate user"><i class="fas fa-user-slash"></i></button>`
+                      : `<button class="btn btn-sm btn-outline-success" style="font-size:11px;padding:4px 8px" onclick="quickTogglePlatformUserStatus(${u.id}, false)" title="Activate user"><i class="fas fa-user-check"></i></button>`
+                  ) : ''}
+                </div>
               </td>
             </tr>
           `;
@@ -6260,7 +6360,9 @@ function openPlatformUserModal(userId) {
       setEl('pa-modal-ats', `${u.ats_score || 0} / 100`);
       setEl('pa-modal-created', u.created_at ? new Date(u.created_at).toLocaleString() : 'N/A');
       setEl('pa-modal-last-login', u.last_login ? new Date(u.last_login).toLocaleString() : 'Never logged in');
-      setEl('pa-modal-stats', `${u.application_count || 0} job applications · ${u.resume_count || 0} uploaded resumes`);
+      
+      const stats = u.stats || {};
+      setEl('pa-modal-stats', `${stats.applications_count || 0} job applications · ${stats.resumes_count || 0} uploaded resumes`);
 
       const avatarEl = document.getElementById('pa-modal-avatar');
       if (avatarEl) {
@@ -6316,7 +6418,7 @@ function openPlatformUserModal(userId) {
           if (logins.length) {
             html += '<div style="font-weight:700;margin-bottom:4px;color:var(--text)">Recent Login Attempts:</div><ul style="padding-left:18px;margin:0">';
             logins.forEach(l => {
-              html += `<li>IP: <code>${escapeHTML(l.ip_address || 'N/A')}</code> — <span class="badge ${l.success ? 'badge-success' : 'badge-danger'}" style="font-size:10px">${l.success ? 'Success' : 'Failed'}</span> <span style="color:var(--text-3);font-size:11px">(${l.timestamp ? new Date(l.timestamp).toLocaleString() : ''})</span></li>`;
+              html += `<li>IP: <code>${escapeHTML(l.ip_address || 'N/A')}</code> — <span class="badge ${l.success ? 'badge-success' : 'badge-danger'}" style="font-size:10px">${l.success ? 'Success' : 'Failed'}</span> <span style="color:var(--text-3);font-size:11px">(${l.attempted_at ? new Date(l.attempted_at).toLocaleString() : ''})</span></li>`;
             });
             html += '</ul>';
           }
@@ -6338,11 +6440,44 @@ function openPlatformUserModal(userId) {
         }
       }
 
+      // Self-Protection Safeguards
+      const isSelf = DB.currentUser && DB.currentUser.id === u.id;
+      const selfBanner = document.getElementById('pa-modal-self-banner');
+      const roleBtn = document.getElementById('pa-modal-btn-role');
+      const deleteBtn = document.getElementById('pa-modal-btn-delete');
+
+      if (selfBanner) selfBanner.style.display = isSelf ? 'block' : 'none';
+      if (roleSelect) roleSelect.disabled = isSelf;
+      if (roleBtn) roleBtn.disabled = isSelf;
+      if (toggleBtn) toggleBtn.disabled = isSelf;
+      if (deleteBtn) deleteBtn.disabled = isSelf;
+
       Modal.open('pa-user-modal');
     })
     .catch(err => {
       console.error('Error loading user detail:', err);
       Toast.show('Network error retrieving user details.', 'error');
+    });
+}
+
+function quickTogglePlatformUserStatus(userId, currentActive) {
+  const endpoint = currentActive ? `/api/platform-admin/users/${userId}/deactivate` : `/api/platform-admin/users/${userId}/activate`;
+  fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.success) {
+        Toast.show(res.message || 'User status updated successfully.', 'success');
+        fetchPlatformAdminUsers(PlatformAdminState.usersPage);
+      } else {
+        Toast.show((res && res.message) || 'Failed to update user status.', 'error');
+      }
+    })
+    .catch(err => {
+      console.error('Quick status toggle error:', err);
+      Toast.show('Network error updating user status.', 'error');
     });
 }
 
@@ -6438,6 +6573,177 @@ function togglePlatformUserStatus() {
       }
       console.error('Status toggle error:', err);
       Toast.show('Network error while toggling status.', 'error');
+    });
+}
+
+function deletePlatformUser() {
+  const u = PlatformAdminState.selectedUser;
+  if (!u) return;
+
+  if (DB.currentUser && DB.currentUser.id === u.id) {
+    Toast.show('Administrators cannot delete their own account.', 'error');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to permanently delete user "${u.name}" (${u.email})? This action will cascade delete all associated resumes and applications.`)) {
+    return;
+  }
+
+  const deleteBtn = document.getElementById('pa-modal-btn-delete');
+  if (deleteBtn) { deleteBtn.disabled = true; deleteBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+
+  fetch(`/api/platform-admin/users/${u.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete'; }
+      if (res && res.success) {
+        Toast.show(res.message || 'User account successfully deleted.', 'success');
+        Modal.close('pa-user-modal');
+        fetchPlatformAdminUsers(PlatformAdminState.usersPage);
+      } else {
+        Toast.show((res && res.message) || 'Failed to delete user account.', 'error');
+      }
+    })
+    .catch(err => {
+      if (deleteBtn) { deleteBtn.disabled = false; deleteBtn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete'; }
+      console.error('Delete user error:', err);
+      Toast.show('Network error deleting user account.', 'error');
+    });
+}
+
+function openCreatePlatformUserModal() {
+  const nameEl = document.getElementById('pa-new-user-name');
+  const emailEl = document.getElementById('pa-new-user-email');
+  const passEl = document.getElementById('pa-new-user-pass');
+  const roleEl = document.getElementById('pa-new-user-role');
+  const verifEl = document.getElementById('pa-new-user-verified');
+
+  if (nameEl) nameEl.value = '';
+  if (emailEl) emailEl.value = '';
+  if (passEl) passEl.value = '';
+  if (roleEl) roleEl.value = 'candidate';
+  if (verifEl) verifEl.checked = true;
+
+  Modal.open('pa-create-user-modal');
+}
+
+function submitCreatePlatformUser() {
+  const name = (document.getElementById('pa-new-user-name')?.value || '').trim();
+  const email = (document.getElementById('pa-new-user-email')?.value || '').trim();
+  const password = document.getElementById('pa-new-user-pass')?.value || '';
+  const role = document.getElementById('pa-new-user-role')?.value || 'candidate';
+  const is_verified = Boolean(document.getElementById('pa-new-user-verified')?.checked);
+
+  if (!name) {
+    Toast.show('Full name is required.', 'warning');
+    return;
+  }
+  if (!email || !email.includes('@')) {
+    Toast.show('Valid email address is required.', 'warning');
+    return;
+  }
+  if (!password || password.length < 8) {
+    Toast.show('Password must be at least 8 characters.', 'warning');
+    return;
+  }
+
+  const submitBtn = document.getElementById('pa-new-user-submit-btn');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Provisioning...'; }
+
+  fetch('/api/platform-admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, password, role, is_verified })
+  })
+    .then(r => r.json().then(data => ({ status: r.status, body: data })))
+    .then(({ status, body }) => {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create User'; }
+      if (body.success) {
+        Toast.show(body.message || `User '${name}' successfully provisioned!`, 'success');
+        Modal.close('pa-create-user-modal');
+        fetchPlatformAdminUsers(1);
+      } else {
+        Toast.show(body.message || 'Failed to provision user.', 'error');
+      }
+    })
+    .catch(err => {
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create User'; }
+      console.error('Provision user error:', err);
+      Toast.show('Network error while provisioning user.', 'error');
+    });
+}
+
+function exportPlatformUsersCSV() {
+  const searchInput = document.getElementById('pa-user-search');
+  const roleSelect   = document.getElementById('pa-user-role-filter');
+  const statusSelect = document.getElementById('pa-user-status-filter');
+  const verifSelect  = document.getElementById('pa-user-verification-filter');
+
+  const q = searchInput ? searchInput.value.trim() : '';
+  const role = roleSelect ? roleSelect.value : '';
+  const status = statusSelect ? statusSelect.value : '';
+  const verification = verifSelect ? verifSelect.value : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 500 });
+  if (q) params.set('search', q);
+  if (role) params.set('role', role);
+  if (status) params.set('status', status);
+  if (verification) params.set('verification', verification);
+
+  Toast.show('Preparing User Directory CSV export...', 'info');
+
+  fetch(`/api/platform-admin/users?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success || !res.data || !res.data.users) {
+        Toast.show('Failed to fetch user data for export.', 'error');
+        return;
+      }
+
+      const users = res.data.users;
+      if (users.length === 0) {
+        Toast.show('No user records match current filter for export.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        let str = String(val == null ? '' : val);
+        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['User ID', 'Full Name', 'Email Address', 'Platform Role', 'Account Status', 'Verification Status', 'ATS Score', 'Location', 'Registered At', 'Last Login'];
+      const rows = users.map(u => [
+        sanitizeCSV(u.id),
+        sanitizeCSV(u.name),
+        sanitizeCSV(u.email),
+        sanitizeCSV(u.role),
+        sanitizeCSV(u.is_active ? 'Active' : 'Inactive'),
+        sanitizeCSV(u.is_verified ? 'Verified' : 'Unverified'),
+        sanitizeCSV(u.ats_score != null ? `${u.ats_score}/100` : 'N/A'),
+        sanitizeCSV(u.location || 'Not Specified'),
+        sanitizeCSV(u.created_at || 'N/A'),
+        sanitizeCSV(u.last_login || 'Never')
+      ]);
+
+      const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TalentSync_User_Directory_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${users.length} user record(s) to CSV! 📁`, 'success');
+    })
+    .catch(err => {
+      console.error('CSV Export error:', err);
+      Toast.show('Network error exporting user directory.', 'error');
     });
 }
 
@@ -7370,6 +7676,14 @@ window.changePlatformUsersPage       = changePlatformUsersPage;
 window.openPlatformUserModal         = openPlatformUserModal;
 window.submitPlatformUserRoleChange  = submitPlatformUserRoleChange;
 window.togglePlatformUserStatus      = togglePlatformUserStatus;
+window.onPaUserSearch                = onPaUserSearch;
+window.filterPlatformUsersByTab      = filterPlatformUsersByTab;
+window.resetPlatformUserFilters      = resetPlatformUserFilters;
+window.quickTogglePlatformUserStatus = quickTogglePlatformUserStatus;
+window.deletePlatformUser            = deletePlatformUser;
+window.openCreatePlatformUserModal   = openCreatePlatformUserModal;
+window.submitCreatePlatformUser      = submitCreatePlatformUser;
+window.exportPlatformUsersCSV        = exportPlatformUsersCSV;
 
 // Section 3
 window.fetchPlatformAdminJobs        = fetchPlatformAdminJobs;

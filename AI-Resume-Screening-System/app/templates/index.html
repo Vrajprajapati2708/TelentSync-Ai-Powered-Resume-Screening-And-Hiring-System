@@ -2620,13 +2620,46 @@
           </div>
         </div>
 
-        <!-- ── SECTION 2: USERS ── -->
+        <!-- ── SECTION 2: USERS & GOVERNANCE ── -->
         <div id="platform-admin-users" data-portal="platform-admin" class="hidden">
+          
+          <!-- Tab Navigation Bar with Live Counter Badges -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="tab-btn active" id="pa-user-tab-all" onclick="filterPlatformUsersByTab('all', this)" style="padding:8px 16px;font-size:13px;font-weight:700">
+                <i class="fas fa-users" style="margin-right:6px"></i> All Users <span class="badge badge-gray" id="pa-user-count-all" style="margin-left:6px;font-size:11px">--</span>
+              </button>
+              <button class="tab-btn" id="pa-user-tab-candidate" onclick="filterPlatformUsersByTab('candidate', this)" style="padding:8px 16px;font-size:13px;font-weight:700">
+                <i class="fas fa-user-graduate" style="margin-right:6px"></i> Candidates <span class="badge badge-gray" id="pa-user-count-cand" style="margin-left:6px;font-size:11px">--</span>
+              </button>
+              <button class="tab-btn" id="pa-user-tab-hr" onclick="filterPlatformUsersByTab('hr', this)" style="padding:8px 16px;font-size:13px;font-weight:700">
+                <i class="fas fa-user-tie" style="margin-right:6px"></i> HR / Recruiters <span class="badge badge-gray" id="pa-user-count-hr" style="margin-left:6px;font-size:11px">--</span>
+              </button>
+              <button class="tab-btn" id="pa-user-tab-admin" onclick="filterPlatformUsersByTab('admin', this)" style="padding:8px 16px;font-size:13px;font-weight:700">
+                <i class="fas fa-user-shield" style="margin-right:6px"></i> Platform Admins <span class="badge badge-gray" id="pa-user-count-admin" style="margin-left:6px;font-size:11px">--</span>
+              </button>
+              <button class="tab-btn" id="pa-user-tab-inactive" onclick="filterPlatformUsersByTab('inactive', this)" style="padding:8px 16px;font-size:13px;font-weight:700">
+                <i class="fas fa-user-slash" style="margin-right:6px"></i> Inactive <span class="badge badge-gray" id="pa-user-count-inactive" style="margin-left:6px;font-size:11px">--</span>
+              </button>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" onclick="exportPlatformUsersCSV()"><i class="fas fa-file-csv" style="color:#059669;margin-right:4px"></i> Export Directory CSV</button>
+              <button class="btn btn-primary btn-sm" onclick="openCreatePlatformUserModal()"><i class="fas fa-user-plus" style="margin-right:4px"></i> Provision User</button>
+              <button class="btn btn-outline btn-sm" onclick="fetchPlatformAdminUsers(1)" title="Refresh Directory"><i class="fas fa-sync-alt"></i></button>
+            </div>
+          </div>
+
           <div class="card">
-            <div class="card-header" style="flex-wrap:wrap;gap:12px">
-              <span class="card-title"><i class="fas fa-users" style="color:#2563eb;margin-right:8px"></i> User Directory &amp; Governance</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input id="pa-user-search" class="form-control" style="width:190px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search name, email..." onkeydown="if(event.key==='Enter')fetchPlatformAdminUsers(1)">
+            <!-- Filter Toolbar -->
+            <div class="card-header" style="flex-wrap:wrap;gap:12px;background:var(--bg-card);border-bottom:1px solid var(--border)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <span class="card-title" style="font-size:15px"><i class="fas fa-address-book" style="color:var(--primary);margin-right:6px"></i> User Directory</span>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <div style="position:relative">
+                  <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:12px"></i>
+                  <input id="pa-user-search" class="form-control" style="width:220px;padding:6px 12px 6px 30px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search name, email..." oninput="onPaUserSearch(this.value)" onkeydown="if(event.key==='Enter')fetchPlatformAdminUsers(1)">
+                </div>
                 <select id="pa-user-role-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminUsers(1)">
                   <option value="">All Roles</option>
                   <option value="candidate">Candidate</option>
@@ -2643,7 +2676,7 @@
                   <option value="verified">Verified</option>
                   <option value="unverified">Unverified</option>
                 </select>
-                <button class="btn btn-primary btn-sm" onclick="fetchPlatformAdminUsers(1)"><i class="fas fa-search"></i> Search</button>
+                <button class="btn btn-outline btn-sm" onclick="resetPlatformUserFilters()" title="Reset Filters"><i class="fas fa-redo"></i> Reset</button>
               </div>
             </div>
 
@@ -2651,8 +2684,8 @@
               <table class="table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>User</th>
+                    <th style="width:60px">ID</th>
+                    <th>User Profile</th>
                     <th>Role</th>
                     <th>Verification</th>
                     <th>Status</th>
@@ -2670,8 +2703,8 @@
             </div>
 
             <!-- Pagination Controls -->
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-top:1px solid var(--border)">
-              <div id="pa-users-page-info" style="font-size:13px;color:var(--text-3)">Showing Page 1</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px">
+              <div id="pa-users-page-info" style="font-size:13px;color:var(--text-3);font-weight:600">Showing Page 1</div>
               <div style="display:flex;gap:8px">
                 <button id="pa-users-prev-btn" class="btn btn-sm btn-outline" onclick="changePlatformUsersPage(-1)" disabled><i class="fas fa-chevron-left"></i> Previous</button>
                 <button id="pa-users-next-btn" class="btn btn-sm btn-outline" onclick="changePlatformUsersPage(1)" disabled>Next <i class="fas fa-chevron-right"></i></button>
@@ -3305,10 +3338,15 @@
 <div id="pa-user-modal" class="modal-backdrop">
   <div class="modal-box" style="max-width:680px">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-user-title">User Administration</div>
+      <div class="modal-title" id="pa-modal-user-title"><i class="fas fa-user-cog" style="color:var(--primary);margin-right:8px"></i> User Administration</div>
       <button class="modal-close" onclick="Modal.close('pa-user-modal')">&times;</button>
     </div>
     <div class="modal-body" style="padding:24px">
+      <!-- Self-Protection Warning Banner (Shown when admin views their own profile) -->
+      <div id="pa-modal-self-banner" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:18px">
+        <i class="fas fa-shield-alt" style="margin-right:6px"></i> <strong>Active Admin Session:</strong> You are managing your current administrator account. Self-demotion, self-deactivation, and deletion are disabled for governance safety.
+      </div>
+
       <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
         <div id="pa-modal-avatar" class="avatar avatar-lg" style="background:#4338ca;color:#fff;font-size:20px">--</div>
         <div>
@@ -3357,28 +3395,87 @@
           <label style="font-size:13px;font-weight:600;color:var(--text)">Assigned Role:</label>
           <select id="pa-modal-role-select" class="form-control" style="width:160px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px">
             <option value="candidate">Candidate</option>
-            <option value="hr">HR</option>
-            <option value="admin">Admin</option>
+            <option value="hr">HR / Recruiter</option>
+            <option value="admin">Platform Admin</option>
           </select>
           <button id="pa-modal-btn-role" class="btn btn-sm btn-primary" onclick="submitPlatformUserRoleChange()">
             <i class="fas fa-save"></i> Update Role
           </button>
         </div>
 
-        <div style="display:flex;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:14px">
-          <div style="flex:1">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">Account Access Status</div>
-            <div style="font-size:12px;color:var(--text-3)">Deactivating will suspend user authentication access.</div>
+        <div style="display:flex;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:13px;font-weight:700;color:var(--text)">Account Access &amp; Lifecycle</div>
+            <div style="font-size:12px;color:var(--text-3)">Manage user access status or permanently delete the account.</div>
           </div>
-          <button id="pa-modal-btn-toggle-status" class="btn btn-sm btn-outline" onclick="togglePlatformUserStatus()">
-            Toggle Status
-          </button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button id="pa-modal-btn-toggle-status" class="btn btn-sm btn-outline" onclick="togglePlatformUserStatus()">
+              Toggle Status
+            </button>
+            <button id="pa-modal-btn-delete" class="btn btn-sm btn-outline-danger" onclick="deletePlatformUser()" title="Permanently delete user">
+              <i class="fas fa-trash-alt"></i> Delete
+            </button>
+          </div>
         </div>
       </div>
     </div>
     <div class="modal-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
       <button class="btn btn-outline" onclick="Modal.close('pa-user-modal')">Close</button>
     </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL: PLATFORM ADMIN PROVISION USER
+═══════════════════════════════════════════════════════════ -->
+<div id="pa-create-user-modal" class="modal-backdrop">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <div class="modal-title"><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px"></i> Provision New User</div>
+      <button class="modal-close" onclick="Modal.close('pa-create-user-modal')">&times;</button>
+    </div>
+    <form onsubmit="event.preventDefault(); submitCreatePlatformUser();">
+      <div class="modal-body" style="padding:24px">
+        <p style="font-size:13px;color:var(--text-3);margin-bottom:18px">Create and provision a new platform account with immediate verified access.</p>
+        
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Full Name <span style="color:var(--danger)">*</span></label>
+          <input type="text" id="pa-new-user-name" class="form-control" placeholder="e.g. Alex Morgan" required style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Email Address <span style="color:var(--danger)">*</span></label>
+          <input type="email" id="pa-new-user-email" class="form-control" placeholder="alex@company.com" required style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Initial Password <span style="color:var(--danger)">*</span></label>
+          <input type="password" id="pa-new-user-pass" class="form-control" placeholder="Min. 8 characters" required minlength="8" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
+          <div style="font-size:11px;color:var(--text-3);margin-top:4px">Temporary password to be shared with the provisioned user.</div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:16px">
+          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Platform Role <span style="color:var(--danger)">*</span></label>
+          <select id="pa-new-user-role" class="form-control" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
+            <option value="candidate">Candidate (Job Seeker / Applicant)</option>
+            <option value="hr">HR / Recruiter (Hiring Manager)</option>
+            <option value="admin">Platform Administrator (Superuser)</option>
+          </select>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin-top:20px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+          <input type="checkbox" id="pa-new-user-verified" checked style="width:16px;height:16px;cursor:pointer">
+          <div>
+            <label for="pa-new-user-verified" style="font-size:13px;font-weight:700;cursor:pointer;color:var(--text)">Mark Account Verified &amp; Active</label>
+            <div style="font-size:11px;color:var(--text-3)">Grants instant login access without waiting for email confirmation.</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+        <button type="button" class="btn btn-outline" onclick="Modal.close('pa-create-user-modal')">Cancel</button>
+        <button type="submit" id="pa-new-user-submit-btn" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
+      </div>
+    </form>
   </div>
 </div>
 

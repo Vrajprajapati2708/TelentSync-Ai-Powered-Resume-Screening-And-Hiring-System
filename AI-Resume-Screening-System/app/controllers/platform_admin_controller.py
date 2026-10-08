@@ -371,6 +371,62 @@ def delete_platform_user(user_id: int, admin_user_id: int) -> Tuple[bool, str, i
     return True, "User account and associated records deleted successfully.", 200
 
 
+def create_platform_user(data: Dict[str, Any], admin_user_id: int) -> Tuple[bool, str, int, Optional[int]]:
+    """
+    Provisions a new user directly from the Platform Administration panel.
+    Returns (success, message, status_code, user_id).
+    """
+    from werkzeug.security import generate_password_hash
+    from app.utils.validators import validate_email
+
+    name = (data.get("name") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    role = (data.get("role") or "candidate").strip().lower()
+    is_verified = 1 if data.get("is_verified", True) else 0
+
+    if not name:
+        return False, "User name is required.", 400, None
+    if not email or not validate_email(email):
+        return False, "Valid email address is required.", 400, None
+    if role not in ALLOWED_ROLES:
+        return False, f"Invalid role '{role}'. Allowed roles: {', '.join(sorted(ALLOWED_ROLES))}", 400, None
+    if not password or len(password) < 8:
+        return False, "Password must be at least 8 characters.", 400, None
+
+    with get_db() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE LOWER(email) = ?", (email,)).fetchone()
+        if existing:
+            return False, f"An account with email '{email}' already exists.", 409, None
+
+        pwd_hash = generate_password_hash(password)
+        cursor = conn.execute(
+            """INSERT INTO users (name, email, password, role, is_verified, created_at)
+               VALUES (?, ?, ?, ?, ?, datetime('now'))""",
+            (name, email, pwd_hash, role, is_verified)
+        )
+        new_id = cursor.lastrowid
+        if hasattr(conn, "commit"):
+            conn.commit()
+
+        # Write audit log
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'create_user', ?, '127.0.0.1', datetime('now'))",
+                (admin_user_id, f"Created {role} user '{name}' ({email}) with ID #{new_id}")
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+        except Exception:
+            pass
+
+    logger.info(f"Platform admin user_id={admin_user_id} created new user_id={new_id} ({email}, role={role})")
+    return True, f"User '{name}' ({role.upper()}) created successfully.", 201, new_id
+
+
 # ── 2. System-Wide Analytics ─────────────────────────────────
 
 def get_platform_analytics() -> Dict[str, Any]:

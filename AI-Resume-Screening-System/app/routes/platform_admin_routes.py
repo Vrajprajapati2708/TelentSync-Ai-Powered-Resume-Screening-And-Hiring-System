@@ -10,6 +10,7 @@ from app.utils.security import login_required, role_required
 from app.controllers.platform_admin_controller import (
     get_platform_users,
     get_platform_user_detail,
+    create_platform_user,
     activate_platform_user,
     deactivate_platform_user,
     change_platform_user_role,
@@ -66,6 +67,23 @@ def list_users():
         page=page, limit=limit, search=search, role=role, status=status, verification=verification
     )
     return jsonify(result), 200
+
+
+@platform_admin_bp.route('/users', methods=['POST'])
+@login_required
+@role_required('admin')
+@limiter.limit("15 per minute")
+def create_user():
+    """
+    POST /api/platform-admin/users
+    Provisions a new user account with specified role and credentials.
+    """
+    admin_user_id = session.get('user_id')
+    if admin_user_id is None:
+        return jsonify({'success': False, 'message': 'Unauthorized session.'}), 401
+    data = request.get_json(silent=True) or {}
+    success, message, status_code, user_id = create_platform_user(data, int(admin_user_id))
+    return jsonify({'success': success, 'message': message, 'user_id': user_id}), status_code
 
 
 @platform_admin_bp.route('/users/<int:user_id>', methods=['GET'])
