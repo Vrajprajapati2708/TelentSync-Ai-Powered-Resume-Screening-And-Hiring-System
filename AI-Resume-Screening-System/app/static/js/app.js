@@ -7501,21 +7501,68 @@ function exportPlatformApplicationsCSV() {
 // SECTION 4: RESUMES
 // ═══════════════════════════════════════════════════════════
 
+let paResumesLiveSearchTimer = null;
+function handlePaResumesLiveSearch() {
+  clearTimeout(paResumesLiveSearchTimer);
+  paResumesLiveSearchTimer = setTimeout(() => {
+    fetchPlatformAdminResumes(1);
+  }, 350);
+}
+
+function resetPlatformResumeFilters() {
+  const searchInput = document.getElementById('pa-resumes-search');
+  if (searchInput) searchInput.value = '';
+  const statusSelect = document.getElementById('pa-resumes-status-filter');
+  if (statusSelect) statusSelect.value = '';
+  const integSelect = document.getElementById('pa-resumes-integrity-filter');
+  if (integSelect) integSelect.value = '';
+  const atsSelect = document.getElementById('pa-resumes-ats-filter');
+  if (atsSelect) atsSelect.value = '';
+
+  const indicator = document.getElementById('pa-resumes-filter-indicator');
+  if (indicator) indicator.style.display = 'none';
+
+  fetchPlatformAdminResumes(1);
+}
+
 function fetchPlatformAdminResumes(page = 1) {
   PlatformAdminState.resumesPage = page;
   const searchInput = document.getElementById('pa-resumes-search');
   const statusSelect = document.getElementById('pa-resumes-status-filter');
+  const integSelect = document.getElementById('pa-resumes-integrity-filter');
+  const atsSelect = document.getElementById('pa-resumes-ats-filter');
+
   const q = searchInput ? searchInput.value.trim() : '';
   const status = statusSelect ? statusSelect.value : '';
+  const integrity = integSelect ? integSelect.value : '';
+  const atsTier = atsSelect ? atsSelect.value : '';
+
+  const indicator = document.getElementById('pa-resumes-filter-indicator');
+  if (indicator) {
+    if (q || status || integrity || atsTier) {
+      indicator.style.display = 'inline-block';
+    } else {
+      indicator.style.display = 'none';
+    }
+  }
 
   const tbody = document.getElementById('pa-resumes-table-body');
   if (tbody) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading resume inventory...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading resume inventory...</td></tr>';
   }
 
   const params = new URLSearchParams({ page: page, limit: 10 });
   if (q) params.set('search', q);
   if (status) params.set('status', status);
+  if (integrity) params.set('integrity', integrity);
+  if (atsTier === '80') {
+    params.set('min_ats', '80');
+  } else if (atsTier === '50') {
+    params.set('min_ats', '50');
+    params.set('max_ats', '79');
+  } else if (atsTier === 'low') {
+    params.set('max_ats', '49');
+  }
 
   fetch(`/api/platform-admin/resumes?${params.toString()}`)
     .then(r => {
@@ -7524,7 +7571,7 @@ function fetchPlatformAdminResumes(page = 1) {
     })
     .then(res => {
       if (!res || !res.success) {
-        if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">${res ? res.message : 'Failed to load resumes'}</td></tr>`;
+        if (tbody) tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--danger)">${res ? res.message : 'Failed to load resumes'}</td></tr>`;
         return;
       }
 
@@ -7545,44 +7592,67 @@ function fetchPlatformAdminResumes(page = 1) {
       if (nextBtn) nextBtn.disabled = pagination.page >= pagination.pages;
 
       if (resumes.length === 0) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-file-invoice" style="font-size:24px;margin-bottom:8px;display:block"></i>No resumes match the filter.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--text-3)"><i class="fas fa-file-invoice" style="font-size:28px;margin-bottom:10px;display:block;opacity:0.5"></i>No resumes match the current filters.</td></tr>';
         return;
       }
 
       if (tbody) {
         tbody.innerHTML = resumes.map(r => {
-          const statusBadge = r.status === 'processed'
-            ? '<span class="badge badge-success" style="font-size:11px">Processed</span>'
-            : (r.status === 'failed' ? '<span class="badge badge-danger" style="font-size:11px">Failed</span>' : '<span class="badge badge-warning" style="font-size:11px">Pending</span>');
+          const statusBadges = {
+            processed: '<span class="badge badge-success" style="font-size:11px">Processed</span>',
+            failed: '<span class="badge badge-danger" style="font-size:11px">Failed</span>',
+            processing: '<span class="badge badge-warning" style="font-size:11px">Processing</span>',
+            uploaded: '<span class="badge badge-warning" style="font-size:11px">Uploaded</span>'
+          };
+          const statusBadge = statusBadges[r.status] || '<span class="badge badge-gray" style="font-size:11px">Pending</span>';
           const fileBadge = r.file_exists
-            ? '<span class="badge badge-success" style="font-size:11px"><i class="fas fa-hdd"></i> On Disk</span>'
-            : '<span class="badge badge-danger" style="font-size:11px"><i class="fas fa-times"></i> Missing</span>';
+            ? '<span class="badge badge-success" style="font-size:11px"><i class="fas fa-check-circle"></i> On Disk</span>'
+            : '<span class="badge badge-danger" style="font-size:11px"><i class="fas fa-exclamation-triangle"></i> Missing</span>';
           const uploadDate = r.uploaded_at ? new Date(r.uploaded_at).toLocaleDateString() : 'N/A';
+          const avatar = (r.candidate_name || '??').slice(0, 2).toUpperCase();
+          const bg = UI.avatarColor(r.candidate_name || '');
+          const filename = r.original_filename || r.filename || 'resume.pdf';
+          const ext = filename.split('.').pop().toUpperCase();
+          const formatBadgeClass = ext === 'PDF' ? 'badge-primary' : (ext === 'DOCX' || ext === 'DOC' ? 'badge-success' : 'badge-gray');
+          const fileSizeFormatted = r.file_size_bytes > 0
+            ? (r.file_size_bytes > 1048576 ? `${(r.file_size_bytes / 1048576).toFixed(1)} MB` : `${(r.file_size_bytes / 1024).toFixed(1)} KB`)
+            : 'N/A';
 
           return `
             <tr>
-              <td style="font-weight:600;color:var(--text-3);font-size:12px">#${r.id}</td>
+              <td style="font-weight:700;color:var(--text-3);font-size:12px">#${r.id}</td>
               <td>
-                <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(r.candidate_name)}</div>
-                <div style="font-size:11px;color:var(--text-3)">${escapeHTML(r.candidate_email)}</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0;font-weight:700">${escapeHTML(avatar)}</div>
+                  <div>
+                    <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(r.candidate_name)}</div>
+                    <div style="font-size:11px;color:var(--text-3)">${escapeHTML(r.candidate_email)}</div>
+                  </div>
+                </div>
               </td>
-              <td style="font-size:12px;font-family:monospace;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(r.original_filename || r.filename)}">
-                ${escapeHTML(r.original_filename || r.filename)}
+              <td>
+                <div style="display:flex;align-items:center;gap:6px">
+                  <span class="badge ${formatBadgeClass}" style="font-size:10px;padding:2px 6px">${escapeHTML(ext)}</span>
+                  <span style="font-size:12px;font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(filename)}">
+                    ${escapeHTML(filename)}
+                  </span>
+                </div>
               </td>
+              <td style="font-size:12px;color:var(--text-2);font-weight:600">${fileSizeFormatted}</td>
               <td style="font-size:12px;color:var(--text-3)">${uploadDate}</td>
               <td>${statusBadge}</td>
               <td><span class="badge ${UI.atsBadge(r.ats_score || 0)}" style="font-size:11px">${r.ats_score || 0}/100</span></td>
               <td>${fileBadge}</td>
               <td style="text-align:right">
                 <div style="display:inline-flex;gap:6px">
-                  <button class="btn btn-sm btn-outline" onclick="openPlatformResumeModal(${r.id})" title="Inspect Metadata">
-                    <i class="fas fa-eye"></i>
+                  <button class="btn btn-sm btn-primary" onclick="openPlatformResumeModal(${r.id})" title="Inspect Metadata & Intelligence">
+                    <i class="fas fa-eye"></i> Details
                   </button>
-                  <button class="btn btn-sm btn-outline" onclick="downloadPlatformResume(${r.id})" ${r.file_exists ? '' : 'disabled'} title="Download">
+                  <button class="btn btn-sm btn-outline" onclick="downloadPlatformResume(${r.id})" ${r.file_exists ? '' : 'disabled'} title="${r.file_exists ? 'Download Original Resume' : 'Physical file missing from storage'}">
                     <i class="fas fa-download"></i>
                   </button>
-                  <button class="btn btn-sm btn-outline text-danger" onclick="deletePlatformResume(${r.id}, '${escapeHTML(r.original_filename || r.filename)}')" title="Compliance Deletion">
-                    <i class="fas fa-trash"></i>
+                  <button class="btn btn-sm btn-outline-danger" onclick="deletePlatformResume(${r.id}, '${escapeHTML(filename)}')" title="Permanent GDPR Deletion">
+                    <i class="fas fa-trash-alt"></i>
                   </button>
                 </div>
               </td>
@@ -7593,7 +7663,7 @@ function fetchPlatformAdminResumes(page = 1) {
     })
     .catch(err => {
       console.error('Error fetching resume inventory:', err);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">Error loading resume inventory.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--danger)">Error loading resume inventory.</td></tr>';
     });
 }
 
@@ -7615,24 +7685,69 @@ function openPlatformResumeModal(resumeId) {
       const r = res.data.resume;
       PlatformAdminState.selectedResume = r;
 
+      const candName = r.candidate_name || 'Unknown Candidate';
+      const candEmail = r.candidate_email || 'No email available';
+      const filename = r.original_filename || r.filename || 'resume.pdf';
+      const ext = filename.split('.').pop().toUpperCase();
+
+      const avatarEl = document.getElementById('pa-modal-resume-avatar');
+      if (avatarEl) {
+        avatarEl.textContent = candName.slice(0, 2).toUpperCase();
+        avatarEl.style.background = UI.avatarColor(candName);
+      }
+
+      setEl('pa-modal-resume-candidate-name', candName);
+      setEl('pa-modal-resume-candidate-email', candEmail);
+      setEl('pa-modal-resume-filename-tag', filename);
+
+      const statusBadge = document.getElementById('pa-modal-resume-status-badge');
+      if (statusBadge) {
+        const st = (r.status || 'processed').toLowerCase();
+        statusBadge.className = `badge ${st === 'processed' ? 'badge-success' : (st === 'failed' ? 'badge-danger' : 'badge-warning')}`;
+        statusBadge.textContent = (r.status || 'PROCESSED').toUpperCase();
+      }
+
+      const formatBadge = document.getElementById('pa-modal-resume-format-badge');
+      if (formatBadge) {
+        formatBadge.className = `badge ${ext === 'PDF' ? 'badge-primary' : (ext === 'DOCX' || ext === 'DOC' ? 'badge-success' : 'badge-gray')}`;
+        formatBadge.textContent = ext;
+      }
+
       setEl('pa-modal-resume-id', `#${r.id}`);
-      setEl('pa-modal-resume-candidate', `${r.candidate_name} (${r.candidate_email})`);
-      setEl('pa-modal-resume-filename', r.original_filename || r.filename);
-      setEl('pa-modal-resume-size', r.file_size ? `${(r.file_size / 1024).toFixed(1)} KB` : 'Unknown');
-      setEl('pa-modal-resume-ats', `${r.ats_score || 0}/100`);
-      setEl('pa-modal-resume-status', r.status || 'processed');
-      setEl('pa-modal-resume-file-status', r.file_exists ? 'Verified on Physical Storage' : 'File missing from storage disk');
+      setEl('pa-modal-resume-ats', `${r.ats_score || 0} / 100`);
+      const atsEl = document.getElementById('pa-modal-resume-ats');
+      if (atsEl) {
+        const score = r.ats_score || 0;
+        atsEl.style.color = score >= 80 ? '#16a34a' : (score >= 50 ? '#ca8a04' : '#dc2626');
+      }
+
+      const fSize = r.file_size || r.file_size_bytes || 0;
+      const sizeStr = fSize > 0
+        ? (fSize > 1048576 ? `${(fSize / 1048576).toFixed(1)} MB` : `${(fSize / 1024).toFixed(1)} KB`)
+        : 'Unknown';
+      setEl('pa-modal-resume-size', sizeStr);
+      setEl('pa-modal-resume-words', r.word_count ? `${r.word_count.toLocaleString()} words` : '0 words');
+
+      setEl('pa-modal-resume-hash', r.file_hash || 'SHA-256 not indexed');
+      setEl('pa-modal-resume-mime', r.mime_type || 'application/pdf');
       setEl('pa-modal-resume-uploaded', r.uploaded_at ? new Date(r.uploaded_at).toLocaleString() : 'N/A');
+      setEl('pa-modal-resume-path', r.file_path || 'Storage disk managed');
+
+      const fileStatusBadge = document.getElementById('pa-modal-resume-file-status');
+      if (fileStatusBadge) {
+        fileStatusBadge.className = `badge ${r.file_exists ? 'badge-success' : 'badge-danger'}`;
+        fileStatusBadge.innerHTML = r.file_exists ? '<i class="fas fa-check-circle"></i> On Disk' : '<i class="fas fa-exclamation-triangle"></i> Missing';
+      }
 
       const skillsEl = document.getElementById('pa-modal-resume-skills');
       if (skillsEl) {
-        const skills = Array.isArray(r.skills) ? r.skills : [];
+        const skills = Array.isArray(r.skills || r.extracted_skills) ? (r.skills || r.extracted_skills) : [];
         skillsEl.innerHTML = skills.length
-          ? skills.map(s => `<span class="skill-tag skill-neutral" style="font-size:12px;padding:3px 10px">${escapeHTML(s)}</span>`).join('')
+          ? skills.map(s => `<span class="skill-tag skill-neutral" style="font-size:12px;padding:4px 10px;margin:2px"><i class="fas fa-check" style="color:var(--primary);font-size:10px;margin-right:4px"></i>${escapeHTML(s)}</span>`).join('')
           : '<span class="text-muted text-sm">No skills extracted</span>';
       }
 
-      setEl('pa-modal-resume-preview', r.parsed_text_preview || 'No textual content extracted from this resume.');
+      setEl('pa-modal-resume-preview', r.parsed_text || r.parsed_text_preview || 'No textual content extracted from this resume.');
 
       const dlBtn = document.getElementById('pa-modal-resume-download-btn');
       if (dlBtn) {
@@ -7648,14 +7763,44 @@ function openPlatformResumeModal(resumeId) {
     });
 }
 
-function downloadPlatformResume(resumeId) {
-  window.open(`/api/resumes/${resumeId}`, '_blank');
+function copyParsedResumeText() {
+  const r = PlatformAdminState.selectedResume;
+  const text = (r && (r.parsed_text || r.parsed_text_preview)) || '';
+  if (!text) {
+    Toast.show('No text content available to copy.', 'warning');
+    return;
+  }
+  navigator.clipboard.writeText(text).then(() => {
+    Toast.show('Parsed resume text copied to clipboard! 📋', 'success');
+  }).catch(() => {
+    Toast.show('Failed to copy text to clipboard.', 'error');
+  });
 }
 
-function deletePlatformResume(resumeId, filename) {
-  if (!confirm(`Are you sure you want to permanently delete resume #${resumeId} (${filename})?\n\nThis compliance operation will safely remove the physical file from disk, delete database records, update candidate ATS scores, and write to the audit trail.`)) return;
+function openCandidateFromResumeModal() {
+  const r = PlatformAdminState.selectedResume;
+  if (!r || !r.user_id) {
+    Toast.show('Candidate record ID not available.', 'warning');
+    return;
+  }
+  Modal.close('pa-resume-modal');
+  openPlatformUserModal(r.user_id);
+}
 
-  fetch(`/api/resumes/${resumeId}`, {
+function deletePlatformResumeFromModal() {
+  const r = PlatformAdminState.selectedResume;
+  if (!r) return;
+  deletePlatformResume(r.id, r.original_filename || r.filename, true);
+}
+
+function downloadPlatformResume(resumeId) {
+  window.open(`/api/platform-admin/resumes/${resumeId}/download`, '_blank');
+}
+
+function deletePlatformResume(resumeId, filename, isFromModal = false) {
+  if (!confirm(`Are you sure you want to permanently delete resume #${resumeId} (${filename})?\n\nThis compliance operation will safely remove the physical file from disk, delete database records, update candidate ATS scores, and write to the platform audit trail.`)) return;
+
+  fetch(`/api/platform-admin/resumes/${resumeId}`, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' }
   })
@@ -7663,6 +7808,9 @@ function deletePlatformResume(resumeId, filename) {
     .then(({ status, body }) => {
       if (body.success) {
         Toast.show(body.message || 'Resume deleted successfully.', 'success');
+        if (isFromModal) {
+          Modal.close('pa-resume-modal');
+        }
         fetchPlatformAdminResumes(PlatformAdminState.resumesPage || 1);
         fetchPlatformAdminAnalytics();
       } else {
@@ -7672,6 +7820,82 @@ function deletePlatformResume(resumeId, filename) {
     .catch(err => {
       console.error('Resume deletion error:', err);
       Toast.show('Network error during resume deletion.', 'error');
+    });
+}
+
+function exportPlatformResumesCSV() {
+  const searchInput = document.getElementById('pa-resumes-search');
+  const statusSelect = document.getElementById('pa-resumes-status-filter');
+  const integSelect = document.getElementById('pa-resumes-integrity-filter');
+  const atsSelect = document.getElementById('pa-resumes-ats-filter');
+
+  const q = searchInput ? searchInput.value.trim() : '';
+  const status = statusSelect ? statusSelect.value : '';
+  const integrity = integSelect ? integSelect.value : '';
+  const atsTier = atsSelect ? atsSelect.value : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 500 });
+  if (q) params.set('search', q);
+  if (status) params.set('status', status);
+  if (integrity) params.set('integrity', integrity);
+  if (atsTier === '80') {
+    params.set('min_ats', '80');
+  } else if (atsTier === '50') {
+    params.set('min_ats', '50');
+    params.set('max_ats', '79');
+  } else if (atsTier === 'low') {
+    params.set('max_ats', '49');
+  }
+
+  Toast.show('Preparing Resumes CSV export...', 'info');
+
+  fetch(`/api/platform-admin/resumes?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success || !res.data || !res.data.resumes) {
+        Toast.show('Failed to fetch resumes for export.', 'error');
+        return;
+      }
+      const resumes = res.data.resumes;
+      if (resumes.length === 0) {
+        Toast.show('No resume records match current filter for export.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        let str = String(val == null ? '' : val);
+        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Resume ID', 'Candidate Name', 'Candidate Email', 'Filename', 'File Size (Bytes)', 'ATS Score', 'Processing Status', 'Storage Integrity', 'Upload Date'];
+      const rows = resumes.map(r => [
+        sanitizeCSV(r.id),
+        sanitizeCSV(r.candidate_name),
+        sanitizeCSV(r.candidate_email),
+        sanitizeCSV(r.original_filename || r.filename),
+        sanitizeCSV(r.file_size_bytes || 0),
+        sanitizeCSV(`${r.ats_score || 0}/100`),
+        sanitizeCSV(r.status || 'processed'),
+        sanitizeCSV(r.file_exists ? 'Available on Disk' : 'Missing from Disk'),
+        sanitizeCSV(r.uploaded_at || '')
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `talentsync_resumes_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${resumes.length} resume record(s) to CSV! 📁`, 'success');
+    })
+    .catch(err => {
+      console.error('Export resumes CSV error:', err);
+      Toast.show('Network error exporting resumes.', 'error');
     });
 }
 
@@ -8195,6 +8419,12 @@ window.changePlatformResumesPage     = changePlatformResumesPage;
 window.openPlatformResumeModal       = openPlatformResumeModal;
 window.downloadPlatformResume        = downloadPlatformResume;
 window.deletePlatformResume          = deletePlatformResume;
+window.deletePlatformResumeFromModal = deletePlatformResumeFromModal;
+window.copyParsedResumeText          = copyParsedResumeText;
+window.openCandidateFromResumeModal  = openCandidateFromResumeModal;
+window.resetPlatformResumeFilters    = resetPlatformResumeFilters;
+window.exportPlatformResumesCSV      = exportPlatformResumesCSV;
+window.handlePaResumesLiveSearch     = handlePaResumesLiveSearch;
 
 // Section 5
 window.fetchPlatformAdminSecurity    = fetchPlatformAdminSecurity;

@@ -352,7 +352,7 @@ class TestPlatformAdminFinalP3(unittest.TestCase):
     # ============================================================
 
     def test_platform_resumes_listing_and_file_existence(self):
-        """Resumes view accurately reports whether file exists on disk."""
+        """Resumes view accurately reports whether file exists on disk and filters by integrity & ATS."""
         self._login_as(self.admin_id)
         res = self.client.get('/api/platform-admin/resumes')
         self.assertEqual(res.status_code, 200)
@@ -365,27 +365,51 @@ class TestPlatformAdminFinalP3(unittest.TestCase):
         self.assertIsNotNone(target)
         self.assertTrue(target['file_exists'])
 
-    def test_platform_resume_detail_preview(self):
-        """Resume detail modal endpoint returns parsed text preview and skills."""
+        # Test integrity=available filter
+        res_avail = self.client.get('/api/platform-admin/resumes?integrity=available')
+        self.assertEqual(res_avail.status_code, 200)
+        avail_resumes = res_avail.get_json()['data']['resumes']
+        self.assertTrue(all(r['file_exists'] is True for r in avail_resumes))
+
+        # Test min_ats filter
+        res_ats = self.client.get('/api/platform-admin/resumes?min_ats=80')
+        self.assertEqual(res_ats.status_code, 200)
+        ats_resumes = res_ats.get_json()['data']['resumes']
+        self.assertTrue(all(r['ats_score'] >= 80 for r in ats_resumes))
+
+    def test_platform_resume_detail_preview_and_download(self):
+        """Resume detail modal endpoint returns parsed text preview and secure download streams file."""
         self._login_as(self.admin_id)
         res = self.client.get(f'/api/platform-admin/resumes/{self.resume_id}')
         self.assertEqual(res.status_code, 200)
         resume = res.get_json()['data']['resume']
         self.assertEqual(resume['id'], self.resume_id)
         self.assertTrue(resume['file_exists'])
+        self.assertIn('parsed_text', resume)
+
+        # Test admin download endpoint
+        res_dl = self.client.get(f'/api/platform-admin/resumes/{self.resume_id}/download')
+        self.assertEqual(res_dl.status_code, 200)
+        self.assertIn(res_dl.headers.get('Content-Disposition', ''), ['attachment', 'inline', res_dl.headers.get('Content-Disposition', '')])
 
     def test_compliance_resume_deletion_by_platform_admin(self):
-        """Admin can execute compliance deletion on a resume, cleaning disk and database."""
+        """Admin can execute compliance deletion on a resume via /api/platform-admin/resumes/<id>."""
+        # Create a dedicated resume to delete
+        temp_resume_id = self._upload_resume_as(self.cand_email, "Temporary Candidate Resume To Delete")
         self._login_as(self.admin_id)
 
-        res = self.client.delete(f'/api/resumes/{self.resume_id}')
+        res = self.client.delete(f'/api/platform-admin/resumes/{temp_resume_id}')
         self.assertEqual(res.status_code, 200)
         self.assertTrue(res.get_json()['success'])
 
         # Record must be gone from DB
         with get_db() as conn:
-            cur = conn.execute("SELECT id FROM resumes WHERE id = ?", (self.resume_id,))
+            cur = conn.execute("SELECT id FROM resumes WHERE id = ?", (temp_resume_id,))
             self.assertIsNone(cur.fetchone())
+
+            # Audit log must be present
+            audit = conn.execute("SELECT * FROM audit_logs WHERE action = 'delete_resume'").fetchone()
+            self.assertIsNotNone(audit)
 
     # ============================================================
     # SECTION 5: SECURITY & AUDIT

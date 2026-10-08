@@ -1314,14 +1314,17 @@ def get_platform_resumes(
     page: int = 1,
     limit: int = 20,
     search: str = "",
-    status: str = ""
+    status: str = "",
+    integrity: str = "",
+    min_ats: Optional[int] = None,
+    max_ats: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Paginated, searchable administrative view of resumes in the system.
-    Tracks file integrity, parse status, and candidate linkage.
+    Tracks file integrity, parse status, ATS score tier, and candidate linkage.
     """
     page = max(1, page)
-    limit = max(1, min(limit, 100))
+    limit = max(1, min(limit, 500))
     offset = (page - 1) * limit
 
     conditions = []
@@ -1340,6 +1343,14 @@ def get_platform_resumes(
             conditions.append("LOWER(r.status) = ?")
             params.append(st)
 
+    if min_ats is not None:
+        conditions.append("COALESCE(r.ats_score, 0) >= ?")
+        params.append(min_ats)
+
+    if max_ats is not None:
+        conditions.append("COALESCE(r.ats_score, 0) <= ?")
+        params.append(max_ats)
+
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
     with get_db() as conn:
@@ -1356,62 +1367,130 @@ def get_platform_resumes(
             "failed": by_status.get("failed", 0)
         }
 
-        # Filtered count
-        filtered_count = conn.execute(
-            f"""SELECT COUNT(*)
+        # If integrity filter is specified ('available' or 'missing'), we evaluate physical file presence across matched rows
+        if integrity in ("available", "missing"):
+            data_query = f"""
+                SELECT r.id, r.user_id, r.original_name, r.stored_filename, r.file_path,
+                       r.file_size_bytes, r.mime_type, r.word_count, r.ats_score,
+                       r.status, r.uploaded_at,
+                       u.name as candidate_name, u.email as candidate_email
                 FROM resumes r
                 LEFT JOIN users u ON r.user_id = u.id
-                {where_clause}""",
-            tuple(params)
-        ).fetchone()[0]
+                {where_clause}
+                ORDER BY r.id DESC
+            """
+            all_rows = conn.execute(data_query, tuple(params)).fetchall()
 
-        # Data query
-        data_query = f"""
-            SELECT r.id, r.user_id, r.original_name, r.stored_filename, r.file_path,
-                   r.file_size_bytes, r.mime_type, r.word_count, r.ats_score,
-                   r.status, r.uploaded_at,
-                   u.name as candidate_name, u.email as candidate_email
-            FROM resumes r
-            LEFT JOIN users u ON r.user_id = u.id
-            {where_clause}
-            ORDER BY r.id DESC
-            LIMIT ? OFFSET ?
-        """
-        fetch_params = list(params) + [limit, offset]
-        rows = conn.execute(data_query, tuple(fetch_params)).fetchall()
+            from app.controllers.resume_controller import get_upload_folder
+            upload_dir = get_upload_folder()
 
-    resumes = []
-    for r in rows:
-        fpath = r["file_path"] or ""
-        exists_on_disk = os.path.isfile(fpath) if fpath else False
-        resumes.append({
-            "id": r["id"],
-            "user_id": r["user_id"],
-            "candidate_name": r["candidate_name"] or "Unknown",
-            "candidate_email": r["candidate_email"] or "",
-            "filename": r["original_name"],
-            "stored_filename": r["stored_filename"],
-            "file_size_bytes": r["file_size_bytes"] or 0,
-            "mime_type": r["mime_type"] or "application/pdf",
-            "word_count": r["word_count"] or 0,
-            "ats_score": r["ats_score"] or 0,
-            "status": r["status"] or "processed",
-            "file_exists": exists_on_disk,
-            "file_status": "Available" if exists_on_disk else "Missing File",
-            "uploaded_at": r["uploaded_at"] or ""
-        })
+            filtered_resumes = []
+            for r in all_rows:
+                fpath = r["file_path"] or ""
+                if not os.path.isfile(fpath) and r["stored_filename"]:
+                    candidate_p = os.path.join(upload_dir, r["stored_filename"])
+                    if os.path.isfile(candidate_p):
+                        fpath = candidate_p
 
-    total_pages = (filtered_count + limit - 1) // limit if limit > 0 else 1
-    pagination = {
-        "page": page,
-        "limit": limit,
-        "total": filtered_count,
-        "total_items": filtered_count,
-        "total_pages": total_pages,
-        "pages": total_pages,
-        "has_next": page < total_pages,
-        "has_prev": page > 1
-    }
+                exists_on_disk = os.path.isfile(fpath) if fpath else False
+                if (integrity == "available" and exists_on_disk) or (integrity == "missing" and not exists_on_disk):
+                    filtered_resumes.append({
+                        "id": r["id"],
+                        "user_id": r["user_id"],
+                        "candidate_name": r["candidate_name"] or "Unknown",
+                        "candidate_email": r["candidate_email"] or "",
+                        "filename": r["original_name"],
+                        "original_filename": r["original_name"],
+                        "stored_filename": r["stored_filename"],
+                        "file_size_bytes": r["file_size_bytes"] or 0,
+                        "mime_type": r["mime_type"] or "application/pdf",
+                        "word_count": r["word_count"] or 0,
+                        "ats_score": r["ats_score"] or 0,
+                        "status": r["status"] or "processed",
+                        "file_exists": exists_on_disk,
+                        "file_status": "Available" if exists_on_disk else "Missing File",
+                        "uploaded_at": r["uploaded_at"] or ""
+                    })
+
+            total_items = len(filtered_resumes)
+            resumes = filtered_resumes[offset:offset + limit]
+            total_pages = (total_items + limit - 1) // limit if limit > 0 else 1
+            pagination = {
+                "page": page,
+                "limit": limit,
+                "total": total_items,
+                "total_items": total_items,
+                "total_pages": total_pages,
+                "pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }
+        else:
+            # Filtered count
+            filtered_count = conn.execute(
+                f"""SELECT COUNT(*)
+                    FROM resumes r
+                    LEFT JOIN users u ON r.user_id = u.id
+                    {where_clause}""",
+                tuple(params)
+            ).fetchone()[0]
+
+            # Data query
+            data_query = f"""
+                SELECT r.id, r.user_id, r.original_name, r.stored_filename, r.file_path,
+                       r.file_size_bytes, r.mime_type, r.word_count, r.ats_score,
+                       r.status, r.uploaded_at,
+                       u.name as candidate_name, u.email as candidate_email
+                FROM resumes r
+                LEFT JOIN users u ON r.user_id = u.id
+                {where_clause}
+                ORDER BY r.id DESC
+                LIMIT ? OFFSET ?
+            """
+            fetch_params = list(params) + [limit, offset]
+            rows = conn.execute(data_query, tuple(fetch_params)).fetchall()
+
+            from app.controllers.resume_controller import get_upload_folder
+            upload_dir = get_upload_folder()
+
+            resumes = []
+            for r in rows:
+                fpath = r["file_path"] or ""
+                if not os.path.isfile(fpath) and r["stored_filename"]:
+                    candidate_p = os.path.join(upload_dir, r["stored_filename"])
+                    if os.path.isfile(candidate_p):
+                        fpath = candidate_p
+
+                exists_on_disk = os.path.isfile(fpath) if fpath else False
+                resumes.append({
+                    "id": r["id"],
+                    "user_id": r["user_id"],
+                    "candidate_name": r["candidate_name"] or "Unknown",
+                    "candidate_email": r["candidate_email"] or "",
+                    "filename": r["original_name"],
+                    "original_filename": r["original_name"],
+                    "stored_filename": r["stored_filename"],
+                    "file_size_bytes": r["file_size_bytes"] or 0,
+                    "mime_type": r["mime_type"] or "application/pdf",
+                    "word_count": r["word_count"] or 0,
+                    "ats_score": r["ats_score"] or 0,
+                    "status": r["status"] or "processed",
+                    "file_exists": exists_on_disk,
+                    "file_status": "Available" if exists_on_disk else "Missing File",
+                    "uploaded_at": r["uploaded_at"] or ""
+                })
+
+            total_pages = (filtered_count + limit - 1) // limit if limit > 0 else 1
+            pagination = {
+                "page": page,
+                "limit": limit,
+                "total": filtered_count,
+                "total_items": filtered_count,
+                "total_pages": total_pages,
+                "pages": total_pages,
+                "has_next": page < total_pages,
+                "has_prev": page > 1
+            }
 
     return {
         "success": True,
@@ -1447,11 +1526,17 @@ def get_platform_resume_detail(resume_id: int) -> Optional[Dict[str, Any]]:
             return None
 
     fpath = row["file_path"] or ""
+    if not os.path.isfile(fpath) and row["stored_filename"]:
+        from app.controllers.resume_controller import get_upload_folder
+        candidate_p = os.path.join(get_upload_folder(), row["stored_filename"])
+        if os.path.isfile(candidate_p):
+            fpath = candidate_p
+
     exists_on_disk = os.path.isfile(fpath) if fpath else False
 
-    # Preview of parsed text (first 500 chars)
+    # Preview of parsed text (first 1000 chars)
     raw_text = row["parsed_text"] or ""
-    text_preview = (raw_text[:500] + "...") if len(raw_text) > 500 else raw_text
+    text_preview = (raw_text[:1000] + "...") if len(raw_text) > 1000 else raw_text
 
     skills_raw = row["extracted_skills"] or ""
     skills_list = [s.strip() for s in skills_raw.split(",") if s.strip()]
@@ -1462,8 +1547,12 @@ def get_platform_resume_detail(resume_id: int) -> Optional[Dict[str, Any]]:
         "candidate_name": row["candidate_name"] or "Unknown",
         "candidate_email": row["candidate_email"] or "",
         "original_name": row["original_name"],
+        "original_filename": row["original_name"],
+        "filename": row["original_name"],
         "stored_filename": row["stored_filename"],
+        "file_path": fpath,
         "file_hash": row["file_hash"] or "",
+        "file_size": row["file_size_bytes"] or 0,
         "file_size_bytes": row["file_size_bytes"] or 0,
         "mime_type": row["mime_type"] or "application/pdf",
         "word_count": row["word_count"] or 0,
@@ -1472,10 +1561,89 @@ def get_platform_resume_detail(resume_id: int) -> Optional[Dict[str, Any]]:
         "version": row["version"] or 1,
         "uploaded_at": row["uploaded_at"] or "",
         "file_exists": exists_on_disk,
-        "file_status": "Available" if exists_on_disk else "Missing on disk",
+        "file_status": "Available on Disk" if exists_on_disk else "Missing on disk",
         "extracted_skills": skills_list,
-        "text_preview": text_preview
+        "skills": skills_list,
+        "text_preview": text_preview,
+        "parsed_text_preview": text_preview,
+        "parsed_text": raw_text
     }
+
+
+def delete_platform_resume(resume_id: int, admin_user_id: int) -> Tuple[bool, str, int]:
+    """
+    Platform administrator moderation action to permanently delete a resume.
+    Ensures safe file removal from disk, cache invalidation, candidate ATS recalculation,
+    and platform audit logging.
+    """
+    from app.controllers.resume_controller import delete_resume_by_id
+
+    with get_db() as conn:
+        res = conn.execute(
+            """SELECT r.id, r.original_name, r.user_id, u.email as candidate_email
+               FROM resumes r
+               LEFT JOIN users u ON r.user_id = u.id
+               WHERE r.id = ?""",
+            (resume_id,)
+        ).fetchone()
+
+    if not res:
+        return False, "Resume not found.", 404
+
+    filename = res["original_name"] or f"Resume #{resume_id}"
+    candidate_email = res["candidate_email"] or f"User #{res['user_id']}"
+
+    result = delete_resume_by_id(resume_id, admin_user_id, 'admin')
+    if not result.get("success"):
+        return False, result.get("message", "Failed to delete resume."), result.get("status_code", 500)
+
+    # Write to platform audit_logs
+    try:
+        with get_db() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'delete_resume', ?, '127.0.0.1', datetime('now'))",
+                (admin_user_id, f"Permanently deleted resume #{resume_id} ('{filename}') belonging to {candidate_email}")
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+    except Exception as e:
+        logger.warning(f"Audit log write on delete resume failed: {e}")
+
+    logger.info(f"Platform admin (ID #{admin_user_id}) permanently deleted resume_id={resume_id} ({filename})")
+    return True, f"Resume '{filename}' successfully deleted from system.", 200
+
+
+def get_platform_resume_file_path(resume_id: int) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """
+    Returns (file_path, original_filename, mime_type) for secure admin download.
+    """
+    with get_db() as conn:
+        row = conn.execute(
+            "SELECT file_path, original_name, stored_filename, mime_type FROM resumes WHERE id = ?",
+            (resume_id,)
+        ).fetchone()
+
+    if not row:
+        return None, None, None
+
+    fpath = row["file_path"] or ""
+    # If path stored in DB is relative or filename-only, check upload folder
+    if not os.path.isfile(fpath):
+        from app.controllers.resume_controller import get_upload_folder
+        upload_dir = get_upload_folder()
+        candidate_path = os.path.join(upload_dir, row["stored_filename"] or "")
+        if os.path.isfile(candidate_path):
+            fpath = candidate_path
+
+    if not os.path.isfile(fpath):
+        return None, None, None
+
+    orig_name = row["original_name"] or "resume.pdf"
+    mime_type = row["mime_type"] or "application/pdf"
+    return fpath, orig_name, mime_type
 
 
 # ── 8. Platform System Health & Integrations ─────────────────

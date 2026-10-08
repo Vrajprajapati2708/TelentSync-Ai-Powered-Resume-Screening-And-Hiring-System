@@ -1,10 +1,5 @@
-# ============================================================
-#  HireAI / TalentSync — Platform Admin Routes
-#  Blueprint namespace: /api/platform-admin
-#  ALL routes strictly enforce @login_required & @role_required('admin')
-# ============================================================
-
-from flask import Blueprint, request, jsonify, session
+import os
+from flask import Blueprint, request, jsonify, session, send_file
 from app import limiter
 from app.utils.security import login_required, role_required
 from app.controllers.platform_admin_controller import (
@@ -29,6 +24,8 @@ from app.controllers.platform_admin_controller import (
     get_platform_jobs_apps_summary,
     get_platform_resumes,
     get_platform_resume_detail,
+    delete_platform_resume,
+    get_platform_resume_file_path,
     get_platform_system_health,
     get_platform_integrations
 )
@@ -456,6 +453,9 @@ def list_resumes():
       - limit: int (default 20)
       - search: string
       - status: string
+      - integrity: string ('available', 'missing')
+      - min_ats: int
+      - max_ats: int
     """
     try:
         page = int(request.args.get('page', 1))
@@ -469,8 +469,18 @@ def list_resumes():
 
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip()
+    integrity = request.args.get('integrity', '').strip().lower()
 
-    result = get_platform_resumes(page=page, limit=limit, search=search, status=status)
+    min_ats_param = request.args.get('min_ats', '').strip()
+    min_ats = int(min_ats_param) if min_ats_param.isdigit() else None
+
+    max_ats_param = request.args.get('max_ats', '').strip()
+    max_ats = int(max_ats_param) if max_ats_param.isdigit() else None
+
+    result = get_platform_resumes(
+        page=page, limit=limit, search=search, status=status,
+        integrity=integrity, min_ats=min_ats, max_ats=max_ats
+    )
     return jsonify(result), 200
 
 
@@ -485,6 +495,39 @@ def get_resume(resume_id: int):
     if not result:
         return jsonify({'success': False, 'message': 'Resume not found.'}), 404
     return jsonify({'success': True, 'resume': result, 'data': {'resume': result}}), 200
+
+
+@platform_admin_bp.route('/resumes/<int:resume_id>', methods=['DELETE'])
+@login_required
+@role_required('admin')
+@limiter.limit("20 per minute")
+def delete_resume(resume_id: int):
+    """
+    DELETE /api/platform-admin/resumes/<resume_id>
+    Permanently deletes resume record, storage file, and records audit trail.
+    """
+    admin_user_id = session.get('user_id', 0)
+    success, message, status_code = delete_platform_resume(resume_id, int(admin_user_id))
+    return jsonify({'success': success, 'message': message}), status_code
+
+
+@platform_admin_bp.route('/resumes/<int:resume_id>/download', methods=['GET'])
+@login_required
+@role_required('admin')
+def download_resume(resume_id: int):
+    """
+    GET /api/platform-admin/resumes/<resume_id>/download
+    Safely streams the physical resume file for platform admin review.
+    """
+    fpath, orig_name, mime_type = get_platform_resume_file_path(resume_id)
+    if not fpath or not os.path.isfile(fpath):
+        return jsonify({'success': False, 'message': 'Resume file does not exist on storage.'}), 404
+    return send_file(
+        fpath,
+        as_attachment=True,
+        download_name=orig_name or 'resume.pdf',
+        mimetype=mime_type or 'application/pdf'
+    )
 
 
 # ── 8. System Health & Integrations ──────────────────────────

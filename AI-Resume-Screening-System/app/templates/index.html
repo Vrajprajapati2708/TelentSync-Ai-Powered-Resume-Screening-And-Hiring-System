@@ -2916,17 +2916,36 @@
 
           <div class="card" style="margin-top:20px">
             <div class="card-header" style="flex-wrap:wrap;gap:12px">
-              <span class="card-title"><i class="fas fa-file-alt" style="color:#2563eb;margin-right:8px"></i> Resume Storage &amp; Operations</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input id="pa-resumes-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search candidate, file..." onkeydown="if(event.key==='Enter')fetchPlatformAdminResumes(1)">
-                <select id="pa-resumes-status-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminResumes(1)">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="card-title"><i class="fas fa-file-alt" style="color:#2563eb;margin-right:8px"></i> Resume Storage &amp; Operations</span>
+                <span id="pa-resumes-filter-indicator" class="badge badge-primary" style="display:none;font-size:11px">Filtered</span>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <div style="position:relative;width:200px">
+                  <input id="pa-resumes-search" class="form-control" style="width:100%;padding:6px 12px 6px 30px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search candidate, file..." oninput="handlePaResumesLiveSearch()" onkeydown="if(event.key==='Enter')fetchPlatformAdminResumes(1)">
+                  <i class="fas fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-3);font-size:11px"></i>
+                </div>
+                <select id="pa-resumes-status-filter" class="form-control" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminResumes(1)">
                   <option value="">All Statuses</option>
                   <option value="processed">Processed</option>
                   <option value="uploaded">Uploaded</option>
                   <option value="processing">Processing</option>
                   <option value="failed">Failed</option>
                 </select>
+                <select id="pa-resumes-integrity-filter" class="form-control" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminResumes(1)">
+                  <option value="">All Storage</option>
+                  <option value="available">Available on Disk</option>
+                  <option value="missing">Missing from Disk</option>
+                </select>
+                <select id="pa-resumes-ats-filter" class="form-control" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminResumes(1)">
+                  <option value="">All ATS Scores</option>
+                  <option value="80">80%+ (High Match)</option>
+                  <option value="50">50-79% (Medium)</option>
+                  <option value="low">&lt;50% (Low Match)</option>
+                </select>
                 <button class="btn btn-primary btn-sm" onclick="fetchPlatformAdminResumes(1)"><i class="fas fa-search"></i> Search</button>
+                <button id="pa-resumes-reset-btn" class="btn btn-outline btn-sm" onclick="resetPlatformResumeFilters()" title="Reset all filters"><i class="fas fa-sync-alt"></i> Reset</button>
+                <button class="btn btn-outline btn-sm" onclick="exportPlatformResumesCSV()" title="Export filtered resumes to CSV"><i class="fas fa-file-csv" style="color:#10b981"></i> Export CSV</button>
               </div>
             </div>
 
@@ -2936,16 +2955,17 @@
                   <tr>
                     <th>ID</th>
                     <th>Candidate</th>
-                    <th>Filename</th>
+                    <th>Filename &amp; Format</th>
+                    <th>Size</th>
                     <th>Upload Date</th>
-                    <th>Processing Status</th>
+                    <th>Status</th>
                     <th>ATS Score</th>
-                    <th>File Integrity</th>
+                    <th>Storage Integrity</th>
                     <th style="text-align:right">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="pa-resumes-table-body">
-                  <tr><td colspan="8" style="text-align:center;padding:30px">Loading resume records...</td></tr>
+                  <tr><td colspan="9" style="text-align:center;padding:30px">Loading resume records...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -3764,37 +3784,105 @@
   <div class="modal modal-lg">
     <div class="modal-header">
       <div class="modal-title" id="pa-modal-resume-title" style="display:flex;align-items:center;gap:8px">
-        <i class="fas fa-file-pdf" style="color:var(--primary)"></i> Resume Metadata &amp; Intelligence
+        <i class="fas fa-file-invoice" style="color:var(--primary)"></i> Resume Metadata &amp; Intelligence
       </div>
       <button class="modal-close" onclick="Modal.close('pa-resume-modal')">✕</button>
     </div>
-    <div style="margin-bottom:20px">
-      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Resume ID</td><td id="pa-modal-resume-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate</td><td id="pa-modal-resume-candidate">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Original Filename</td><td id="pa-modal-resume-filename">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">File Size</td><td id="pa-modal-resume-size">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">ATS Score</td><td id="pa-modal-resume-ats">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Status</td><td id="pa-modal-resume-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">File on Disk</td><td id="pa-modal-resume-file-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Uploaded At</td><td id="pa-modal-resume-uploaded">--</td></tr>
-      </table>
 
-      <div style="margin-bottom:18px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Extracted Skills</div>
-        <div class="skills-cloud" id="pa-modal-resume-skills">None extracted</div>
-      </div>
-
-      <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Parsed Content Excerpt</div>
-        <div id="pa-modal-resume-preview" style="font-size:12px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap;font-family:monospace">--</div>
+    <!-- Resume Hero Header Card -->
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
+      <div id="pa-modal-resume-avatar" class="avatar avatar-lg" style="background:var(--primary);color:#fff;font-size:18px;font-weight:800;flex-shrink:0">--</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h3 id="pa-modal-resume-candidate-name" style="margin:0;font-size:18px;font-weight:800;color:var(--text)">Candidate Name</h3>
+          <span id="pa-modal-resume-status-badge" class="badge badge-success" style="font-size:11px">PROCESSED</span>
+          <span id="pa-modal-resume-format-badge" class="badge badge-primary" style="font-size:11px">PDF</span>
+        </div>
+        <div id="pa-modal-resume-candidate-email" style="font-size:13px;color:var(--text-3);margin-top:2px">candidate@example.com</div>
+        <div id="pa-modal-resume-filename-tag" style="font-size:12px;color:var(--text-2);margin-top:4px;font-family:monospace">resume.pdf</div>
       </div>
     </div>
+
+    <!-- Quick Metric Cards Grid -->
+    <div class="stats-grid" style="grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+      <div class="stat-card" style="padding:14px">
+        <div class="stat-top" style="margin-bottom:6px">
+          <div class="stat-label" style="font-size:11px">Resume ID</div>
+          <div class="stat-icon" style="background:#eff6ff;width:28px;height:28px;font-size:12px"><i class="fas fa-hashtag" style="color:#2563eb"></i></div>
+        </div>
+        <div class="stat-value" id="pa-modal-resume-id" style="font-size:18px">--</div>
+      </div>
+      <div class="stat-card" style="padding:14px">
+        <div class="stat-top" style="margin-bottom:6px">
+          <div class="stat-label" style="font-size:11px">ATS Score</div>
+          <div class="stat-icon" style="background:#f0fdf4;width:28px;height:28px;font-size:12px"><i class="fas fa-star" style="color:#16a34a"></i></div>
+        </div>
+        <div class="stat-value" id="pa-modal-resume-ats" style="font-size:18px;color:#16a34a">--</div>
+      </div>
+      <div class="stat-card" style="padding:14px">
+        <div class="stat-top" style="margin-bottom:6px">
+          <div class="stat-label" style="font-size:11px">File Size</div>
+          <div class="stat-icon" style="background:#fef9c3;width:28px;height:28px;font-size:12px"><i class="fas fa-hdd" style="color:#ca8a04"></i></div>
+        </div>
+        <div class="stat-value" id="pa-modal-resume-size" style="font-size:18px">--</div>
+      </div>
+      <div class="stat-card" style="padding:14px">
+        <div class="stat-top" style="margin-bottom:6px">
+          <div class="stat-label" style="font-size:11px">Word Count</div>
+          <div class="stat-icon" style="background:#f3e8ff;width:28px;height:28px;font-size:12px"><i class="fas fa-font" style="color:#9333ea"></i></div>
+        </div>
+        <div class="stat-value" id="pa-modal-resume-words" style="font-size:18px">--</div>
+      </div>
+    </div>
+
+    <!-- Technical & Storage Metadata Table -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:6px">
+        <i class="fas fa-server" style="color:#2563eb"></i> Technical &amp; Storage Metadata
+      </div>
+      <table class="table" style="margin-bottom:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12px">
+        <tr><td style="color:var(--text-3);font-weight:600;width:160px;background:var(--bg-card)">SHA-256 Checksum</td><td id="pa-modal-resume-hash" style="font-family:monospace;word-break:break-all">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">MIME Content-Type</td><td id="pa-modal-resume-mime">application/pdf</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Upload Timestamp</td><td id="pa-modal-resume-uploaded">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Storage Path &amp; Health</td><td><span id="pa-modal-resume-file-status" class="badge badge-success" style="margin-right:8px;font-size:11px">Available</span> <code id="pa-modal-resume-path" style="font-size:11px;color:var(--text-3);word-break:break-all">--</code></td></tr>
+      </table>
+    </div>
+
+    <!-- Extracted Skills Profile -->
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text);display:flex;align-items:center;gap:6px">
+        <i class="fas fa-tags" style="color:#10b981"></i> Extracted Skills Profile
+      </div>
+      <div class="skills-cloud" id="pa-modal-resume-skills" style="background:var(--bg);padding:12px;border-radius:10px;border:1px solid var(--border);min-height:45px">None extracted</div>
+    </div>
+
+    <!-- Parsed Content Intelligence Viewer -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:6px">
+          <i class="fas fa-align-left" style="color:#6366f1"></i> Parsed Text Intelligence Excerpt
+        </div>
+        <button id="pa-modal-resume-copy-btn" class="btn btn-sm btn-outline" onclick="copyParsedResumeText()" style="font-size:11px;padding:3px 10px">
+          <i class="fas fa-copy"></i> Copy Text
+        </button>
+      </div>
+      <div id="pa-modal-resume-preview" style="font-size:12px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap;font-family:monospace;line-height:1.5">--</div>
+    </div>
+
+    <!-- Footer Actions -->
     <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px">
-      <button id="pa-modal-resume-download-btn" class="btn btn-primary btn-sm">
-        <i class="fas fa-download"></i> Download Resume
+      <button class="btn btn-outline btn-sm" onclick="openCandidateFromResumeModal()" title="View candidate profile and history in User Management">
+        <i class="fas fa-user-circle"></i> View Candidate Profile
       </button>
-      <button class="btn btn-outline" onclick="Modal.close('pa-resume-modal')">Close</button>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="pa-modal-resume-delete-btn" class="btn btn-outline-danger btn-sm" onclick="deletePlatformResumeFromModal()" title="Permanently delete this resume (GDPR Compliance)">
+          <i class="fas fa-trash-alt"></i> Delete Resume
+        </button>
+        <button id="pa-modal-resume-download-btn" class="btn btn-primary btn-sm">
+          <i class="fas fa-download"></i> Download Resume
+        </button>
+        <button class="btn btn-outline btn-sm" onclick="Modal.close('pa-resume-modal')">Close</button>
+      </div>
     </div>
   </div>
 </div>
