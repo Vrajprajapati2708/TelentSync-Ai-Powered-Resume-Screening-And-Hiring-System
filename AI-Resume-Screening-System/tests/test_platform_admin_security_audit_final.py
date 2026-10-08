@@ -357,7 +357,8 @@ class TestPlatformAdminSecurityAuditFinal(unittest.TestCase):
         self._login(self.admin1_id, self.admin1_email, "admin")
         res = self.client.get("/api/platform-admin/export?format=csv&type=users")
         self.assertEqual(res.status_code, 200)
-        self.assertIn("text/csv", res.mimetype)
+        self.assertIsNotNone(res.mimetype)
+        self.assertIn("text/csv", res.mimetype or "")
         csv_text = res.data.decode("utf-8")
         self.assertIn("ID,Name,Email,Role", csv_text)
 
