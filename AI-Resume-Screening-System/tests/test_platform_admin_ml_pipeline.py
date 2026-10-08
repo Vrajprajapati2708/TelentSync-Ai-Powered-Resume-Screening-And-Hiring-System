@@ -64,7 +64,7 @@ class TestPlatformAdminMLPipeline(unittest.TestCase):
                 (name, email, generate_password_hash("SecretPass123!"), role)
             )
             conn.commit()
-            return cur.lastrowid, email
+            return int(cur.lastrowid or 0), email
 
     def _login_as(self, email: str, role: str):
         with self.client.session_transaction() as sess:

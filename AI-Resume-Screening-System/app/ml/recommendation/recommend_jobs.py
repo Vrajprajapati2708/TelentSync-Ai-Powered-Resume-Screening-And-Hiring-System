@@ -87,13 +87,11 @@ def recommend_jobs(candidate_skills: list[str],
 
     if vectorizer.is_sklearn:
         # ── Fast sklearn path: single matrix transform ────────
-        import scipy.sparse as sp
-        cand_vec  = vectorizer.transform(candidate_text)      # (1 × vocab) sparse
-        job_vecs_list = [vectorizer.transform(t) for t in job_texts]
-        job_matrix    = sp.vstack(job_vecs_list)              # (n_jobs × vocab) sparse
-
+        from typing import Any, cast
         from sklearn.metrics.pairwise import cosine_similarity as sk_cos
-        sim_scores = sk_cos(cand_vec, job_matrix).flatten()   # numpy array
+        cand_vec   = vectorizer.transform(candidate_text)
+        job_matrix = vectorizer.transform_many(job_texts)
+        sim_scores = sk_cos(cast(Any, cand_vec), cast(Any, job_matrix)).flatten()
 
     else:
         # ── Pure-Python fallback: fit on fly ──────────────────

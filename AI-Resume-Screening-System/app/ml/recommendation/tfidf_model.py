@@ -175,6 +175,13 @@ class TFIDFVectorizer:
             return _sklearn_vectorizer.transform([processed])
         return self._fallback.transform(text)
 
+    def transform_many(self, texts: list[str]):
+        """Transform multiple documents to TF-IDF vectors."""
+        if self.is_sklearn:
+            processed = [preprocess_to_string(d) for d in texts]
+            return _sklearn_vectorizer.transform(processed)
+        return [self._fallback.transform(d) for d in texts]
+
     def fit_transform(self, documents: list[str]):
         """Fit and transform all documents."""
         if self.is_sklearn:
