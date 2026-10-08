@@ -21,8 +21,12 @@ from app.controllers.platform_admin_controller import (
     get_platform_audit_logs,
     get_platform_jobs,
     get_platform_job_detail,
+    update_platform_job_status,
+    delete_platform_job,
     get_platform_applications,
     get_platform_application_detail,
+    update_platform_application_status,
+    get_platform_jobs_apps_summary,
     get_platform_resumes,
     get_platform_resume_detail,
     get_platform_system_health,
@@ -283,6 +287,7 @@ def list_jobs():
       - limit: int (default 20)
       - search: string
       - status: string
+      - company: string
     """
     try:
         page = int(request.args.get('page', 1))
@@ -296,8 +301,9 @@ def list_jobs():
 
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip()
+    company = request.args.get('company', '').strip()
 
-    result = get_platform_jobs(page=page, limit=limit, search=search, status=status)
+    result = get_platform_jobs(page=page, limit=limit, search=search, status=status, company=company)
     return jsonify(result), 200
 
 
@@ -314,6 +320,38 @@ def get_job(job_id: int):
     return jsonify({'success': True, 'job': result, 'data': {'job': result}}), 200
 
 
+@platform_admin_bp.route('/jobs/<int:job_id>/status', methods=['POST'])
+@login_required
+@role_required('admin')
+@limiter.limit("20 per minute")
+def change_job_status(job_id: int):
+    """
+    POST /api/platform-admin/jobs/<job_id>/status
+    JSON Payload: { "status": "Active" | "Closed" | "Draft" }
+    """
+    admin_user_id = session.get('user_id', 0)
+    data = request.get_json(silent=True) or {}
+    new_status = data.get('status', '').strip()
+    if not new_status:
+        return jsonify({'success': False, 'message': 'Status parameter is required.'}), 400
+
+    success, message, status_code = update_platform_job_status(job_id, new_status, int(admin_user_id))
+    return jsonify({'success': success, 'message': message}), status_code
+
+
+@platform_admin_bp.route('/jobs/<int:job_id>', methods=['DELETE'])
+@login_required
+@role_required('admin')
+@limiter.limit("15 per minute")
+def remove_job(job_id: int):
+    """
+    DELETE /api/platform-admin/jobs/<job_id>
+    """
+    admin_user_id = session.get('user_id', 0)
+    success, message, status_code = delete_platform_job(job_id, int(admin_user_id))
+    return jsonify({'success': success, 'message': message}), status_code
+
+
 # ── 6. Platform Applications Management ──────────────────────
 
 @platform_admin_bp.route('/applications', methods=['GET'])
@@ -327,6 +365,9 @@ def list_applications():
       - limit: int (default 20)
       - search: string
       - status: string
+      - job_id: int
+      - min_match: int
+      - max_match: int
     """
     try:
         page = int(request.args.get('page', 1))
@@ -341,7 +382,19 @@ def list_applications():
     search = request.args.get('search', '').strip()
     status = request.args.get('status', '').strip()
 
-    result = get_platform_applications(page=page, limit=limit, search=search, status=status)
+    job_id_param = request.args.get('job_id', '').strip()
+    job_id = int(job_id_param) if job_id_param.isdigit() else None
+
+    min_match_param = request.args.get('min_match', '').strip()
+    min_match = int(min_match_param) if min_match_param.isdigit() else None
+
+    max_match_param = request.args.get('max_match', '').strip()
+    max_match = int(max_match_param) if max_match_param.isdigit() else None
+
+    result = get_platform_applications(
+        page=page, limit=limit, search=search, status=status,
+        job_id=job_id, min_match=min_match, max_match=max_match
+    )
     return jsonify(result), 200
 
 
@@ -356,6 +409,38 @@ def get_application(app_id: int):
     if not result:
         return jsonify({'success': False, 'message': 'Application not found.'}), 404
     return jsonify({'success': True, 'application': result, 'data': {'application': result}}), 200
+
+
+@platform_admin_bp.route('/applications/<int:app_id>/status', methods=['POST'])
+@login_required
+@role_required('admin')
+@limiter.limit("30 per minute")
+def change_application_status(app_id: int):
+    """
+    POST /api/platform-admin/applications/<app_id>/status
+    JSON Payload: { "status": "Pending" | "Reviewing" | "Shortlisted" | "Rejected" | "Hired", "notes": string }
+    """
+    admin_user_id = session.get('user_id', 0)
+    data = request.get_json(silent=True) or {}
+    new_status = data.get('status', '').strip()
+    notes = data.get('notes', '').strip()
+    if not new_status:
+        return jsonify({'success': False, 'message': 'Status parameter is required.'}), 400
+
+    success, message, status_code = update_platform_application_status(app_id, new_status, notes, int(admin_user_id))
+    return jsonify({'success': success, 'message': message}), status_code
+
+
+@platform_admin_bp.route('/jobs-apps/summary', methods=['GET'])
+@login_required
+@role_required('admin')
+def jobs_apps_summary():
+    """
+    GET /api/platform-admin/jobs-apps/summary
+    Returns summary KPIs and company filter choices.
+    """
+    result = get_platform_jobs_apps_summary()
+    return jsonify(result), 200
 
 
 # ── 7. Platform Resume Operations ────────────────────────────

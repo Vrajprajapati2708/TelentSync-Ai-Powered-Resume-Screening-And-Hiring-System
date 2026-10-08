@@ -877,7 +877,8 @@ def get_platform_jobs(
     page: int = 1,
     limit: int = 20,
     search: str = "",
-    status: str = ""
+    status: str = "",
+    company: str = ""
 ) -> Dict[str, Any]:
     """
     Paginated, searchable retrieval of internal TalentSync jobs only.
@@ -898,6 +899,10 @@ def get_platform_jobs(
     if status:
         conditions.append("LOWER(j.status) = ?")
         params.append(status.strip().lower())
+
+    if company:
+        conditions.append("LOWER(j.company) LIKE ?")
+        params.append(f"%{company.strip().lower()}%")
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -1007,16 +1012,55 @@ def get_platform_job_detail(job_id: int) -> Optional[Dict[str, Any]]:
     }
 
 
+def update_platform_job_status(job_id: int, status: str, admin_user_id: int = 0) -> Tuple[bool, str, int]:
+    """
+    Administrative status toggle for an internal job posting (Active / Closed / Draft).
+    """
+    valid_statuses = {"Active", "Closed", "Draft"}
+    status_normalized = status.strip().title()
+    if status_normalized not in valid_statuses:
+        return False, f"Invalid job status '{status}'. Must be Active, Closed, or Draft.", 400
+
+    with get_db() as conn:
+        job = conn.execute("SELECT id, title, status FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not job:
+            return False, "Job posting not found.", 404
+
+        conn.execute("UPDATE jobs SET status = ? WHERE id = ?", (status_normalized, job_id))
+        conn.commit()
+
+    return True, f"Job #{job_id} ('{job['title']}') status successfully updated to {status_normalized}.", 200
+
+
+def delete_platform_job(job_id: int, admin_user_id: int = 0) -> Tuple[bool, str, int]:
+    """
+    Permanently delete an internal job posting and cascade clean associated applications.
+    """
+    with get_db() as conn:
+        job = conn.execute("SELECT id, title FROM jobs WHERE id = ?", (job_id,)).fetchone()
+        if not job:
+            return False, "Job posting not found.", 404
+
+        conn.execute("DELETE FROM jobs WHERE id = ?", (job_id,))
+        conn.commit()
+
+    return True, f"Job #{job_id} ('{job['title']}') successfully deleted.", 200
+
+
 # ── 6. Platform Applications Management ──────────────────────
 
 def get_platform_applications(
     page: int = 1,
     limit: int = 20,
     search: str = "",
-    status: str = ""
+    status: str = "",
+    job_id: Optional[int] = None,
+    min_match: Optional[int] = None,
+    max_match: Optional[int] = None
 ) -> Dict[str, Any]:
     """
     Paginated, searchable administrative view of internal candidate applications.
+    Supports filtering by candidate, job, status, job_id, and match score ranges.
     """
     page = max(1, page)
     limit = max(1, min(limit, 100))
@@ -1033,6 +1077,18 @@ def get_platform_applications(
     if status:
         conditions.append("LOWER(a.status) = ?")
         params.append(status.strip().lower())
+
+    if job_id is not None and int(job_id) > 0:
+        conditions.append("a.job_id = ?")
+        params.append(int(job_id))
+
+    if min_match is not None:
+        conditions.append("a.match_score >= ?")
+        params.append(int(min_match))
+
+    if max_match is not None:
+        conditions.append("a.match_score <= ?")
+        params.append(int(max_match))
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -1095,6 +1151,92 @@ def get_platform_applications(
             "applications": applications,
             "pagination": pagination
         }
+    }
+
+
+def update_platform_application_status(
+    app_id: int,
+    status: str,
+    notes: str = "",
+    admin_user_id: int = 0
+) -> Tuple[bool, str, int]:
+    """
+    Administrative status transition for an application (Pending, Reviewing, Shortlisted, Rejected, Hired).
+    Inserts audit trail and candidate notification.
+    """
+    valid_statuses = {"Pending", "Reviewing", "Shortlisted", "Rejected", "Hired"}
+    status_normalized = status.strip().title()
+    if status_normalized not in valid_statuses:
+        return False, f"Invalid status '{status}'. Allowed values: {', '.join(sorted(valid_statuses))}", 400
+
+    with get_db() as conn:
+        app_row = conn.execute(
+            """SELECT a.id, a.user_id, a.job_id, a.status, u.name as candidate_name, j.title as job_title
+               FROM applications a
+               LEFT JOIN users u ON a.user_id = u.id
+               LEFT JOIN jobs j ON a.job_id = j.id
+               WHERE a.id = ?""",
+            (app_id,)
+        ).fetchone()
+
+        if not app_row:
+            return False, "Application not found.", 404
+
+        prev_status = app_row["status"]
+        conn.execute("UPDATE applications SET status = ? WHERE id = ?", (status_normalized, app_id))
+
+        audit_note = notes.strip() if notes else f"Status updated from {prev_status} to {status_normalized} by Platform Admin"
+        conn.execute(
+            "INSERT INTO application_status (application_id, status, notes) VALUES (?, ?, ?)",
+            (app_id, status_normalized, audit_note)
+        )
+
+        if app_row["user_id"]:
+            conn.execute(
+                """INSERT INTO notifications (user_id, title, message, type, action_type, action_target)
+                   VALUES (?, ?, ?, 'application', 'view_application', '#cand-applications')""",
+                (
+                    app_row["user_id"],
+                    f"Application Status Updated: {status_normalized}",
+                    f"Your application for '{app_row['job_title'] or 'Job Post'}' has been updated to '{status_normalized}'."
+                )
+            )
+        conn.commit()
+
+    return True, f"Application #{app_id} status successfully updated to {status_normalized}.", 200
+
+
+def get_platform_jobs_apps_summary() -> Dict[str, Any]:
+    """
+    Returns real-time KPI overview metrics and unique company list for Jobs & Applications tab.
+    """
+    with get_db() as conn:
+        total_jobs = conn.execute("SELECT COUNT(*) FROM jobs").fetchone()[0]
+        active_jobs = conn.execute("SELECT COUNT(*) FROM jobs WHERE LOWER(status) = 'active'").fetchone()[0]
+        closed_jobs = conn.execute("SELECT COUNT(*) FROM jobs WHERE LOWER(status) = 'closed'").fetchone()[0]
+        draft_jobs = conn.execute("SELECT COUNT(*) FROM jobs WHERE LOWER(status) = 'draft'").fetchone()[0]
+
+        total_apps = conn.execute("SELECT COUNT(*) FROM applications").fetchone()[0]
+        avg_match_row = conn.execute("SELECT AVG(match_score) FROM applications WHERE match_score > 0").fetchone()[0]
+        avg_match = round(float(avg_match_row), 1) if avg_match_row is not None else 0.0
+
+        company_rows = conn.execute("SELECT DISTINCT company FROM jobs WHERE company IS NOT NULL AND company != '' ORDER BY company ASC").fetchall()
+        companies = [r["company"] for r in company_rows]
+
+    summary_data = {
+        "total_jobs": total_jobs,
+        "active_jobs": active_jobs,
+        "closed_jobs": closed_jobs,
+        "draft_jobs": draft_jobs,
+        "total_applications": total_apps,
+        "avg_match_score": avg_match,
+        "companies": companies
+    }
+
+    return {
+        "success": True,
+        "summary": summary_data,
+        "data": summary_data
     }
 
 

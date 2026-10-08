@@ -5629,6 +5629,7 @@ const PlatformAdminState = {
   appsPage: 1,
   appsTotalPages: 1,
   selectedApp: null,
+  appsJobIdFilter: null,
   // Section 4: Resumes
   resumesPage: 1,
   resumesTotalPages: 1,
@@ -5649,6 +5650,7 @@ function switchPaJobsAppsTab(tab) {
   const btnApps = document.getElementById('pa-tab-btn-apps');
   const contentJobs = document.getElementById('pa-content-jobs');
   const contentApps = document.getElementById('pa-content-applications');
+  fetchPlatformJobsAppsSummary();
   if (tab === 'jobs') {
     if (btnJobs) btnJobs.classList.add('active');
     if (btnApps) btnApps.classList.remove('active');
@@ -6751,12 +6753,52 @@ function exportPlatformUsersCSV() {
 // SECTION 3: JOBS & APPLICATIONS
 // ═══════════════════════════════════════════════════════════
 
+let _jobsDebounceTimer = null;
+function debounceFetchJobs() {
+  clearTimeout(_jobsDebounceTimer);
+  _jobsDebounceTimer = setTimeout(() => fetchPlatformAdminJobs(1), 350);
+}
+
+let _appsDebounceTimer = null;
+function debounceFetchApps() {
+  clearTimeout(_appsDebounceTimer);
+  _appsDebounceTimer = setTimeout(() => fetchPlatformAdminApplications(1), 350);
+}
+
+function fetchPlatformJobsAppsSummary() {
+  fetch('/api/platform-admin/jobs-apps/summary')
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success) return;
+      const d = res.data || res.summary || {};
+      setEl('pa-jobs-kpi-active', d.active_jobs != null ? d.active_jobs : '--');
+      setEl('pa-jobs-kpi-total', d.total_jobs != null ? d.total_jobs : '--');
+      setEl('pa-jobs-kpi-closed', (d.closed_jobs || 0) + (d.draft_jobs || 0));
+      setEl('pa-apps-kpi-total', d.total_applications != null ? d.total_applications : '--');
+      setEl('pa-apps-kpi-match', d.avg_match_score ? `${d.avg_match_score}%` : '--');
+
+      const companySelect = document.getElementById('pa-jobs-company-filter');
+      if (companySelect && Array.isArray(d.companies)) {
+        const currentVal = companySelect.value;
+        let opts = '<option value="">All Companies</option>';
+        d.companies.forEach(c => {
+          opts += `<option value="${escapeHTML(c)}" ${c === currentVal ? 'selected' : ''}>${escapeHTML(c)}</option>`;
+        });
+        companySelect.innerHTML = opts;
+      }
+    })
+    .catch(err => console.error('Error fetching jobs-apps summary:', err));
+}
+
 function fetchPlatformAdminJobs(page = 1) {
   PlatformAdminState.jobsPage = page;
   const searchInput = document.getElementById('pa-jobs-search');
   const statusSelect = document.getElementById('pa-jobs-status-filter');
+  const companySelect = document.getElementById('pa-jobs-company-filter');
+
   const q = searchInput ? searchInput.value.trim() : '';
   const status = statusSelect ? statusSelect.value : '';
+  const company = companySelect ? companySelect.value : '';
 
   const tbody = document.getElementById('pa-jobs-table-body');
   if (tbody) {
@@ -6766,6 +6808,7 @@ function fetchPlatformAdminJobs(page = 1) {
   const params = new URLSearchParams({ page: page, limit: 10 });
   if (q) params.set('search', q);
   if (status) params.set('status', status);
+  if (company) params.set('company', company);
 
   fetch(`/api/platform-admin/jobs?${params.toString()}`)
     .then(r => {
@@ -6788,31 +6831,46 @@ function fetchPlatformAdminJobs(page = 1) {
       if (nextBtn) nextBtn.disabled = pagination.page >= pagination.pages;
 
       if (jobs.length === 0) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-briefcase" style="font-size:24px;margin-bottom:8px;display:block"></i>No internal jobs found matching query.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--text-3)"><i class="fas fa-briefcase" style="font-size:28px;margin-bottom:10px;display:block;opacity:0.5"></i>No internal jobs found matching current filters.</td></tr>';
         return;
       }
 
       if (tbody) {
         tbody.innerHTML = jobs.map(j => {
-          const statusBadge = j.status === 'Active'
-            ? '<span class="badge badge-success" style="font-size:11px">Active</span>'
-            : (j.status === 'Closed' ? '<span class="badge badge-gray" style="font-size:11px">Closed</span>' : '<span class="badge badge-warning" style="font-size:11px">Draft</span>');
+          let statusBadge = '';
+          if (j.status === 'Active') {
+            statusBadge = '<span class="badge badge-success" style="font-size:11px"><i class="fas fa-check-circle"></i> Active</span>';
+          } else if (j.status === 'Closed') {
+            statusBadge = '<span class="badge badge-gray" style="font-size:11px"><i class="fas fa-archive"></i> Closed</span>';
+          } else {
+            statusBadge = '<span class="badge badge-warning" style="font-size:11px"><i class="fas fa-pen"></i> Draft</span>';
+          }
+
           const createdDate = j.created_at ? new Date(j.created_at).toLocaleDateString() : 'N/A';
 
           return `
             <tr>
-              <td style="font-weight:600;color:var(--text-3);font-size:12px">#${j.id}</td>
+              <td style="font-weight:700;color:var(--text-3);font-size:12px">#${j.id}</td>
               <td style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(j.title)}</td>
-              <td style="font-size:13px">${escapeHTML(j.company)}</td>
+              <td style="font-size:13px;color:var(--text-2)"><strong>${escapeHTML(j.company)}</strong></td>
               <td style="font-size:12px;color:var(--text-2)">${escapeHTML(j.location || 'Remote')}</td>
-              <td style="font-size:12px">${escapeHTML(j.type || 'Full-time')}</td>
+              <td style="font-size:12px"><span class="badge badge-gray" style="font-size:10px">${escapeHTML(j.type || 'Full-time')}</span></td>
               <td>${statusBadge}</td>
-              <td><span class="badge badge-primary" style="font-size:11px">${j.application_count || 0} Applicants</span></td>
+              <td>
+                <span class="badge badge-primary" style="cursor:pointer;font-size:11px;font-weight:700" onclick="filterAppsByJob(${j.id}, '${escapeHTML(j.title.replace(/'/g, "\\'"))}')" title="Click to view applicants in Applications tab">
+                  <i class="fas fa-users" style="margin-right:3px"></i> ${j.applications_count || 0} Applicants
+                </span>
+              </td>
               <td style="font-size:12px;color:var(--text-3)">${createdDate}</td>
-              <td style="text-align:right">
-                <button class="btn btn-sm btn-outline" onclick="openPlatformJobModal(${j.id})">
-                  <i class="fas fa-eye"></i> Details
-                </button>
+              <td style="text-align:right;white-space:nowrap">
+                <div style="display:inline-flex;gap:6px;align-items:center">
+                  <button class="btn btn-sm btn-primary" onclick="openPlatformJobModal(${j.id})" title="View Details &amp; Governance">
+                    <i class="fas fa-eye"></i> Details
+                  </button>
+                  <button class="btn btn-sm ${j.status === 'Active' ? 'btn-outline-danger' : 'btn-outline-success'}" style="font-size:11px;padding:4px 8px" onclick="quickTogglePlatformJobStatus(${j.id}, '${j.status}')" title="${j.status === 'Active' ? 'Close job' : 'Reactivate job'}">
+                    <i class="fas ${j.status === 'Active' ? 'fa-ban' : 'fa-check'}"></i>
+                  </button>
+                </div>
               </td>
             </tr>
           `;
@@ -6832,6 +6890,29 @@ function changePlatformJobsPage(delta) {
   }
 }
 
+function quickTogglePlatformJobStatus(jobId, currentStatus) {
+  const newStatus = (currentStatus === 'Active') ? 'Closed' : 'Active';
+  fetch(`/api/platform-admin/jobs/${jobId}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.success) {
+        Toast.show(res.message || `Job status updated to ${newStatus}.`, 'success');
+        fetchPlatformAdminJobs(PlatformAdminState.jobsPage);
+        fetchPlatformJobsAppsSummary();
+      } else {
+        Toast.show((res && res.message) || 'Failed to update job status.', 'error');
+      }
+    })
+    .catch(err => {
+      console.error('Quick toggle job status error:', err);
+      Toast.show('Network error updating job status.', 'error');
+    });
+}
+
 function openPlatformJobModal(jobId) {
   fetch(`/api/platform-admin/jobs/${jobId}`)
     .then(r => r.json())
@@ -6848,9 +6929,20 @@ function openPlatformJobModal(jobId) {
       setEl('pa-modal-job-company', j.company);
       setEl('pa-modal-job-location', j.location || 'Remote');
       setEl('pa-modal-job-type', j.type || 'Full-time');
-      setEl('pa-modal-job-salary', j.salary || 'Competitive');
-      setEl('pa-modal-job-status', j.status || 'Active');
+      setEl('pa-modal-job-salary', j.salary || 'Competitive / Not Disclosed');
       setEl('pa-modal-job-created', j.created_at ? new Date(j.created_at).toLocaleString() : 'N/A');
+
+      const typeBadge = document.getElementById('pa-modal-job-type-badge');
+      if (typeBadge) typeBadge.textContent = j.type || 'Full-time';
+
+      const statusBadge = document.getElementById('pa-modal-job-status-badge');
+      if (statusBadge) {
+        statusBadge.className = `badge ${j.status === 'Active' ? 'badge-success' : (j.status === 'Closed' ? 'badge-gray' : 'badge-warning')}`;
+        statusBadge.textContent = j.status ? j.status.toUpperCase() : 'ACTIVE';
+      }
+
+      const statusSelect = document.getElementById('pa-modal-job-status-select');
+      if (statusSelect) statusSelect.value = j.status || 'Active';
 
       const skillsEl = document.getElementById('pa-modal-job-skills');
       if (skillsEl) {
@@ -6869,13 +6961,21 @@ function openPlatformJobModal(jobId) {
         appTbody.innerHTML = applicants.length
           ? applicants.map(a => `
               <tr>
-                <td style="font-weight:600;font-size:12px">${escapeHTML(a.name)} <span style="font-size:11px;color:var(--text-3)">(${escapeHTML(a.email)})</span></td>
+                <td style="font-weight:600;font-size:12px">
+                  ${escapeHTML(a.candidate_name || a.name || 'Candidate')} 
+                  <span style="font-size:11px;color:var(--text-3)">(${escapeHTML(a.candidate_email || a.email || '')})</span>
+                </td>
                 <td><span class="badge ${UI.atsBadge(a.match_score || 0)}" style="font-size:11px">${a.match_score || 0}%</span></td>
                 <td><span class="badge badge-gray" style="font-size:11px">${escapeHTML(a.status || 'Pending')}</span></td>
                 <td style="font-size:11px;color:var(--text-3)">${a.applied_at ? new Date(a.applied_at).toLocaleDateString() : 'N/A'}</td>
+                <td style="text-align:right">
+                  <button class="btn btn-sm btn-outline" style="font-size:11px;padding:3px 8px" onclick="openPlatformAppModal(${a.application_id || a.id})">
+                    <i class="fas fa-eye"></i> View
+                  </button>
+                </td>
               </tr>
             `).join('')
-          : '<tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-3)">No candidates have applied to this job yet.</td></tr>';
+          : '<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-3)">No candidates have applied to this job yet.</td></tr>';
       }
 
       Modal.open('pa-job-modal');
@@ -6886,12 +6986,195 @@ function openPlatformJobModal(jobId) {
     });
 }
 
+function submitPlatformJobStatusChange() {
+  const j = PlatformAdminState.selectedJob;
+  if (!j) return;
+
+  const select = document.getElementById('pa-modal-job-status-select');
+  if (!select) return;
+  const newStatus = select.value;
+
+  const btn = document.getElementById('pa-modal-btn-save-job-status');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+
+  fetch(`/api/platform-admin/jobs/${j.id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Status'; }
+      if (res && res.success) {
+        Toast.show(res.message || 'Job status updated successfully.', 'success');
+        j.status = newStatus;
+        const statusBadge = document.getElementById('pa-modal-job-status-badge');
+        if (statusBadge) {
+          statusBadge.className = `badge ${newStatus === 'Active' ? 'badge-success' : (newStatus === 'Closed' ? 'badge-gray' : 'badge-warning')}`;
+          statusBadge.textContent = newStatus.toUpperCase();
+        }
+        fetchPlatformAdminJobs(PlatformAdminState.jobsPage);
+        fetchPlatformJobsAppsSummary();
+      } else {
+        Toast.show((res && res.message) || 'Failed to update job status.', 'error');
+      }
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Save Status'; }
+      console.error('Job status change error:', err);
+      Toast.show('Network error updating job status.', 'error');
+    });
+}
+
+function deletePlatformJobPosting() {
+  const j = PlatformAdminState.selectedJob;
+  if (!j) return;
+
+  if (!confirm(`Are you sure you want to permanently delete job "${j.title}" at "${j.company}"? This will delete all associated application records.`)) {
+    return;
+  }
+
+  const btn = document.getElementById('pa-modal-btn-delete-job');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...'; }
+
+  fetch(`/api/platform-admin/jobs/${j.id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Job'; }
+      if (res && res.success) {
+        Toast.show(res.message || 'Job successfully deleted.', 'success');
+        Modal.close('pa-job-modal');
+        fetchPlatformAdminJobs(PlatformAdminState.jobsPage);
+        fetchPlatformJobsAppsSummary();
+      } else {
+        Toast.show((res && res.message) || 'Failed to delete job.', 'error');
+      }
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-trash-alt"></i> Delete Job'; }
+      console.error('Delete job error:', err);
+      Toast.show('Network error deleting job.', 'error');
+    });
+}
+
+function exportPlatformJobsCSV() {
+  const searchInput = document.getElementById('pa-jobs-search');
+  const statusSelect = document.getElementById('pa-jobs-status-filter');
+  const companySelect = document.getElementById('pa-jobs-company-filter');
+
+  const q = searchInput ? searchInput.value.trim() : '';
+  const status = statusSelect ? statusSelect.value : '';
+  const company = companySelect ? companySelect.value : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 500 });
+  if (q) params.set('search', q);
+  if (status) params.set('status', status);
+  if (company) params.set('company', company);
+
+  Toast.show('Preparing Jobs CSV export...', 'info');
+
+  fetch(`/api/platform-admin/jobs?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success || !res.data || !res.data.jobs) {
+        Toast.show('Failed to fetch jobs for export.', 'error');
+        return;
+      }
+      const jobs = res.data.jobs;
+      if (jobs.length === 0) {
+        Toast.show('No job records match current filter for export.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        let str = String(val == null ? '' : val);
+        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Job ID', 'Job Title', 'Company', 'Location', 'Employment Type', 'Salary', 'Status', 'Applicants Count', 'Created At'];
+      const rows = jobs.map(j => [
+        sanitizeCSV(j.id),
+        sanitizeCSV(j.title),
+        sanitizeCSV(j.company),
+        sanitizeCSV(j.location || 'Remote'),
+        sanitizeCSV(j.type || 'Full-time'),
+        sanitizeCSV(j.salary || ''),
+        sanitizeCSV(j.status || 'Active'),
+        sanitizeCSV(j.applications_count || 0),
+        sanitizeCSV(j.created_at || '')
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `talentsync_jobs_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${jobs.length} job record(s) to CSV! 📁`, 'success');
+    })
+    .catch(err => {
+      console.error('Export jobs CSV error:', err);
+      Toast.show('Network error exporting jobs.', 'error');
+    });
+}
+
+function jumpToJobApplications() {
+  const j = PlatformAdminState.selectedJob;
+  if (!j) return;
+  Modal.close('pa-job-modal');
+  filterAppsByJob(j.id, j.title);
+}
+
+function filterAppsByJob(jobId, jobTitle) {
+  PlatformAdminState.appsJobIdFilter = jobId;
+  switchPaJobsAppsTab('applications');
+
+  const indicator = document.getElementById('pa-apps-filter-indicator');
+  if (indicator) {
+    indicator.style.display = 'inline-block';
+    indicator.textContent = `Filtered: ${jobTitle || 'Job #' + jobId}`;
+  }
+
+  const resetBtn = document.getElementById('pa-apps-reset-filter-btn');
+  if (resetBtn) resetBtn.style.display = 'inline-block';
+
+  fetchPlatformAdminApplications(1);
+}
+
+function resetPlatformAppFilters() {
+  PlatformAdminState.appsJobIdFilter = null;
+  const searchInput = document.getElementById('pa-apps-search');
+  if (searchInput) searchInput.value = '';
+  const statusSelect = document.getElementById('pa-apps-status-filter');
+  if (statusSelect) statusSelect.value = '';
+  const matchSelect = document.getElementById('pa-apps-match-filter');
+  if (matchSelect) matchSelect.value = '';
+
+  const indicator = document.getElementById('pa-apps-filter-indicator');
+  if (indicator) indicator.style.display = 'none';
+  const resetBtn = document.getElementById('pa-apps-reset-filter-btn');
+  if (resetBtn) resetBtn.style.display = 'none';
+
+  fetchPlatformAdminApplications(1);
+}
+
 function fetchPlatformAdminApplications(page = 1) {
   PlatformAdminState.appsPage = page;
   const searchInput = document.getElementById('pa-apps-search');
   const statusSelect = document.getElementById('pa-apps-status-filter');
+  const matchSelect = document.getElementById('pa-apps-match-filter');
+
   const q = searchInput ? searchInput.value.trim() : '';
   const status = statusSelect ? statusSelect.value : '';
+  const matchTier = matchSelect ? matchSelect.value : '';
 
   const tbody = document.getElementById('pa-apps-table-body');
   if (tbody) {
@@ -6901,6 +7184,16 @@ function fetchPlatformAdminApplications(page = 1) {
   const params = new URLSearchParams({ page: page, limit: 10 });
   if (q) params.set('search', q);
   if (status) params.set('status', status);
+  if (PlatformAdminState.appsJobIdFilter) params.set('job_id', PlatformAdminState.appsJobIdFilter);
+
+  if (matchTier === '80') {
+    params.set('min_match', '80');
+  } else if (matchTier === '50') {
+    params.set('min_match', '50');
+    params.set('max_match', '79');
+  } else if (matchTier === 'low') {
+    params.set('max_match', '49');
+  }
 
   fetch(`/api/platform-admin/applications?${params.toString()}`)
     .then(r => {
@@ -6924,7 +7217,7 @@ function fetchPlatformAdminApplications(page = 1) {
       if (nextBtn) nextBtn.disabled = pagination.page >= pagination.pages;
 
       if (apps.length === 0) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-file-contract" style="font-size:24px;margin-bottom:8px;display:block"></i>No applications match your filter.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--text-3)"><i class="fas fa-file-contract" style="font-size:28px;margin-bottom:10px;display:block;opacity:0.5"></i>No candidate applications match current filters.</td></tr>';
         return;
       }
 
@@ -6934,25 +7227,33 @@ function fetchPlatformAdminApplications(page = 1) {
             Reviewing: 'badge-primary',
             Shortlisted: 'badge-success',
             Pending: 'badge-warning',
-            Rejected: 'badge-danger'
+            Rejected: 'badge-danger',
+            Hired: 'badge-success'
           };
           const badgeClass = statusBadges[a.status] || 'badge-gray';
           const appliedDate = a.applied_at ? new Date(a.applied_at).toLocaleDateString() : 'N/A';
+          const avatar = (a.candidate_name || '??').slice(0, 2).toUpperCase();
+          const bg = UI.avatarColor(a.candidate_name || '');
 
           return `
             <tr>
-              <td style="font-weight:600;color:var(--text-3);font-size:12px">#${a.id}</td>
+              <td style="font-weight:700;color:var(--text-3);font-size:12px">#${a.id}</td>
               <td>
-                <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(a.candidate_name)}</div>
-                <div style="font-size:11px;color:var(--text-3)">${escapeHTML(a.candidate_email)}</div>
+                <div style="display:flex;align-items:center;gap:10px">
+                  <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0;font-weight:700">${escapeHTML(avatar)}</div>
+                  <div>
+                    <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(a.candidate_name)}</div>
+                    <div style="font-size:11px;color:var(--text-3)">${escapeHTML(a.candidate_email)}</div>
+                  </div>
+                </div>
               </td>
-              <td style="font-weight:600;font-size:13px">${escapeHTML(a.job_title)}</td>
-              <td style="font-size:12px;color:var(--text-2)">${escapeHTML(a.company)}</td>
+              <td style="font-weight:700;font-size:13px;color:var(--text)">${escapeHTML(a.job_title)}</td>
+              <td style="font-size:12px;color:var(--text-2)"><strong>${escapeHTML(a.job_company || a.company || 'TalentSync')}</strong></td>
               <td><span class="badge ${UI.atsBadge(a.match_score || 0)}" style="font-size:11px">${a.match_score || 0}%</span></td>
               <td><span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(a.status)}</span></td>
               <td style="font-size:12px;color:var(--text-3)">${appliedDate}</td>
               <td style="text-align:right">
-                <button class="btn btn-sm btn-outline" onclick="openPlatformAppModal(${a.id})">
+                <button class="btn btn-sm btn-primary" onclick="openPlatformAppModal(${a.id})" title="View Details &amp; Governance">
                   <i class="fas fa-eye"></i> Details
                 </button>
               </td>
@@ -6986,23 +7287,55 @@ function openPlatformAppModal(appId) {
       PlatformAdminState.selectedApp = a;
 
       setEl('pa-modal-app-id', `#${a.id}`);
-      setEl('pa-modal-app-candidate', a.candidate_name);
-      setEl('pa-modal-app-email', a.candidate_email);
-      setEl('pa-modal-app-cand-ats', `${a.candidate_ats || 0}/100`);
-      setEl('pa-modal-app-job', a.job_title);
-      setEl('pa-modal-app-company', a.company);
+      setEl('pa-modal-app-candidate', a.candidate ? a.candidate.name : (a.candidate_name || 'Unknown'));
+      setEl('pa-modal-app-email', a.candidate ? a.candidate.email : (a.candidate_email || ''));
+      setEl('pa-modal-app-cand-ats', `${(a.candidate && a.candidate.ats_score != null) ? a.candidate.ats_score : (a.candidate_ats || 0)} / 100`);
+      setEl('pa-modal-app-job', a.job ? a.job.title : (a.job_title || 'Position'));
+      setEl('pa-modal-app-company', a.job ? a.job.company : (a.company || 'TalentSync'));
       setEl('pa-modal-app-match', `${a.match_score || 0}%`);
-      setEl('pa-modal-app-status', a.status);
       setEl('pa-modal-app-applied', a.applied_at ? new Date(a.applied_at).toLocaleString() : 'N/A');
+
+      const jobBadge = document.getElementById('pa-modal-app-job-badge');
+      if (jobBadge) jobBadge.textContent = a.job ? a.job.title : `Job #${a.job_id}`;
+
+      const avatarEl = document.getElementById('pa-modal-app-avatar');
+      const candName = a.candidate ? a.candidate.name : (a.candidate_name || '??');
+      if (avatarEl) {
+        avatarEl.textContent = candName.slice(0, 2).toUpperCase();
+        avatarEl.style.background = UI.avatarColor(candName);
+      }
+
+      const statusBadge = document.getElementById('pa-modal-app-status-badge');
+      if (statusBadge) {
+        const statusBadges = {
+          Reviewing: 'badge-primary',
+          Shortlisted: 'badge-success',
+          Pending: 'badge-warning',
+          Rejected: 'badge-danger',
+          Hired: 'badge-success'
+        };
+        statusBadge.className = `badge ${statusBadges[a.status] || 'badge-gray'}`;
+        statusBadge.textContent = (a.status || 'PENDING').toUpperCase();
+      }
+
+      const statusSelect = document.getElementById('pa-modal-app-status-select');
+      if (statusSelect) statusSelect.value = a.status || 'Pending';
+
+      const notesInput = document.getElementById('pa-modal-app-notes-input');
+      if (notesInput) notesInput.value = '';
 
       const histEl = document.getElementById('pa-modal-app-history');
       if (histEl) {
-        const hist = a.status_history || [];
+        const hist = a.history || a.status_history || [];
         if (!hist.length) {
-          histEl.innerHTML = '<span class="text-muted">Initial submission state preserved. No subsequent recruiter transitions logged.</span>';
+          histEl.innerHTML = '<span class="text-muted">Initial submission state preserved. No subsequent status transitions logged.</span>';
         } else {
           histEl.innerHTML = `<ul style="padding-left:18px;margin:0">` + hist.map(h => `
-            <li>Changed to <strong>${escapeHTML(h.to_status)}</strong> by ${escapeHTML(h.changed_by || 'Recruiter')} <span style="color:var(--text-3);font-size:11px">(${h.timestamp ? new Date(h.timestamp).toLocaleString() : ''})</span></li>
+            <li style="margin-bottom:6px">
+              Status set to <strong>${escapeHTML(h.status || h.to_status)}</strong>
+              ${h.notes ? `— <em>"${escapeHTML(h.notes)}"</em>` : ''} 
+              <span style="color:var(--text-3);font-size:11px">(${h.updated_at || h.timestamp ? new Date(h.updated_at || h.timestamp).toLocaleString() : ''})</span>
+            </li>
           `).join('') + `</ul>`;
         }
       }
@@ -7012,6 +7345,155 @@ function openPlatformAppModal(appId) {
     .catch(err => {
       console.error('Error opening application modal:', err);
       Toast.show('Network error opening application modal.', 'error');
+    });
+}
+
+function submitPlatformAppStatusChange() {
+  const a = PlatformAdminState.selectedApp;
+  if (!a) return;
+
+  const select = document.getElementById('pa-modal-app-status-select');
+  const notesInput = document.getElementById('pa-modal-app-notes-input');
+  if (!select) return;
+
+  const newStatus = select.value;
+  const notes = notesInput ? notesInput.value.trim() : '';
+
+  const btn = document.getElementById('pa-modal-btn-save-app-status');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...'; }
+
+  fetch(`/api/platform-admin/applications/${a.id}/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: newStatus, notes: notes })
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Update Status'; }
+      if (res && res.success) {
+        Toast.show(res.message || 'Application status updated successfully.', 'success');
+        a.status = newStatus;
+        const statusBadge = document.getElementById('pa-modal-app-status-badge');
+        if (statusBadge) {
+          const statusBadges = {
+            Reviewing: 'badge-primary',
+            Shortlisted: 'badge-success',
+            Pending: 'badge-warning',
+            Rejected: 'badge-danger',
+            Hired: 'badge-success'
+          };
+          statusBadge.className = `badge ${statusBadges[newStatus] || 'badge-gray'}`;
+          statusBadge.textContent = newStatus.toUpperCase();
+        }
+        fetchPlatformAdminApplications(PlatformAdminState.appsPage);
+        fetchPlatformJobsAppsSummary();
+        openPlatformAppModal(a.id); // Refresh history
+      } else {
+        Toast.show((res && res.message) || 'Failed to update application status.', 'error');
+      }
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Update Status'; }
+      console.error('Application status update error:', err);
+      Toast.show('Network error updating application status.', 'error');
+    });
+}
+
+function openCandidateFromAppModal() {
+  const a = PlatformAdminState.selectedApp;
+  if (!a) return;
+  const userId = a.candidate ? a.candidate.id : (a.user_id || 0);
+  if (userId) {
+    Modal.close('pa-app-modal');
+    openPlatformUserModal(userId);
+  } else {
+    Toast.show('Candidate record ID not available.', 'warning');
+  }
+}
+
+function openJobFromAppModal() {
+  const a = PlatformAdminState.selectedApp;
+  if (!a) return;
+  const jobId = a.job ? a.job.id : (a.job_id || 0);
+  if (jobId) {
+    Modal.close('pa-app-modal');
+    openPlatformJobModal(jobId);
+  } else {
+    Toast.show('Job record ID not available.', 'warning');
+  }
+}
+
+function exportPlatformApplicationsCSV() {
+  const searchInput = document.getElementById('pa-apps-search');
+  const statusSelect = document.getElementById('pa-apps-status-filter');
+  const matchSelect = document.getElementById('pa-apps-match-filter');
+
+  const q = searchInput ? searchInput.value.trim() : '';
+  const status = statusSelect ? statusSelect.value : '';
+  const matchTier = matchSelect ? matchSelect.value : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 500 });
+  if (q) params.set('search', q);
+  if (status) params.set('status', status);
+  if (PlatformAdminState.appsJobIdFilter) params.set('job_id', PlatformAdminState.appsJobIdFilter);
+
+  if (matchTier === '80') {
+    params.set('min_match', '80');
+  } else if (matchTier === '50') {
+    params.set('min_match', '50');
+    params.set('max_match', '79');
+  } else if (matchTier === 'low') {
+    params.set('max_match', '49');
+  }
+
+  Toast.show('Preparing Applications CSV export...', 'info');
+
+  fetch(`/api/platform-admin/applications?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success || !res.data || !res.data.applications) {
+        Toast.show('Failed to fetch applications for export.', 'error');
+        return;
+      }
+      const apps = res.data.applications;
+      if (apps.length === 0) {
+        Toast.show('No application records match current filter for export.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        let str = String(val == null ? '' : val);
+        if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Application ID', 'Candidate Name', 'Candidate Email', 'Job Title', 'Company', 'Match Score', 'Application Status', 'Applied At'];
+      const rows = apps.map(a => [
+        sanitizeCSV(a.id),
+        sanitizeCSV(a.candidate_name),
+        sanitizeCSV(a.candidate_email),
+        sanitizeCSV(a.job_title),
+        sanitizeCSV(a.job_company || a.company || ''),
+        sanitizeCSV(`${a.match_score || 0}%`),
+        sanitizeCSV(a.status || 'Pending'),
+        sanitizeCSV(a.applied_at || '')
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `talentsync_applications_export_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${apps.length} application record(s) to CSV! 📁`, 'success');
+    })
+    .catch(err => {
+      console.error('Export applications CSV error:', err);
+      Toast.show('Network error exporting applications.', 'error');
     });
 }
 
@@ -7686,12 +8168,26 @@ window.submitCreatePlatformUser      = submitCreatePlatformUser;
 window.exportPlatformUsersCSV        = exportPlatformUsersCSV;
 
 // Section 3
+window.fetchPlatformJobsAppsSummary  = fetchPlatformJobsAppsSummary;
 window.fetchPlatformAdminJobs        = fetchPlatformAdminJobs;
 window.changePlatformJobsPage        = changePlatformJobsPage;
+window.quickTogglePlatformJobStatus  = quickTogglePlatformJobStatus;
 window.openPlatformJobModal          = openPlatformJobModal;
+window.submitPlatformJobStatusChange = submitPlatformJobStatusChange;
+window.deletePlatformJobPosting      = deletePlatformJobPosting;
+window.exportPlatformJobsCSV         = exportPlatformJobsCSV;
+window.jumpToJobApplications         = jumpToJobApplications;
+window.filterAppsByJob               = filterAppsByJob;
+window.resetPlatformAppFilters       = resetPlatformAppFilters;
 window.fetchPlatformAdminApplications = fetchPlatformAdminApplications;
 window.changePlatformAppsPage        = changePlatformAppsPage;
 window.openPlatformAppModal          = openPlatformAppModal;
+window.submitPlatformAppStatusChange = submitPlatformAppStatusChange;
+window.openCandidateFromAppModal     = openCandidateFromAppModal;
+window.openJobFromAppModal           = openJobFromAppModal;
+window.exportPlatformApplicationsCSV = exportPlatformApplicationsCSV;
+window.debounceFetchJobs             = debounceFetchJobs;
+window.debounceFetchApps             = debounceFetchApps;
 
 // Section 4
 window.fetchPlatformAdminResumes     = fetchPlatformAdminResumes;

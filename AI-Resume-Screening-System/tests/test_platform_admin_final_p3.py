@@ -281,6 +281,72 @@ class TestPlatformAdminFinalP3(unittest.TestCase):
         self.assertGreaterEqual(len(app['history']), 1)
         self.assertEqual(app['history'][0]['status'], 'Reviewing')
 
+    def test_platform_job_status_toggle_and_deletion(self):
+        """Platform Admin can change job status (Active/Closed/Draft) and delete jobs."""
+        self._login_as(self.admin_id)
+
+        # Toggle status to Closed
+        res = self.client.post(f'/api/platform-admin/jobs/{self.job_id}/status',
+                               json={'status': 'Closed'},
+                               content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.get_json()['success'])
+
+        # Verify job is now Closed
+        res_get = self.client.get(f'/api/platform-admin/jobs/{self.job_id}')
+        self.assertEqual(res_get.get_json()['data']['job']['status'], 'Closed')
+
+        # Create temporary job and delete it
+        temp_job_id = self._create_internal_job("Temp Job To Delete", "Test Company", status="Draft")
+        res_del = self.client.delete(f'/api/platform-admin/jobs/{temp_job_id}')
+        self.assertEqual(res_del.status_code, 200)
+        self.assertTrue(res_del.get_json()['success'])
+
+        # Verify it no longer exists
+        res_del_check = self.client.get(f'/api/platform-admin/jobs/{temp_job_id}')
+        self.assertEqual(res_del_check.status_code, 404)
+
+    def test_platform_application_status_update_with_audit_trail(self):
+        """Platform Admin can update application status with custom notes and audit history."""
+        self._login_as(self.admin_id)
+
+        res = self.client.post(f'/api/platform-admin/applications/{self.app_id}/status',
+                               json={'status': 'Shortlisted', 'notes': 'Exceeds technical requirements'},
+                               content_type='application/json')
+        self.assertEqual(res.status_code, 200)
+        self.assertTrue(res.get_json()['success'])
+
+        # Verify application status changed and audit trail recorded
+        res_get = self.client.get(f'/api/platform-admin/applications/{self.app_id}')
+        app = res_get.get_json()['data']['application']
+        self.assertEqual(app['status'], 'Shortlisted')
+        self.assertTrue(any(h['status'] == 'Shortlisted' for h in app['history']))
+
+    def test_platform_jobs_apps_summary_and_filters(self):
+        """Summary KPI endpoint returns accurate counts and application filters by score/job_id work."""
+        self._login_as(self.admin_id)
+
+        # Test summary endpoint
+        res = self.client.get('/api/platform-admin/jobs-apps/summary')
+        self.assertEqual(res.status_code, 200)
+        summary = res.get_json()['data']
+        self.assertIn('total_jobs', summary)
+        self.assertIn('total_applications', summary)
+        self.assertIn('avg_match_score', summary)
+        self.assertIn('companies', summary)
+
+        # Test application filtering by job_id
+        res_job_filter = self.client.get(f'/api/platform-admin/applications?job_id={self.job_id}')
+        self.assertEqual(res_job_filter.status_code, 200)
+        apps = res_job_filter.get_json()['data']['applications']
+        self.assertTrue(all(a['job_id'] == self.job_id for a in apps))
+
+        # Test application filtering by min_match
+        res_match = self.client.get('/api/platform-admin/applications?min_match=80')
+        self.assertEqual(res_match.status_code, 200)
+        apps_matched = res_match.get_json()['data']['applications']
+        self.assertTrue(all(a['match_score'] >= 80 for a in apps_matched))
+
     # ============================================================
     # SECTION 4: RESUMES
     # ============================================================

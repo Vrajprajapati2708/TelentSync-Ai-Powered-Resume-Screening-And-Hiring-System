@@ -2715,32 +2715,75 @@
 
         <!-- ── SECTION 3: JOBS & APPLICATIONS ── -->
         <div id="platform-admin-jobs-apps" data-portal="platform-admin" class="hidden">
-          <div style="display:flex;gap:8px;margin-bottom:18px">
-            <button class="tab-btn active" id="pa-tab-btn-jobs" onclick="switchPaJobsAppsTab('jobs')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-briefcase" style="margin-right:6px"></i> Internal Jobs
-            </button>
-            <button class="tab-btn" id="pa-tab-btn-apps" onclick="switchPaJobsAppsTab('applications')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-file-signature" style="margin-right:6px"></i> Candidate Applications
-            </button>
+          
+          <!-- Summary Metrics KPI Grid -->
+          <div class="stats-grid" style="margin-bottom:20px">
+            <div class="stat-card">
+              <div class="stat-top">
+                <div class="stat-label">Active Job Postings</div>
+                <div class="stat-icon" style="background:#eff6ff"><i class="fas fa-briefcase" style="color:#2563eb"></i></div>
+              </div>
+              <div class="stat-value" id="pa-jobs-kpi-active">--</div>
+              <div class="stat-change up"><span id="pa-jobs-kpi-total">--</span> Total Listings</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top">
+                <div class="stat-label">Closed / Archived Jobs</div>
+                <div class="stat-icon" style="background:#f1f5f9"><i class="fas fa-archive" style="color:#64748b"></i></div>
+              </div>
+              <div class="stat-value" id="pa-jobs-kpi-closed">--</div>
+              <div class="stat-change flat">Archived / Draft</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top">
+                <div class="stat-label">Total Applications</div>
+                <div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-file-signature" style="color:#16a34a"></i></div>
+              </div>
+              <div class="stat-value" id="pa-apps-kpi-total">--</div>
+              <div class="stat-change up">Candidate Submissions</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-top">
+                <div class="stat-label">Avg Match Score</div>
+                <div class="stat-icon" style="background:#fdf4ff"><i class="fas fa-chart-pie" style="color:#a855f7"></i></div>
+              </div>
+              <div class="stat-value" id="pa-apps-kpi-match">--</div>
+              <div class="stat-change flat">System Alignment</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+            <div style="display:flex;gap:8px">
+              <button class="tab-btn active" id="pa-tab-btn-jobs" onclick="switchPaJobsAppsTab('jobs')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-briefcase" style="margin-right:6px"></i> Internal Jobs
+              </button>
+              <button class="tab-btn" id="pa-tab-btn-apps" onclick="switchPaJobsAppsTab('applications')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-file-signature" style="margin-right:6px"></i> Candidate Applications
+              </button>
+            </div>
           </div>
 
           <!-- Tab 1: Internal Jobs -->
           <div id="pa-content-jobs" class="card">
-            <div style="padding:12px 18px;background:#f8fafc;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-2)">
-              <i class="fas fa-info-circle" style="color:#2563eb"></i>
-              <span><strong>Internal Job Inventory:</strong> Displays native TalentSync employer job postings only. External live Adzuna listings are excluded to prevent inventory distortion.</span>
+            <div style="padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-2);border-radius:12px 12px 0 0">
+              <i class="fas fa-shield-alt" style="color:#2563eb"></i>
+              <span><strong>Internal Job Inventory:</strong> Displays native TalentSync employer job postings only. External live listings are isolated to prevent platform inventory distortion.</span>
             </div>
             <div class="card-header" style="flex-wrap:wrap;gap:12px">
-              <span class="card-title"><i class="fas fa-building" style="color:#2563eb;margin-right:8px"></i> Job Postings</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input id="pa-jobs-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search title, company..." onkeydown="if(event.key==='Enter')fetchPlatformAdminJobs(1)">
+              <span class="card-title"><i class="fas fa-building" style="color:#2563eb;margin-right:8px"></i> Job Postings Directory</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <input id="pa-jobs-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search title, company..." oninput="debounceFetchJobs()" onkeydown="if(event.key==='Enter')fetchPlatformAdminJobs(1)">
                 <select id="pa-jobs-status-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminJobs(1)">
                   <option value="">All Statuses</option>
                   <option value="Active">Active</option>
                   <option value="Closed">Closed</option>
                   <option value="Draft">Draft</option>
                 </select>
+                <select id="pa-jobs-company-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;max-width:160px" onchange="fetchPlatformAdminJobs(1)">
+                  <option value="">All Companies</option>
+                </select>
                 <button class="btn btn-primary btn-sm" onclick="fetchPlatformAdminJobs(1)"><i class="fas fa-search"></i> Search</button>
+                <button class="btn btn-outline btn-sm" onclick="exportPlatformJobsCSV()" title="Export filtered jobs to CSV"><i class="fas fa-file-csv"></i> Export CSV</button>
               </div>
             </div>
 
@@ -2777,17 +2820,29 @@
           <!-- Tab 2: Applications -->
           <div id="pa-content-applications" class="card hidden">
             <div class="card-header" style="flex-wrap:wrap;gap:12px">
-              <span class="card-title"><i class="fas fa-file-contract" style="color:#10b981;margin-right:8px"></i> Platform Applications</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input id="pa-apps-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search candidate, job..." onkeydown="if(event.key==='Enter')fetchPlatformAdminApplications(1)">
+              <div>
+                <span class="card-title"><i class="fas fa-file-contract" style="color:#10b981;margin-right:8px"></i> Platform Applications</span>
+                <span id="pa-apps-filter-indicator" class="badge badge-primary" style="display:none;margin-left:8px;font-size:11px">Filtered by Job</span>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                <input id="pa-apps-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search candidate, job..." oninput="debounceFetchApps()" onkeydown="if(event.key==='Enter')fetchPlatformAdminApplications(1)">
                 <select id="pa-apps-status-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminApplications(1)">
                   <option value="">All Statuses</option>
+                  <option value="Pending">Pending</option>
                   <option value="Reviewing">Reviewing</option>
                   <option value="Shortlisted">Shortlisted</option>
-                  <option value="Pending">Pending</option>
                   <option value="Rejected">Rejected</option>
+                  <option value="Hired">Hired</option>
+                </select>
+                <select id="pa-apps-match-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminApplications(1)">
+                  <option value="">All Match Scores</option>
+                  <option value="80">Top Match (80%+)</option>
+                  <option value="50">Medium Match (50-79%)</option>
+                  <option value="low">Low Match (&lt;50%)</option>
                 </select>
                 <button class="btn btn-primary btn-sm" onclick="fetchPlatformAdminApplications(1)"><i class="fas fa-search"></i> Search</button>
+                <button id="pa-apps-reset-filter-btn" class="btn btn-outline btn-sm" style="display:none" onclick="resetPlatformAppFilters()"><i class="fas fa-times"></i> Clear Filters</button>
+                <button class="btn btn-outline btn-sm" onclick="exportPlatformApplicationsCSV()" title="Export filtered applications to CSV"><i class="fas fa-file-csv"></i> Export CSV</button>
               </div>
             </div>
 
@@ -3499,89 +3554,204 @@
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     MODAL 2: PLATFORM ADMIN JOB DETAIL
+     MODAL 2: PLATFORM ADMIN JOB DETAIL & GOVERNANCE
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-job-modal" class="modal-backdrop">
   <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-job-title" style="display:flex;align-items:center;gap:8px">
-        <i class="fas fa-briefcase" style="color:var(--primary)"></i> Job Details (Internal)
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-briefcase" style="color:var(--primary)"></i> Internal Job Posting Governance
       </div>
       <button class="modal-close" onclick="Modal.close('pa-job-modal')">✕</button>
     </div>
-    <div style="margin-bottom:20px">
-      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Job ID</td><td id="pa-modal-job-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Company</td><td id="pa-modal-job-company">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Location</td><td id="pa-modal-job-location">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Employment Type</td><td id="pa-modal-job-type">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Salary Range</td><td id="pa-modal-job-salary">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Posting Status</td><td id="pa-modal-job-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Created Date</td><td id="pa-modal-job-created">--</td></tr>
-      </table>
 
-      <div style="margin-bottom:18px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Required Skills</div>
-        <div class="skills-cloud" id="pa-modal-job-skills">None listed</div>
+    <!-- Job Hero Card -->
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
+      <div style="width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">
+        <i class="fas fa-building"></i>
       </div>
-
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Job Description</div>
-        <div id="pa-modal-job-desc" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap">--</div>
-      </div>
-
-      <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Applicants (<span id="pa-modal-job-app-count">0</span>)</div>
-        <div class="table-wrap" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">
-          <table class="table">
-            <thead>
-              <tr><th>Candidate</th><th>Match</th><th>Status</th><th>Applied</th></tr>
-            </thead>
-            <tbody id="pa-modal-job-applicants-tbody">
-              <tr><td colspan="4" style="text-align:center;padding:16px;color:var(--text-3)">No applicants yet.</td></tr>
-            </tbody>
-          </table>
+      <div style="flex:1;min-width:0">
+        <div id="pa-modal-job-title" style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
+          <span id="pa-modal-job-company" style="font-size:13px;font-weight:700;color:var(--text-2)">--</span>
+          <span style="color:var(--text-3)">•</span>
+          <span id="pa-modal-job-type-badge" class="badge badge-gray" style="font-size:11px">Full-time</span>
+          <span id="pa-modal-job-status-badge" class="badge badge-success" style="font-size:11px">Active</span>
         </div>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border)">
+
+    <!-- 3-Metric Summary Grid -->
+    <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Job ID</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-job-id">--</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Total Applicants</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-job-app-count">0</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Compensation</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px" id="pa-modal-job-salary">--</div>
+      </div>
+    </div>
+
+    <!-- Details Table -->
+    <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Workplace Location</td><td id="pa-modal-job-location">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Employment Type</td><td id="pa-modal-job-type">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Posting Date</td><td id="pa-modal-job-created">--</td></tr>
+    </table>
+
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Required Skills Profile</div>
+      <div class="skills-cloud" id="pa-modal-job-skills">None listed</div>
+    </div>
+
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Job Description</div>
+      <div id="pa-modal-job-desc" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:140px;overflow-y:auto;white-space:pre-wrap">--</div>
+    </div>
+
+    <!-- Applicants Subtable -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">Applicants List</div>
+        <button id="pa-modal-btn-view-all-apps" class="btn btn-sm btn-outline" onclick="jumpToJobApplications()" style="font-size:11px;padding:3px 8px">
+          <i class="fas fa-external-link-alt"></i> View in Applications Tab
+        </button>
+      </div>
+      <div class="table-wrap" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">
+        <table class="table">
+          <thead>
+            <tr><th>Candidate</th><th>Match</th><th>Status</th><th>Applied</th><th style="text-align:right">Action</th></tr>
+          </thead>
+          <tbody id="pa-modal-job-applicants-tbody">
+            <tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text-3)">No applicants yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Job Governance Actions -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:16px">
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+        <i class="fas fa-cog" style="color:#2563eb"></i> Listing Lifecycle &amp; Governance
+      </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <label style="font-size:13px;font-weight:700;color:var(--text)">Posting Status:</label>
+        <select id="pa-modal-job-status-select" class="form-control" style="width:140px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+          <option value="Active">Active</option>
+          <option value="Closed">Closed</option>
+          <option value="Draft">Draft</option>
+        </select>
+        <button id="pa-modal-btn-save-job-status" class="btn btn-sm btn-primary" onclick="submitPlatformJobStatusChange()">
+          <i class="fas fa-save"></i> Save Status
+        </button>
+        <div style="flex:1"></div>
+        <button id="pa-modal-btn-delete-job" class="btn btn-sm btn-outline-danger" onclick="deletePlatformJobPosting()" title="Permanently delete job posting">
+          <i class="fas fa-trash-alt"></i> Delete Job
+        </button>
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end">
       <button class="btn btn-outline" onclick="Modal.close('pa-job-modal')">Close</button>
     </div>
   </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════
-     MODAL 3: PLATFORM ADMIN APPLICATION DETAIL
+     MODAL 3: PLATFORM ADMIN APPLICATION DETAIL & GOVERNANCE
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-app-modal" class="modal-backdrop">
   <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-app-title" style="display:flex;align-items:center;gap:8px">
-        <i class="fas fa-file-signature" style="color:var(--primary)"></i> Application Details
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-file-signature" style="color:var(--primary)"></i> Candidate Application Governance
       </div>
       <button class="modal-close" onclick="Modal.close('pa-app-modal')">✕</button>
     </div>
-    <div style="margin-bottom:20px">
-      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
-        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Application ID</td><td id="pa-modal-app-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate</td><td id="pa-modal-app-candidate">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate Email</td><td id="pa-modal-app-email">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate ATS</td><td id="pa-modal-app-cand-ats">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Job Title</td><td id="pa-modal-app-job">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Company</td><td id="pa-modal-app-company">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Match Score</td><td id="pa-modal-app-match">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Current Status</td><td id="pa-modal-app-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Applied At</td><td id="pa-modal-app-applied">--</td></tr>
-      </table>
 
-      <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Status Audit Trail</div>
-        <div id="pa-modal-app-history" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border)">
-          No status transitions recorded.
+    <!-- Application Hero Card -->
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
+      <div id="pa-modal-app-avatar" class="avatar avatar-lg" style="background:var(--primary);color:#fff;font-size:18px;font-weight:800;flex-shrink:0">--</div>
+      <div style="flex:1;min-width:0">
+        <div id="pa-modal-app-candidate" style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div id="pa-modal-app-email" style="font-size:13px;color:var(--text-2);margin-top:2px">--</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <span class="badge badge-gray" id="pa-modal-app-job-badge">Job #--</span>
+          <span id="pa-modal-app-status-badge" class="badge badge-primary">Reviewing</span>
         </div>
       </div>
     </div>
-    <div style="display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border)">
+
+    <!-- 3-Metric Summary Grid -->
+    <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Application ID</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-app-id">--</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Match Score</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-app-match">--</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Candidate ATS</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--teal-d)" id="pa-modal-app-cand-ats">--</div>
+      </div>
+    </div>
+
+    <!-- Information Table -->
+    <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Applied Position</td><td id="pa-modal-app-job">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Hiring Company</td><td id="pa-modal-app-company">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Submission Timestamp</td><td id="pa-modal-app-applied">--</td></tr>
+    </table>
+
+    <!-- Cross-Links & Candidate Intelligence -->
+    <div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      <button id="pa-modal-btn-view-cand" class="btn btn-sm btn-outline" onclick="openCandidateFromAppModal()">
+        <i class="fas fa-user"></i> View Candidate Profile
+      </button>
+      <button id="pa-modal-btn-view-job" class="btn btn-sm btn-outline" onclick="openJobFromAppModal()">
+        <i class="fas fa-briefcase"></i> View Job Posting
+      </button>
+    </div>
+
+    <!-- Application Status Transition Governance Box -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:18px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:6px">
+        <i class="fas fa-exchange-alt" style="color:#10b981"></i> Status Transition Governance
+      </div>
+      <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <label style="font-size:13px;font-weight:700;color:var(--text)">Set Status:</label>
+        <select id="pa-modal-app-status-select" class="form-control" style="width:150px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+          <option value="Pending">Pending</option>
+          <option value="Reviewing">Reviewing</option>
+          <option value="Shortlisted">Shortlisted</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Hired">Hired</option>
+        </select>
+        <button id="pa-modal-btn-save-app-status" class="btn btn-sm btn-success" onclick="submitPlatformAppStatusChange()">
+          <i class="fas fa-check"></i> Update Status
+        </button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="pa-modal-app-notes-input" class="form-control" style="font-size:12px;padding:6px 12px;border:1px solid var(--border);border-radius:8px" placeholder="Optional audit notes for status update...">
+      </div>
+    </div>
+
+    <!-- Chronological Audit Trail Timeline -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Status Audit Trail</div>
+      <div id="pa-modal-app-history" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border)">
+        No status transitions recorded.
+      </div>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end">
       <button class="btn btn-outline" onclick="Modal.close('pa-app-modal')">Close</button>
     </div>
   </div>
