@@ -13,6 +13,7 @@ from app.controllers.platform_admin_controller import (
     get_platform_analytics,
     get_platform_login_attempts,
     get_platform_outliers,
+    resolve_platform_outlier,
     get_platform_audit_logs,
     get_platform_jobs,
     get_platform_job_detail,
@@ -237,6 +238,19 @@ def security_outliers():
 
     result = get_platform_outliers(page=page, limit=limit)
     return jsonify(result), 200
+
+
+@platform_admin_bp.route('/security/outliers/<int:user_id>/resolve', methods=['POST'])
+@login_required
+@role_required('admin')
+def resolve_outlier(user_id):
+    """
+    POST /api/platform-admin/security/outliers/<user_id>/resolve
+    Clears the outlier flag for a candidate profile with audit logging.
+    """
+    admin_user_id = session.get('user_id')
+    success, message, status_code = resolve_platform_outlier(user_id, admin_user_id)
+    return jsonify({"success": success, "message": message}), status_code
 
 
 # ── 4. Audit / Activity Viewer ───────────────────────────────

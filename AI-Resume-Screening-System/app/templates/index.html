@@ -2982,13 +2982,26 @@
 
         <!-- ── SECTION 5: SECURITY & AUDIT ── -->
         <div id="platform-admin-security-audit" data-portal="platform-admin" class="hidden">
-          <div style="display:flex;gap:8px;margin-bottom:18px">
-            <button class="tab-btn active" id="pa-tab-btn-security" onclick="switchPaSecAuditTab('security')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-shield-alt" style="margin-right:6px"></i> Security &amp; Fraud
-            </button>
-            <button class="tab-btn" id="pa-tab-btn-audit" onclick="switchPaSecAuditTab('audit')" style="padding:8px 18px;font-size:13px;font-weight:700">
-              <i class="fas fa-history" style="margin-right:6px"></i> Audit Log
-            </button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:12px">
+            <div style="display:flex;gap:8px">
+              <button class="tab-btn active" id="pa-tab-btn-security" onclick="switchPaSecAuditTab('security')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-shield-alt" style="margin-right:6px"></i> Security &amp; Fraud
+              </button>
+              <button class="tab-btn" id="pa-tab-btn-audit" onclick="switchPaSecAuditTab('audit')" style="padding:8px 18px;font-size:13px;font-weight:700">
+                <i class="fas fa-history" style="margin-right:6px"></i> Audit Log
+              </button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button id="pa-sec-export-logins-btn" class="btn btn-sm btn-outline" onclick="exportPlatformLoginsCSV()" title="Download authentication audit trail as CSV">
+                <i class="fas fa-file-csv" style="color:var(--success)"></i> Export Logins (CSV)
+              </button>
+              <button id="pa-sec-export-audit-btn" class="btn btn-sm btn-outline hidden" onclick="exportPlatformAuditCSV()" title="Download full system activity audit trail as CSV">
+                <i class="fas fa-file-csv" style="color:var(--primary)"></i> Export Audit (CSV)
+              </button>
+              <button class="btn btn-sm btn-outline" onclick="refreshCurrentPaSecAuditTab()" title="Refresh current view">
+                <i class="fas fa-sync-alt"></i> Refresh
+              </button>
+            </div>
           </div>
 
           <!-- Tab 1: Security -->
@@ -2997,7 +3010,7 @@
               <div class="stat-card">
                 <div class="stat-top">
                   <div class="stat-label">Total Login Attempts</div>
-                  <div class="stat-icon" style="background:#eff6ff"><i class="fas fa-sign-in-alt" style="color:#2563eb"></i></div>
+                  <div class="stat-icon" style="background:rgba(37,99,235,0.12)"><i class="fas fa-sign-in-alt" style="color:var(--primary)"></i></div>
                 </div>
                 <div class="stat-value" id="pa-sec-total">--</div>
                 <div class="stat-change flat">Tracked Authentications</div>
@@ -3005,7 +3018,7 @@
               <div class="stat-card">
                 <div class="stat-top">
                   <div class="stat-label">Successful Logins</div>
-                  <div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-check-shield" style="color:#16a34a"></i></div>
+                  <div class="stat-icon" style="background:rgba(16,185,129,0.12)"><i class="fas fa-check-shield" style="color:var(--success)"></i></div>
                 </div>
                 <div class="stat-value" id="pa-sec-success">--</div>
                 <div class="stat-change up" id="pa-sec-success-rate">--% Success Rate</div>
@@ -3013,18 +3026,18 @@
               <div class="stat-card">
                 <div class="stat-top">
                   <div class="stat-label">Failed Attempts</div>
-                  <div class="stat-icon" style="background:#fef2f2"><i class="fas fa-exclamation-triangle" style="color:#dc2626"></i></div>
+                  <div class="stat-icon" style="background:rgba(239,68,68,0.12)"><i class="fas fa-exclamation-triangle" style="color:var(--danger)"></i></div>
                 </div>
                 <div class="stat-value" id="pa-sec-failed">--</div>
-                <div class="stat-change" style="color:#dc2626">Failed Logins</div>
+                <div class="stat-change" style="color:var(--danger)">Failed Logins</div>
               </div>
               <div class="stat-card">
                 <div class="stat-top">
                   <div class="stat-label">Flagged Outliers</div>
-                  <div class="stat-icon" style="background:#fff7ed"><i class="fas fa-user-secret" style="color:#ea580c"></i></div>
+                  <div class="stat-icon" style="background:rgba(245,158,11,0.12)"><i class="fas fa-user-secret" style="color:var(--warning)"></i></div>
                 </div>
                 <div class="stat-value" id="pa-sec-outliers">--</div>
-                <div class="stat-change" style="color:#ea580c">AI Detected Profiles</div>
+                <div class="stat-change" style="color:var(--warning)">AI Detected Profiles</div>
               </div>
             </div>
 
@@ -3032,13 +3045,13 @@
               <!-- Top Failed IPs -->
               <div class="card">
                 <div class="card-header">
-                  <span class="card-title"><i class="fas fa-network-wired" style="color:#dc2626;margin-right:8px"></i> Top Failed Login Sources (IPs)</span>
+                  <span class="card-title"><i class="fas fa-network-wired" style="color:var(--danger);margin-right:8px"></i> Top Failed Login Sources (IPs)</span>
                 </div>
                 <div class="table-wrap">
                   <table class="table">
                     <thead><tr><th>IP Address</th><th style="text-align:right">Failed Attempts</th></tr></thead>
                     <tbody id="pa-top-failed-ips-tbody">
-                      <tr><td colspan="2" style="text-align:center;padding:20px">No failed attempts recorded.</td></tr>
+                      <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-3)">No failed attempts recorded.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -3047,13 +3060,13 @@
               <!-- Top Targeted Accounts -->
               <div class="card">
                 <div class="card-header">
-                  <span class="card-title"><i class="fas fa-bullseye" style="color:#ea580c;margin-right:8px"></i> Targeted User Accounts</span>
+                  <span class="card-title"><i class="fas fa-bullseye" style="color:var(--warning);margin-right:8px"></i> Targeted User Accounts</span>
                 </div>
                 <div class="table-wrap">
                   <table class="table">
                     <thead><tr><th>Account Email</th><th style="text-align:right">Failed Attempts</th></tr></thead>
                     <tbody id="pa-top-targeted-tbody">
-                      <tr><td colspan="2" style="text-align:center;padding:20px">No targeted accounts.</td></tr>
+                      <tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-3)">No targeted accounts.</td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -3062,8 +3075,8 @@
 
             <!-- Flagged Outliers Section -->
             <div class="card" style="margin-top:20px">
-              <div class="card-header">
-                <span class="card-title"><i class="fas fa-radiation" style="color:#ea580c;margin-right:8px"></i> Statistical Outliers &amp; Suspicious Candidate Profiles</span>
+              <div class="card-header" style="justify-content:space-between;align-items:center">
+                <span class="card-title"><i class="fas fa-radiation" style="color:var(--warning);margin-right:8px"></i> Statistical Outliers &amp; Suspicious Candidate Profiles</span>
                 <button class="btn btn-sm btn-outline" onclick="fetchPlatformAdminOutliers()"><i class="fas fa-sync-alt"></i> Refresh Outliers</button>
               </div>
               <div class="table-wrap">
@@ -3075,11 +3088,11 @@
                       <th>ATS Score</th>
                       <th>Cluster</th>
                       <th>Anomaly Context / Reason</th>
-                      <th style="text-align:right">Action</th>
+                      <th style="text-align:right">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="pa-outliers-tbody">
-                    <tr><td colspan="6" style="text-align:center;padding:24px">Loading outlier profiles...</td></tr>
+                    <tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading outlier profiles...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -3088,14 +3101,14 @@
             <!-- Login Attempts Table -->
             <div class="card" style="margin-top:20px">
               <div class="card-header" style="flex-wrap:wrap;gap:12px">
-                <span class="card-title"><i class="fas fa-list-alt" style="color:#2563eb;margin-right:8px"></i> System Authentication Logs</span>
-                <div style="display:flex;gap:8px">
-                  <select id="pa-logins-status-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminLoginAttempts(1)">
+                <span class="card-title"><i class="fas fa-list-alt" style="color:var(--primary);margin-right:8px"></i> System Authentication Logs</span>
+                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                  <select id="pa-logins-status-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--text)" onchange="fetchPlatformAdminLoginAttempts(1)">
                     <option value="">All Attempts</option>
                     <option value="success">Success Only</option>
                     <option value="failed">Failed Only</option>
                   </select>
-                  <input id="pa-logins-search" class="form-control" style="width:180px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Filter email or IP..." onkeydown="if(event.key==='Enter')fetchPlatformAdminLoginAttempts(1)">
+                  <input id="pa-logins-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--text)" placeholder="Filter email or IP..." oninput="onPaLoginsSearch(this.value)" onkeydown="if(event.key==='Enter')fetchPlatformAdminLoginAttempts(1)">
                   <button class="btn btn-sm btn-primary" onclick="fetchPlatformAdminLoginAttempts(1)">Search</button>
                 </div>
               </div>
@@ -3111,7 +3124,7 @@
                     </tr>
                   </thead>
                   <tbody id="pa-logins-tbody">
-                    <tr><td colspan="5" style="text-align:center;padding:24px">Loading login records...</td></tr>
+                    <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading login records...</td></tr>
                   </tbody>
                 </table>
               </div>
@@ -3128,15 +3141,16 @@
           <!-- Tab 2: Audit Log -->
           <div id="pa-content-audit" class="card hidden">
             <div class="card-header" style="flex-wrap:wrap;gap:12px">
-              <span class="card-title"><i class="fas fa-history" style="color:#6366f1;margin-right:8px"></i> Read-Only Activity &amp; Audit Stream</span>
-              <div style="display:flex;gap:8px">
-                <select id="pa-audit-source-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" onchange="fetchPlatformAdminAudit(1)">
+              <span class="card-title"><i class="fas fa-history" style="color:var(--primary);margin-right:8px"></i> Unified Audit &amp; Activity Stream</span>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <select id="pa-audit-source-filter" class="form-control" style="padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--text)" onchange="fetchPlatformAdminAudit(1)">
                   <option value="all">All Audit Sources</option>
+                  <option value="audit_logs">System Admin Logs</option>
                   <option value="application_status">Application Status</option>
                   <option value="recommendation_history">Recommendation History</option>
                   <option value="search_history">Search History</option>
                 </select>
-                <input id="pa-audit-search" class="form-control" style="width:200px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px" placeholder="Search activity..." onkeydown="if(event.key==='Enter')fetchPlatformAdminAudit(1)">
+                <input id="pa-audit-search" class="form-control" style="width:220px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--bg-card);color:var(--text)" placeholder="Search activity, user or action..." oninput="onPaAuditSearch(this.value)" onkeydown="if(event.key==='Enter')fetchPlatformAdminAudit(1)">
                 <button class="btn btn-sm btn-primary" onclick="fetchPlatformAdminAudit(1)">Filter</button>
               </div>
             </div>
@@ -3148,13 +3162,14 @@
                     <th>Severity</th>
                     <th>Source Table</th>
                     <th>Timestamp</th>
-                    <th>User / Entity</th>
+                    <th>User / Actor</th>
                     <th>Action</th>
                     <th>Context Details</th>
+                    <th style="text-align:right">Inspect</th>
                   </tr>
                 </thead>
                 <tbody id="pa-audit-tbody">
-                  <tr><td colspan="7" style="text-align:center;padding:24px">Loading audit events...</td></tr>
+                  <tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading audit events...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -3163,7 +3178,7 @@
             <div id="pa-audit-empty-state" style="display:none;text-align:center;padding:48px 24px">
               <div style="font-size:42px;margin-bottom:12px">📋</div>
               <div style="font-size:16px;font-weight:700;color:var(--text);margin-bottom:6px">No Audit Records Found</div>
-              <div style="font-size:13px;color:var(--text-3);max-width:400px;margin:0 auto">Historical activity tables are currently clean. Events appear here as users interact with the system.</div>
+              <div style="font-size:13px;color:var(--text-3);max-width:400px;margin:0 auto">Historical activity tables are currently clean. Events appear here as operations occur.</div>
             </div>
 
             <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-top:1px solid var(--border)">
@@ -3172,6 +3187,52 @@
                 <button id="pa-audit-prev-btn" class="btn btn-sm btn-outline" onclick="changePlatformAuditPage(-1)" disabled><i class="fas fa-chevron-left"></i> Previous</button>
                 <button id="pa-audit-next-btn" class="btn btn-sm btn-outline" onclick="changePlatformAuditPage(1)" disabled>Next <i class="fas fa-chevron-right"></i></button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Audit Event Inspector Modal -->
+        <div id="pa-audit-detail-modal" class="modal-overlay hidden" style="display:none">
+          <div class="modal-card" style="max-width:680px;width:90%">
+            <div class="modal-header">
+              <div style="display:flex;align-items:center;gap:10px">
+                <div class="modal-title"><i class="fas fa-clipboard-check" style="color:var(--primary);margin-right:6px"></i> Audit Event Payload Inspector</div>
+                <span id="pa-audit-modal-severity" class="badge badge-teal" style="font-size:11px">INFO</span>
+              </div>
+              <button class="modal-close-btn" onclick="closePaAuditDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body" style="padding:20px 24px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+                <div style="background:var(--surface);padding:12px 14px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase">Event ID &amp; Source</div>
+                  <div id="pa-audit-modal-id-source" style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px;font-family:monospace">--</div>
+                </div>
+                <div style="background:var(--surface);padding:12px 14px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase">Timestamp</div>
+                  <div id="pa-audit-modal-time" style="font-size:13px;font-weight:600;color:var(--text);margin-top:4px">--</div>
+                </div>
+                <div style="background:var(--surface);padding:12px 14px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase">Actor / User Account</div>
+                  <div id="pa-audit-modal-actor" style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px">--</div>
+                </div>
+                <div style="background:var(--surface);padding:12px 14px;border-radius:8px;border:1px solid var(--border)">
+                  <div style="font-size:11px;color:var(--text-3);font-weight:700;text-transform:uppercase">Originating IP</div>
+                  <div id="pa-audit-modal-ip" style="font-size:13px;font-weight:600;font-family:monospace;color:var(--text);margin-top:4px">--</div>
+                </div>
+              </div>
+
+              <div style="margin-bottom:16px">
+                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Action Executed:</div>
+                <div id="pa-audit-modal-action" style="padding:10px 14px;background:var(--surface);border-radius:8px;border:1px solid var(--border);font-size:13px;font-weight:600;color:var(--primary)">--</div>
+              </div>
+
+              <div>
+                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">Payload Details &amp; State Context:</div>
+                <pre id="pa-audit-modal-payload" style="background:var(--bg);color:var(--text);padding:14px;border-radius:8px;border:1px solid var(--border);font-size:12px;font-family:monospace;overflow-x:auto;max-height:220px;white-space:pre-wrap;line-height:1.5">--</pre>
+              </div>
+            </div>
+            <div class="modal-footer" style="padding:14px 24px;display:flex;justify-content:flex-end">
+              <button class="btn btn-outline" onclick="closePaAuditDetailModal()">Close Inspector</button>
             </div>
           </div>
         </div>

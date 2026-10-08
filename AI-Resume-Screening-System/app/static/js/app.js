@@ -5603,19 +5603,36 @@ function switchPaSecAuditTab(tab) {
   const btnAudit = document.getElementById('pa-tab-btn-audit');
   const contentSec = document.getElementById('pa-content-security');
   const contentAudit = document.getElementById('pa-content-audit');
+  const exportLoginsBtn = document.getElementById('pa-sec-export-logins-btn');
+  const exportAuditBtn = document.getElementById('pa-sec-export-audit-btn');
+
   if (tab === 'security') {
     if (btnSec) btnSec.classList.add('active');
     if (btnAudit) btnAudit.classList.remove('active');
     if (contentSec) contentSec.classList.remove('hidden');
     if (contentAudit) contentAudit.classList.add('hidden');
+    if (exportLoginsBtn) exportLoginsBtn.classList.remove('hidden');
+    if (exportAuditBtn) exportAuditBtn.classList.add('hidden');
     fetchPlatformAdminSecurity();
   } else {
     if (btnSec) btnSec.classList.remove('active');
     if (btnAudit) btnAudit.classList.add('active');
     if (contentSec) contentSec.classList.add('hidden');
     if (contentAudit) contentAudit.classList.remove('hidden');
+    if (exportLoginsBtn) exportLoginsBtn.classList.add('hidden');
+    if (exportAuditBtn) exportAuditBtn.classList.remove('hidden');
     fetchPlatformAdminAudit(PlatformAdminState.auditPage || 1);
   }
+}
+
+function refreshCurrentPaSecAuditTab() {
+  const isAudit = document.getElementById('pa-tab-btn-audit')?.classList.contains('active');
+  if (isAudit) {
+    fetchPlatformAdminAudit(PlatformAdminState.auditPage || 1);
+  } else {
+    fetchPlatformAdminSecurity();
+  }
+  Toast.show('Security view refreshed. 🛡️', 'info');
 }
 
 function switchPaSystemTab(tab) {
@@ -7835,6 +7852,209 @@ function exportPlatformResumesCSV() {
 // SECTION 5: SECURITY & AUDIT
 // ═══════════════════════════════════════════════════════════
 
+let _paLoginsSearchTimer = null;
+function onPaLoginsSearch(val) {
+  clearTimeout(_paLoginsSearchTimer);
+  _paLoginsSearchTimer = setTimeout(() => {
+    fetchPlatformAdminLoginAttempts(1);
+  }, 300);
+}
+
+let _paAuditSearchTimer = null;
+function onPaAuditSearch(val) {
+  clearTimeout(_paAuditSearchTimer);
+  _paAuditSearchTimer = setTimeout(() => {
+    fetchPlatformAdminAudit(1);
+  }, 300);
+}
+
+let _paAuditEventsList = [];
+
+function openPaAuditDetailModal(idx) {
+  const event = _paAuditEventsList[idx];
+  if (!event) return;
+
+  const modal = document.getElementById('pa-audit-detail-modal');
+  if (!modal) return;
+
+  setEl('pa-audit-modal-id-source', `${event.id} (${event.source_table || event.source || 'audit_logs'})`);
+  setEl('pa-audit-modal-time', event.timestamp ? new Date(event.timestamp).toLocaleString() : 'N/A');
+  setEl('pa-audit-modal-actor', event.actor || event.entity || 'System');
+  setEl('pa-audit-modal-ip', event.ip_address || '127.0.0.1');
+  setEl('pa-audit-modal-action', event.action || 'N/A');
+
+  const sevBadge = document.getElementById('pa-audit-modal-severity');
+  if (sevBadge) {
+    sevBadge.innerHTML = getAuditSeverity(event.action, event.source_table || event.source);
+  }
+
+  const payloadEl = document.getElementById('pa-audit-modal-payload');
+  if (payloadEl) {
+    let payloadStr = '';
+    if (typeof event.details === 'object' && event.details !== null) {
+      payloadStr = JSON.stringify(event.details, null, 2);
+    } else {
+      payloadStr = String(event.details || 'No additional raw payload attributes recorded.');
+    }
+    payloadEl.textContent = payloadStr;
+  }
+
+  modal.classList.remove('hidden');
+  modal.style.display = 'flex';
+}
+
+function closePaAuditDetailModal() {
+  const modal = document.getElementById('pa-audit-detail-modal');
+  if (modal) {
+    modal.classList.add('hidden');
+    modal.style.display = 'none';
+  }
+}
+
+function resolvePlatformOutlier(userId, userName) {
+  const nameDisplay = userName || `User #${userId}`;
+  if (!confirm(`Are you sure you want to resolve the outlier / anomaly flag for ${nameDisplay}?`)) {
+    return;
+  }
+
+  fetch(`/api/platform-admin/security/outliers/${userId}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(r => r.json())
+    .then(res => {
+      if (res && res.success) {
+        Toast.show(res.message || 'Outlier flag cleared successfully. ✅', 'success');
+        fetchPlatformAdminOutliers();
+        if (typeof syncPlatformUserTabCounters === 'function') syncPlatformUserTabCounters();
+      } else {
+        Toast.show(res ? res.message : 'Failed to resolve outlier flag.', 'error');
+      }
+    })
+    .catch(err => {
+      console.error('Resolve outlier error:', err);
+      Toast.show('Network error resolving outlier.', 'error');
+    });
+}
+
+function exportPlatformLoginsCSV() {
+  const statusSelect = document.getElementById('pa-logins-status-filter');
+  const searchInput  = document.getElementById('pa-logins-search');
+  const status = statusSelect ? statusSelect.value : '';
+  const q = searchInput ? searchInput.value.trim() : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 1000 });
+  if (status) params.set('status', status);
+  if (q) params.set('search', q);
+
+  Toast.show('Exporting authentication log records to CSV...', 'info');
+
+  fetch(`/api/platform-admin/security/login-attempts?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success) {
+        Toast.show('Failed to export login logs.', 'error');
+        return;
+      }
+      const attempts = res.data?.attempts || [];
+      if (attempts.length === 0) {
+        Toast.show('No login attempts found matching current criteria.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ');
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Attempt ID', 'Account Email', 'IP Address', 'Authentication Result', 'Timestamp'];
+      const rows = attempts.map(a => [
+        sanitizeCSV(a.id),
+        sanitizeCSV(a.email),
+        sanitizeCSV(a.ip_address || 'N/A'),
+        sanitizeCSV(a.success ? 'Success' : 'Failed'),
+        sanitizeCSV(a.timestamp || a.attempted_at || '')
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `talentsync_login_attempts_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${attempts.length} login record(s) to CSV! 🛡️`, 'success');
+    })
+    .catch(err => {
+      console.error('Export logins CSV error:', err);
+      Toast.show('Network error exporting login records.', 'error');
+    });
+}
+
+function exportPlatformAuditCSV() {
+  const sourceSelect = document.getElementById('pa-audit-source-filter');
+  const searchInput  = document.getElementById('pa-audit-search');
+  const source = sourceSelect ? sourceSelect.value : 'all';
+  const q = searchInput ? searchInput.value.trim() : '';
+
+  const params = new URLSearchParams({ page: 1, limit: 1000 });
+  if (source && source !== 'all') params.set('source', source);
+  if (q) params.set('search', q);
+
+  Toast.show('Exporting audit activity stream to CSV...', 'info');
+
+  fetch(`/api/platform-admin/audit?${params.toString()}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res || !res.success) {
+        Toast.show('Failed to export audit events.', 'error');
+        return;
+      }
+      const events = res.data?.events || [];
+      if (events.length === 0) {
+        Toast.show('No audit events found to export.', 'warning');
+        return;
+      }
+
+      const sanitizeCSV = (val) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/\r\n/g, ' ').replace(/[\r\n]/g, ' ');
+        return `"${str.replace(/"/g, '""')}"`;
+      };
+
+      const headers = ['Event ID', 'Source Table', 'Timestamp', 'Actor / Entity', 'Action', 'Originating IP', 'Details'];
+      const rows = events.map(e => [
+        sanitizeCSV(e.id),
+        sanitizeCSV(e.source_table || e.source || 'N/A'),
+        sanitizeCSV(e.timestamp || ''),
+        sanitizeCSV(e.actor || e.entity || 'System'),
+        sanitizeCSV(e.action || ''),
+        sanitizeCSV(e.ip_address || '127.0.0.1'),
+        sanitizeCSV(typeof e.details === 'object' ? JSON.stringify(e.details) : (e.details || ''))
+      ]);
+
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(row => row.join(','))].join('\r\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `talentsync_audit_trail_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      Toast.show(`Successfully exported ${events.length} audit event(s) to CSV! 📋`, 'success');
+    })
+    .catch(err => {
+      console.error('Export audit CSV error:', err);
+      Toast.show('Network error exporting audit trail.', 'error');
+    });
+}
+
 function fetchPlatformAdminSecurity() {
   fetchPlatformAdminLoginAttempts(1);
   fetchPlatformAdminOutliers();
@@ -7872,7 +8092,7 @@ function fetchPlatformAdminLoginAttempts(page = 1) {
       if (ipsTbody) {
         const ips = data.top_failed_ips || [];
         ipsTbody.innerHTML = ips.length
-          ? ips.map(x => `<tr><td style="font-family:monospace;font-size:12px">${escapeHTML(x.ip_address)}</td><td style="text-align:right"><span class="badge badge-danger">${x.failure_count}</span></td></tr>`).join('')
+          ? ips.map(x => `<tr><td style="font-family:monospace;font-size:12px">${escapeHTML(x.ip_address)}</td><td style="text-align:right"><span class="badge badge-danger">${x.failure_count || x.failed_count || 0}</span></td></tr>`).join('')
           : '<tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-3)">No failed attempts recorded.</td></tr>';
       }
 
@@ -7881,7 +8101,7 @@ function fetchPlatformAdminLoginAttempts(page = 1) {
       if (accTbody) {
         const accs = data.top_targeted_accounts || [];
         accTbody.innerHTML = accs.length
-          ? accs.map(x => `<tr><td style="font-size:12px">${escapeHTML(x.email)}</td><td style="text-align:right"><span class="badge badge-warning">${x.failure_count}</span></td></tr>`).join('')
+          ? accs.map(x => `<tr><td style="font-size:12px">${escapeHTML(x.email)}</td><td style="text-align:right"><span class="badge badge-warning">${x.failure_count || x.failed_count || 0}</span></td></tr>`).join('')
           : '<tr><td colspan="2" style="text-align:center;padding:20px;color:var(--text-3)">No targeted accounts.</td></tr>';
       }
 
@@ -7908,7 +8128,7 @@ function fetchPlatformAdminLoginAttempts(page = 1) {
                     <i class="fas ${a.success ? 'fa-check-circle' : 'fa-times-circle'}"></i> ${a.success ? 'Success' : 'Failed'}
                   </span>
                 </td>
-                <td style="font-size:12px;color:var(--text-3)">${a.timestamp ? new Date(a.timestamp).toLocaleString() : 'N/A'}</td>
+                <td style="font-size:12px;color:var(--text-3)">${a.timestamp || a.attempted_at ? new Date(a.timestamp || a.attempted_at).toLocaleString() : 'N/A'}</td>
               </tr>
             `).join('')
           : '<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text-3)">No login records found.</td></tr>';
@@ -7935,42 +8155,51 @@ function fetchPlatformAdminOutliers() {
     .then(r => r.json())
     .then(res => {
       if (!res || !res.success) return;
-      const outliers = res.data.outliers || [];
-      setEl('pa-sec-outliers', res.data.total_outliers);
+      const outliers = res.data?.outliers || res.outliers || [];
+      setEl('pa-sec-outliers', res.data?.total_outliers ?? res.total_outliers ?? outliers.length);
 
       if (tbody) {
         tbody.innerHTML = outliers.length
           ? outliers.map(o => {
+              const uId = o.user_id || o.id;
               const avatar = (o.name || '??').slice(0, 2).toUpperCase();
               const bg = UI.avatarColor(o.name || '');
+              const safeName = escapeHTML(o.name || 'Candidate');
+              const reasonText = escapeHTML(o.outlier_reason || o.reason || 'Statistical anomaly detected');
+
               return `
                 <tr>
                   <td>
                     <div style="display:flex;align-items:center;gap:10px">
-                      <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0">${escapeHTML(avatar)}</div>
+                      <div class="avatar avatar-sm" style="background:${bg};color:#fff;flex-shrink:0;font-weight:700">${escapeHTML(avatar)}</div>
                       <div>
-                        <div style="font-weight:700;font-size:13px">${escapeHTML(o.name)}</div>
+                        <div style="font-weight:700;font-size:13px;color:var(--text)">${safeName}</div>
                         <div style="font-size:11px;color:var(--text-3)">${escapeHTML(o.email)}</div>
                       </div>
                     </div>
                   </td>
-                  <td><span class="badge badge-info" style="text-transform:capitalize;font-size:11px">${escapeHTML(o.role)}</span></td>
+                  <td><span class="badge badge-info" style="text-transform:capitalize;font-size:11px">${escapeHTML(o.role || 'candidate')}</span></td>
                   <td><span class="badge ${UI.atsBadge(o.ats_score || 0)}" style="font-size:11px">${o.ats_score || 0}/100</span></td>
                   <td><span class="badge badge-gray" style="font-size:11px">${escapeHTML(o.cluster_label || 'Unclustered')}</span></td>
                   <td>
-                    <span style="color:#ea580c;font-size:12px;font-weight:600">
-                      <i class="fas fa-exclamation-circle" style="margin-right:4px"></i> ${escapeHTML(o.outlier_reason || 'Statistical anomaly detected')}
+                    <span style="color:var(--warning);font-size:12px;font-weight:600">
+                      <i class="fas fa-exclamation-circle" style="margin-right:4px"></i> ${reasonText}
                     </span>
                   </td>
-                  <td style="text-align:right">
-                    <button class="btn btn-sm btn-outline" onclick="openPlatformUserModal(${o.id})">
-                      <i class="fas fa-user-shield"></i> Review
-                    </button>
+                  <td style="text-align:right;white-space:nowrap">
+                    <div style="display:inline-flex;gap:6px;align-items:center">
+                      <button class="btn btn-sm btn-outline" onclick="openPlatformUserModal(${uId})" title="Review Full Profile">
+                        <i class="fas fa-user-shield"></i> Review
+                      </button>
+                      <button class="btn btn-sm btn-outline-success" onclick="resolvePlatformOutlier(${uId}, '${escapeHTML(o.name || '').replace(/'/g, "\\'")}')" title="Dismiss/Resolve Outlier Flag">
+                        <i class="fas fa-check"></i> Resolve
+                      </button>
+                    </div>
                   </td>
                 </tr>
               `;
             }).join('')
-          : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fas fa-check-circle" style="color:#16a34a;margin-right:6px"></i>No suspicious outlier candidates flagged at this time.</td></tr>';
+          : '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--text-3)"><i class="fas fa-check-circle" style="color:var(--success);margin-right:6px"></i>No suspicious outlier candidates flagged at this time.</td></tr>';
       }
     })
     .catch(err => {
@@ -7993,19 +8222,20 @@ function fetchPlatformAdminAudit(page = 1) {
 
   const tbody = document.getElementById('pa-audit-tbody');
   const emptyState = document.getElementById('pa-audit-empty-state');
-  if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading audit events...</td></tr>';
+  if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-spinner fa-spin"></i> Loading audit events...</td></tr>';
   if (emptyState) emptyState.style.display = 'none';
 
   fetch(`/api/platform-admin/audit?${params.toString()}`)
     .then(r => r.json())
     .then(res => {
       if (!res || !res.success) {
-        if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--danger)">Failed to load audit records.</td></tr>';
+        if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">Failed to load audit records.</td></tr>';
         return;
       }
 
-      const events = res.data.events || [];
-      const pagination = res.data.pagination;
+      const events = res.data?.events || res.events || [];
+      _paAuditEventsList = events;
+      const pagination = res.data?.pagination || res.pagination || { page: 1, pages: 1, total: events.length };
       PlatformAdminState.auditTotalPages = pagination.pages || 1;
 
       setEl('pa-audit-page-info', `Showing Page ${pagination.page} of ${pagination.pages} (${pagination.total} Total Events)`);
@@ -8022,13 +8252,15 @@ function fetchPlatformAdminAudit(page = 1) {
 
       if (emptyState) emptyState.style.display = 'none';
       if (tbody) {
-        tbody.innerHTML = events.map(e => {
+        tbody.innerHTML = events.map((e, idx) => {
+          const sourceName = e.source_table || e.source || 'audit_logs';
           const tableBadges = {
-            application_status: 'badge-primary',
-            recommendation_history: 'badge-teal',
+            audit_logs: 'badge-primary',
+            application_status: 'badge-teal',
+            recommendation_history: 'badge-info',
             search_history: 'badge-warning'
           };
-          const badgeClass = tableBadges[e.source_table] || 'badge-gray';
+          const badgeClass = tableBadges[sourceName] || 'badge-gray';
           let detailsFormatted = '';
           if (typeof e.details === 'object' && e.details !== null) {
             detailsFormatted = Object.entries(e.details).map(([k, v]) => `<strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}`).join(' · ');
@@ -8036,17 +8268,23 @@ function fetchPlatformAdminAudit(page = 1) {
             detailsFormatted = escapeHTML(String(e.details || ''));
           }
 
-          const severityBadge = getAuditSeverity(e.action, e.source_table);
+          const severityBadge = getAuditSeverity(e.action, sourceName);
+          const actorDisplay = e.actor || e.entity || 'System';
 
           return `
             <tr>
-              <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${e.id}</td>
+              <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${escapeHTML(String(e.id))}</td>
               <td>${severityBadge}</td>
-              <td><span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(e.source_table)}</span></td>
+              <td><span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(sourceName)}</span></td>
               <td style="font-size:12px;color:var(--text-3)">${e.timestamp ? new Date(e.timestamp).toLocaleString() : 'N/A'}</td>
-              <td style="font-weight:600;font-size:13px">${escapeHTML(e.actor || 'System')}</td>
+              <td style="font-weight:600;font-size:13px">${escapeHTML(actorDisplay)}</td>
               <td><span class="badge badge-gray" style="font-size:11px">${escapeHTML(e.action)}</span></td>
-              <td style="font-size:12px;color:var(--text-2);max-width:320px">${detailsFormatted || '<span class="text-muted">None</span>'}</td>
+              <td style="font-size:12px;color:var(--text-2);max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHTML(detailsFormatted)}">${detailsFormatted || '<span class="text-muted">None</span>'}</td>
+              <td style="text-align:right">
+                <button class="btn btn-sm btn-outline" onclick="openPaAuditDetailModal(${idx})" title="Inspect Payload Details">
+                  <i class="fas fa-search-plus"></i>
+                </button>
+              </td>
             </tr>
           `;
         }).join('');
@@ -8054,7 +8292,7 @@ function fetchPlatformAdminAudit(page = 1) {
     })
     .catch(err => {
       console.error('Error fetching audit logs:', err);
-      if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger)">Error loading audit records.</td></tr>';
+      if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--danger)">Error loading audit records.</td></tr>';
     });
 }
 
@@ -8889,6 +9127,14 @@ window.changePlatformLoginsPage      = changePlatformLoginsPage;
 window.fetchPlatformAdminOutliers     = fetchPlatformAdminOutliers;
 window.fetchPlatformAdminAudit       = fetchPlatformAdminAudit;
 window.changePlatformAuditPage       = changePlatformAuditPage;
+window.onPaLoginsSearch              = onPaLoginsSearch;
+window.onPaAuditSearch               = onPaAuditSearch;
+window.openPaAuditDetailModal        = openPaAuditDetailModal;
+window.closePaAuditDetailModal       = closePaAuditDetailModal;
+window.resolvePlatformOutlier        = resolvePlatformOutlier;
+window.exportPlatformLoginsCSV       = exportPlatformLoginsCSV;
+window.exportPlatformAuditCSV        = exportPlatformAuditCSV;
+window.refreshCurrentPaSecAuditTab   = refreshCurrentPaSecAuditTab;
 
 // Section 6 & 7
 window.togglePlatformAdminAutoRefresh = togglePlatformAdminAutoRefresh;

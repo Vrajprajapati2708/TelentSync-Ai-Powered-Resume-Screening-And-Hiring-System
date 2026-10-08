@@ -723,6 +723,7 @@ def get_platform_outliers(page: int = 1, limit: int = 20) -> Dict[str, Any]:
             reason = "Statistical anomaly detected by AI model"
 
         outliers.append({
+            "id": r["id"],
             "user_id": r["id"],
             "name": r["name"],
             "email": r["email"],
@@ -730,13 +731,13 @@ def get_platform_outliers(page: int = 1, limit: int = 20) -> Dict[str, Any]:
             "ats_score": score,
             "cluster_label": r["cluster_label"] or "Unclustered",
             "detected_at": r["created_at"] or "",
-            "reason": reason
+            "reason": reason,
+            "outlier_reason": reason
         })
 
     total_pages = (total_outliers + limit - 1) // limit if limit > 0 else 1
 
-    return {
-        "success": True,
+    payload = {
         "total_outliers": total_outliers,
         "outliers": outliers,
         "pagination": {
@@ -749,6 +750,43 @@ def get_platform_outliers(page: int = 1, limit: int = 20) -> Dict[str, Any]:
         }
     }
 
+    return {
+        "success": True,
+        "data": payload,
+        **payload
+    }
+
+
+def resolve_platform_outlier(user_id: int, admin_user_id: int) -> Tuple[bool, str, int]:
+    """
+    Clears the is_outlier flag for a flagged candidate account and records an audit log event.
+    Returns (success, message, status_code).
+    """
+    with get_db() as conn:
+        user = conn.execute("SELECT id, name, email, is_outlier FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not user:
+            return False, "Candidate account not found.", 404
+
+        conn.execute("UPDATE users SET is_outlier = 0 WHERE id = ?", (user_id,))
+
+        # Write to platform audit_logs
+        try:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'resolve_outlier', ?, '127.0.0.1', datetime('now'))",
+                (admin_user_id, f"Resolved anomaly flag for candidate '{user['email']}' (ID #{user['id']})")
+            )
+        except Exception as e:
+            logger.warning(f"Could not record outlier resolution audit entry: {e}")
+
+        if hasattr(conn, "commit"):
+            conn.commit()
+
+    logger.info(f"Platform admin (ID #{admin_user_id}) resolved outlier flag for user_id={user_id}")
+    return True, f"Outlier flag successfully resolved for candidate '{user['name']}'.", 200
+
 
 # ── 4. Audit / Activity Viewer ───────────────────────────────
 
@@ -759,7 +797,8 @@ def get_platform_audit_logs(
     search: str = ""
 ) -> Dict[str, Any]:
     """
-    Read-only unified activity stream across historical application tables:
+    Read-only unified activity stream across historical application and governance tables:
+      - audit_logs (administrative security actions)
       - application_status
       - recommendation_history
       - search_history
@@ -773,6 +812,35 @@ def get_platform_audit_logs(
     events: List[Dict[str, Any]] = []
 
     with get_db() as conn:
+        # Source 0: audit_logs (Platform Administrative and Governance Operations)
+        if source_clean in ("all", "audit_logs", "admin", "system"):
+            try:
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+                )
+                admin_logs = conn.execute(
+                    """SELECT a.id, a.user_id, a.action, a.details, a.ip_address, a.timestamp,
+                              u.email as user_email, u.name as user_name
+                       FROM audit_logs a
+                       LEFT JOIN users u ON a.user_id = u.id
+                       ORDER BY a.id DESC LIMIT 150"""
+                ).fetchall()
+                for r in admin_logs:
+                    actor_display = r["user_name"] or r["user_email"] or (f"Admin #{r['user_id']}" if r["user_id"] else "System")
+                    events.append({
+                        "id": f"audit_{r['id']}",
+                        "source": "audit_logs",
+                        "source_table": "audit_logs",
+                        "timestamp": r["timestamp"] or "",
+                        "entity": actor_display,
+                        "actor": actor_display,
+                        "action": r["action"] or "System Operation",
+                        "details": r["details"] or "",
+                        "ip_address": r["ip_address"] or "127.0.0.1"
+                    })
+            except Exception as e:
+                logger.warning(f"Error querying audit_logs table: {e}")
+
         # Source 1: application_status
         if source_clean in ("all", "application_status", "applications"):
             app_status_rows = conn.execute(
@@ -784,13 +852,17 @@ def get_platform_audit_logs(
                    ORDER BY s.id DESC LIMIT 100"""
             ).fetchall()
             for r in app_status_rows:
+                actor_display = r["user_name"] or r["user_email"] or f"App #{r['application_id']}"
                 events.append({
                     "id": f"app_status_{r['id']}",
                     "source": "application_status",
+                    "source_table": "application_status",
                     "timestamp": r["updated_at"] or "",
-                    "entity": r["user_name"] or r["user_email"] or f"App #{r['application_id']}",
+                    "entity": actor_display,
+                    "actor": actor_display,
                     "action": f"Status updated to '{r['status']}'",
-                    "details": r["notes"] or ""
+                    "details": r["notes"] or "",
+                    "ip_address": "N/A"
                 })
 
         # Source 2: recommendation_history
@@ -804,13 +876,17 @@ def get_platform_audit_logs(
                    ORDER BY h.id DESC LIMIT 100"""
             ).fetchall()
             for r in recs:
+                actor_display = r["user_name"] or r["user_email"] or f"User #{r['user_id']}"
                 events.append({
                     "id": f"rec_{r['id']}",
                     "source": "recommendation_history",
+                    "source_table": "recommendation_history",
                     "timestamp": r["recommended_at"] or "",
-                    "entity": r["user_name"] or r["user_email"] or f"User #{r['user_id']}",
+                    "entity": actor_display,
+                    "actor": actor_display,
                     "action": f"Job recommendation calculated (Match: {r['match_score']}%)",
-                    "details": f"Job Ref: {r['job_id'] or r['external_id'] or 'N/A'}"
+                    "details": f"Job Ref: {r['job_id'] or r['external_id'] or 'N/A'}",
+                    "ip_address": "N/A"
                 })
 
         # Source 3: search_history
@@ -823,13 +899,17 @@ def get_platform_audit_logs(
                    ORDER BY sh.id DESC LIMIT 100"""
             ).fetchall()
             for r in searches:
+                actor_display = r["user_name"] or r["user_email"] or f"User #{r['user_id']}"
                 events.append({
                     "id": f"search_{r['id']}",
                     "source": "search_history",
+                    "source_table": "search_history",
                     "timestamp": r["searched_at"] or "",
-                    "entity": r["user_name"] or r["user_email"] or f"User #{r['user_id']}",
+                    "entity": actor_display,
+                    "actor": actor_display,
                     "action": f"Candidate job search executed ('{r['keyword'] or 'All'}')",
-                    "details": f"Keyword: {r['keyword'] or 'All'} | Location: {r['location'] or 'Any'}"
+                    "details": f"Keyword: {r['keyword'] or 'All'} | Location: {r['location'] or 'Any'}",
+                    "ip_address": "N/A"
                 })
 
     # Filter by search string if provided
@@ -837,7 +917,7 @@ def get_platform_audit_logs(
         s_term = search.strip().lower()
         events = [
             e for e in events
-            if s_term in e["entity"].lower() or s_term in e["action"].lower() or s_term in e["details"].lower()
+            if s_term in e["entity"].lower() or s_term in e["action"].lower() or s_term in e["details"].lower() or s_term in e.get("source_table", "").lower()
         ]
 
     # Chronological sort (most recent first)

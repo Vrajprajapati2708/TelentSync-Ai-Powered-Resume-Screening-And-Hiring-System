@@ -479,6 +479,10 @@ class TestPlatformAdminRegression(unittest.TestCase):
             conn.execute("DELETE FROM application_status")
             conn.execute("DELETE FROM recommendation_history")
             conn.execute("DELETE FROM search_history")
+            try:
+                conn.execute("DELETE FROM audit_logs")
+            except Exception:
+                pass
             conn.commit()
 
         res = self.client.get("/api/platform-admin/audit")

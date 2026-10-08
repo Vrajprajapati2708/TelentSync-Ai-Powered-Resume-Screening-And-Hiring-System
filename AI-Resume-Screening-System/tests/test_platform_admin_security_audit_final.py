@@ -426,6 +426,80 @@ class TestPlatformAdminSecurityAuditFinal(unittest.TestCase):
         integ_str = json.dumps(integ_json)
         self.assertNotIn("SECRET_KEY", integ_str)
 
+    # ═══════════════════════════════════════════════════════════
+    # 8. OUTLIER FRAUD RESOLUTION & UNIFIED AUDIT TRAIL
+    # ═══════════════════════════════════════════════════════════
+
+    def test_22_security_outlier_resolve_and_audit_trail(self):
+        """Admin can resolve an outlier candidate flag and write to audit_logs."""
+        # Create an outlier candidate
+        outlier_id, outlier_email = self._create_user("Outlier User", "candidate", is_verified=1, ats_score=99)
+        with get_db() as conn:
+            conn.execute("UPDATE users SET is_outlier = 1 WHERE id = ?", (outlier_id,))
+            if hasattr(conn, "commit"):
+                conn.commit()
+
+        # Check in outliers list
+        self._login(self.admin1_id, self.admin1_email, "admin")
+        res_list = self.client.get("/api/platform-admin/security/outliers")
+        self.assertEqual(res_list.status_code, 200)
+        data = res_list.get_json()
+        outliers = data.get("data", {}).get("outliers", data.get("outliers", []))
+        outlier_ids = [o.get("user_id", o.get("id")) for o in outliers]
+        self.assertIn(outlier_id, outlier_ids)
+
+        # Non-admin cannot resolve
+        self._login(self.cand_a_id, self.cand_a_email, "candidate")
+        res_cand = self.client.post(f"/api/platform-admin/security/outliers/{outlier_id}/resolve")
+        self.assertEqual(res_cand.status_code, 403)
+
+        # Admin resolves outlier
+        self._login(self.admin1_id, self.admin1_email, "admin")
+        res_resolve = self.client.post(f"/api/platform-admin/security/outliers/{outlier_id}/resolve")
+        self.assertEqual(res_resolve.status_code, 200)
+        self.assertTrue(res_resolve.get_json()["success"])
+
+        # Verify DB is_outlier cleared
+        with get_db() as conn:
+            user = conn.execute("SELECT is_outlier FROM users WHERE id = ?", (outlier_id,)).fetchone()
+            self.assertEqual(user["is_outlier"], 0)
+
+            # Audit log entry created
+            audit = conn.execute("SELECT action, details FROM audit_logs WHERE action = 'resolve_outlier' ORDER BY id DESC LIMIT 1").fetchone()
+            self.assertIsNotNone(audit)
+            self.assertIn(outlier_email, audit["details"])
+
+    def test_23_security_audit_log_aggregation_sources(self):
+        """Unified audit logs endpoint returns records across audit_logs and operational tables."""
+        self._login(self.admin1_id, self.admin1_email, "admin")
+
+        # Insert audit_log record
+        with get_db() as conn:
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS audit_logs (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, action TEXT, details TEXT, ip_address TEXT, timestamp TEXT DEFAULT (datetime('now')))"
+            )
+            conn.execute(
+                "INSERT INTO audit_logs (user_id, action, details, ip_address, timestamp) VALUES (?, 'system_security_check', 'Verification passed', '10.0.0.1', datetime('now'))",
+                (self.admin1_id,)
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+
+        res = self.client.get("/api/platform-admin/audit?source=all")
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data["success"])
+        events = data.get("data", {}).get("events", data.get("events", []))
+        self.assertGreaterEqual(len(events), 1)
+
+        # Check presence of expected keys in event
+        first_event = events[0]
+        self.assertIn("source", first_event)
+        self.assertIn("source_table", first_event)
+        self.assertIn("action", first_event)
+        self.assertIn("timestamp", first_event)
+
 
 if __name__ == "__main__":
     unittest.main()
+
