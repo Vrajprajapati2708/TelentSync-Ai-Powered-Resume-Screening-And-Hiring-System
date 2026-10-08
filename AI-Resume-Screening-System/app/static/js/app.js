@@ -3781,23 +3781,174 @@ function fetchAdminStats() {
     });
 
     // ── Analytics page stat cards (dynamic) ──
-    // Avg ATS
-    const avgAtsEl = document.querySelector('#admin-analytics .stat-value');
-    if (avgAtsEl) avgAtsEl.textContent = d.avg_ats_score;
-    
-    // Bind all analytics stats by ID
+    const totalScreened = d.total_applicants || (Array.isArray(DB.candidates) ? DB.candidates.length : 0);
     setEl('stat-analytics-avg-ats',        d.avg_ats_score || 0);
     setEl('stat-analytics-time-shortlist', d.time_to_shortlist || '2.4h');
     setEl('stat-analytics-top-skill',      d.top_skill_demanded || (d.top_skills && d.top_skills[0]?.skill) || 'Python');
     setEl('stat-analytics-accept-rate',    (d.acceptance_rate !== undefined ? d.acceptance_rate : 0) + '%');
+    setEl('stat-analytics-total-screened', totalScreened);
     setEl('stat-analytics-active-jobs',    d.active_jobs || 0);
-    
-    // Job postings header: "X active positions"
-    const jobsHeader = document.getElementById('admin-jobs-header-count');
-    if (jobsHeader) jobsHeader.textContent = `${d.active_jobs} active positions · ${d.reviewing} reviewing`;
+
+    // Populate analytics role filter dropdown if available
+    const roleSelect = document.getElementById('analytics-filter-job');
+    if (roleSelect && roleSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
+      const distinctJobTitles = Array.from(new Set(DB.jobs.map(j => j.title).filter(Boolean)));
+      distinctJobTitles.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        roleSelect.appendChild(opt);
+      });
+    }
+
+    // Cache latest stats payload
+    window._lastAdminStats = d;
     
     updateSidebarBadges();
   });
+}
+
+function onAnalyticsFilterChange() {
+  const jobFilter = document.getElementById('analytics-filter-job')?.value || 'All';
+  const timeFilter = document.getElementById('analytics-filter-time')?.value || 'all';
+
+  let candidates = Array.isArray(DB.candidates) ? [...DB.candidates] : [];
+  if (jobFilter && jobFilter !== 'All') {
+    candidates = candidates.filter(c => (c.job || '').toLowerCase().trim() === jobFilter.toLowerCase().trim());
+  }
+
+  if (candidates.length === 0) {
+    setEl('stat-analytics-avg-ats', 0);
+    setEl('stat-analytics-accept-rate', '0%');
+    setEl('stat-analytics-total-screened', 0);
+    return;
+  }
+
+  const avgATS = Math.round(candidates.reduce((sum, c) => sum + (Number(c.ats) || 0), 0) / candidates.length);
+  const shortlisted = candidates.filter(c => c.status === 'Shortlisted').length;
+  const reviewing = candidates.filter(c => c.status === 'Reviewing' || c.status === 'Pending').length;
+  const pending = candidates.filter(c => c.status === 'Pending').length;
+  const rejected = candidates.filter(c => c.status === 'Rejected').length;
+  const acceptRate = Math.round((shortlisted / candidates.length) * 100);
+
+  setEl('stat-analytics-avg-ats', avgATS);
+  setEl('stat-analytics-accept-rate', acceptRate + '%');
+  setEl('stat-analytics-total-screened', candidates.length);
+
+  // Re-calculate ATS score distribution
+  const atsBuckets = [0, 0, 0, 0, 0, 0, 0];
+  candidates.forEach(c => {
+    const s = Number(c.ats) || 0;
+    if (s <= 20) atsBuckets[0]++;
+    else if (s <= 40) atsBuckets[1]++;
+    else if (s <= 60) atsBuckets[2]++;
+    else if (s <= 70) atsBuckets[3]++;
+    else if (s <= 80) atsBuckets[4]++;
+    else if (s <= 90) atsBuckets[5]++;
+    else atsBuckets[6]++;
+  });
+
+  Charts.create('admin-ats-dist', {
+    type: 'bar',
+    data: {
+      labels: ['0–20', '21–40', '41–60', '61–70', '71–80', '81–90', '91–100'],
+      datasets: [{
+        label: 'Candidates',
+        data: atsBuckets,
+        backgroundColor: ['#fee2e2', '#fecaca', '#fed7aa', '#fef08a', '#bbf7d0', '#6ee7b7', '#00c9a7'],
+        borderRadius: 6
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, grid: { color: '#f0f4f9' } }, x: { grid: { display: false } } } }
+  });
+
+  // Re-calculate status funnel
+  Charts.create('admin-status-funnel', {
+    type: 'doughnut',
+    data: {
+      labels: ['Shortlisted', 'Reviewing', 'Pending', 'Rejected'],
+      datasets: [{
+        data: [shortlisted, reviewing, pending, rejected],
+        backgroundColor: ['#16a34a', '#1260cc', '#d97706', '#dc2626'],
+        borderWidth: 3, borderColor: '#fff'
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 12 }, padding: 10 } } }, cutout: '65%' }
+  });
+
+  // Re-calculate top skills for this subset
+  const skillCountMap = {};
+  candidates.forEach(c => {
+    if (Array.isArray(c.skills)) {
+      c.skills.forEach(s => {
+        if (s && s.length > 1) {
+          skillCountMap[s] = (skillCountMap[s] || 0) + 1;
+        }
+      });
+    }
+  });
+
+  const sortedSkills = Object.entries(skillCountMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  if (sortedSkills.length > 0) {
+    setEl('stat-analytics-top-skill', sortedSkills[0][0]);
+    Charts.create('admin-skills-bar', {
+      type: 'bar',
+      data: {
+        labels: sortedSkills.map(x => x[0]),
+        datasets: [{ label: 'Candidates with skill', data: sortedSkills.map(x => x[1]), backgroundColor: '#1260cc', borderRadius: 6 }]
+      },
+      options: { indexAxis: 'y', responsive: true, plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, grid: { color: '#f0f4f9' } }, y: { grid: { display: false } } } }
+    });
+  }
+}
+
+function exportAnalyticsReport() {
+  const jobFilter = document.getElementById('analytics-filter-job')?.value || 'All';
+  const timeFilter = document.getElementById('analytics-filter-time')?.value || 'All Time';
+  const avgATS = document.getElementById('stat-analytics-avg-ats')?.textContent || '0';
+  const acceptRate = document.getElementById('stat-analytics-accept-rate')?.textContent || '0%';
+  const velocity = document.getElementById('stat-analytics-time-shortlist')?.textContent || '2.4h';
+  const topSkill = document.getElementById('stat-analytics-top-skill')?.textContent || 'N/A';
+  const totalScreened = document.getElementById('stat-analytics-total-screened')?.textContent || '0';
+
+  const sanitizeCSV = (val) => {
+    let str = String(val == null ? '' : val);
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const lines = [
+    ['TalentSync Recruitment Intelligence & Analytics Report'],
+    ['Generated On', new Date().toLocaleString()],
+    ['Selected Role Filter', jobFilter],
+    ['Selected Time Window', timeFilter],
+    [],
+    ['Key Performance Metric', 'Value', 'Benchmark Context'],
+    ['Average Applicant ATS Score', avgATS + '/100', 'Calculated across candidate resumes'],
+    ['Shortlisting Conversion Rate', acceptRate, 'Ratio of screened candidates shortlisted'],
+    ['Screening Velocity', velocity, 'Time to shortlist vs manual benchmarks'],
+    ['Top In-Demand Skill', topSkill, 'Most frequent skill detected in candidate pool'],
+    ['Total Pipeline Applicants', totalScreened, 'Current volume evaluated in pipeline'],
+    [],
+    ['Candidate Status Breakdown'],
+    ['Status', 'Candidate Count', 'Percentage'],
+    ['Shortlisted', DB.candidates.filter(c => c.status === 'Shortlisted').length, Math.round((DB.candidates.filter(c => c.status === 'Shortlisted').length / (DB.candidates.length || 1)) * 100) + '%'],
+    ['Reviewing', DB.candidates.filter(c => c.status === 'Reviewing' || c.status === 'Pending').length, Math.round((DB.candidates.filter(c => c.status === 'Reviewing' || c.status === 'Pending').length / (DB.candidates.length || 1)) * 100) + '%'],
+    ['Rejected', DB.candidates.filter(c => c.status === 'Rejected').length, Math.round((DB.candidates.filter(c => c.status === 'Rejected').length / (DB.candidates.length || 1)) * 100) + '%'],
+    ['Flagged Anomaly / Suspicious', DB.candidates.filter(c => c.outlier_flag).length, Math.round((DB.candidates.filter(c => c.outlier_flag).length / (DB.candidates.length || 1)) * 100) + '%']
+  ];
+
+  const csvContent = lines.map(row => row.map(sanitizeCSV).join(',')).join('\r\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TalentSync_Analytics_Report_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.show('Analytics report exported successfully!', 'success');
 }
 
 
@@ -4832,6 +4983,8 @@ window.animateATSRings = animateATSRings;
 window.fetchJobsFromServer = fetchJobsFromServer;
 window.fetchCandidatesFromServer = fetchCandidatesFromServer;
 window.fetchAdminStats = fetchAdminStats;
+window.onAnalyticsFilterChange = onAnalyticsFilterChange;
+window.exportAnalyticsReport = exportAnalyticsReport;
 window.fetchNotificationsFromServer = fetchNotificationsFromServer;
 window.fetchCandidateStats = fetchCandidateStats;
 window.setEl = setEl;
