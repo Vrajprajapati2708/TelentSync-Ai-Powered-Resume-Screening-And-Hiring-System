@@ -1736,7 +1736,7 @@ def get_platform_system_health() -> Dict[str, Any]:
     Zero hardcoded statuses.
     """
     import time
-    services = {}
+    services: Dict[str, Dict[str, Any]] = {}
 
     # 1. Database
     try:
