@@ -2438,9 +2438,31 @@
 
         <!-- ── SECTION 1: DASHBOARD (Overview) ── -->
         <div id="platform-admin-overview" data-portal="platform-admin">
-          <!-- Dynamic KPI Cards -->
+          <!-- Overview Header & Action Bar -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px">
+            <div>
+              <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)">Platform Operations &amp; Intelligence</div>
+              <div style="font-size:13px;color:var(--text-3)">Global governance, subsystem metrics, recruitment funnel health, and real-time activity stream.</div>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-primary btn-sm" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=users]'));Router.inner('platform-admin','users');">
+                <i class="fas fa-user-plus"></i> User Directory
+              </button>
+              <button class="btn btn-navy btn-sm" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=jobs-apps]'));Router.inner('platform-admin','jobs-apps');switchPaJobsAppsTab('jobs');Modal.open('post-job-modal');">
+                <i class="fas fa-plus-circle"></i> Post Job
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="flushMLCache()" title="Flush in-memory ML model caches">
+                <i class="fas fa-broom"></i> Flush Cache
+              </button>
+              <button class="btn btn-outline btn-sm" onclick="exportPlatformMasterCSV()" title="Download platform metrics summary">
+                <i class="fas fa-file-download"></i> Export Summary
+              </button>
+            </div>
+          </div>
+
+          <!-- Dynamic KPI Cards (Clickable) -->
           <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('users')" title="View all users in directory" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Total Users</div>
                 <div class="stat-icon" style="background:#eff6ff"><i class="fas fa-users" style="color:#2563eb"></i></div>
@@ -2449,7 +2471,7 @@
               <div class="stat-change up" id="pa-stat-roles-sub">Candidates: -- | HR: -- | Admins: --</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('users', {status:'active'})" title="Filter for active users" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Active Users</div>
                 <div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-user-check" style="color:#16a34a"></i></div>
@@ -2458,7 +2480,7 @@
               <div class="stat-change up" id="pa-stat-users-sub">Active: -- | Inactive: --</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('jobs')" title="Manage internal job inventory" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Internal Jobs</div>
                 <div class="stat-icon" style="background:#fef9c3"><i class="fas fa-briefcase" style="color:#ca8a04"></i></div>
@@ -2467,7 +2489,7 @@
               <div class="stat-change flat" id="pa-stat-jobs-sub">Active: -- | Closed: --</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('apps')" title="View candidate applications" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Applications</div>
                 <div class="stat-icon" style="background:#e0e7ff"><i class="fas fa-file-signature" style="color:#4f46e5"></i></div>
@@ -2476,7 +2498,7 @@
               <div class="stat-change up" id="pa-stat-apps-sub">Reviewing: -- | Shortlisted: --</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('resumes')" title="Inspect resume processing pipeline" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Total Resumes</div>
                 <div class="stat-icon" style="background:#fdf2f8"><i class="fas fa-file-alt" style="color:#db2777"></i></div>
@@ -2485,7 +2507,7 @@
               <div class="stat-change up" id="pa-stat-resumes-sub">Processed: -- | Pending: --</div>
             </div>
 
-            <div class="stat-card">
+            <div class="stat-card stat-card-interactive" onclick="navigateToPaSection('pipeline')" title="View AI Scoring Engine & Pipeline" style="cursor:pointer;transition:transform .15s ease,box-shadow .15s ease">
               <div class="stat-top">
                 <div class="stat-label">Platform Avg ATS</div>
                 <div class="stat-icon" style="background:#f5f3ff"><i class="fas fa-star" style="color:#7c3aed"></i></div>
@@ -2496,17 +2518,24 @@
           </div>
 
           <!-- System Health Quick Summary Banner -->
-          <div class="card" style="margin-top:20px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-left:4px solid #10b981" id="pa-dash-health-banner">
-            <div style="display:flex;align-items:center;gap:14px">
+          <div class="card" style="margin-top:20px;padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:14px;background:linear-gradient(135deg,#f8fafc,#f1f5f9);border-left:4px solid #10b981" id="pa-dash-health-banner">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
               <div style="font-size:24px"><i class="fas fa-shield-virus" style="color:#10b981"></i></div>
               <div>
-                <div style="font-weight:800;font-size:14px;color:var(--text);display:flex;align-items:center;gap:8px">
-                  System Health: <span id="pa-dash-health-badge" class="badge badge-success" style="font-size:11px">Operational</span>
+                <div style="font-weight:800;font-size:14px;color:var(--text);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  System Health: <span id="pa-dash-health-badge" class="badge badge-success" style="font-size:11px">OPERATIONAL</span>
+                  <span id="pa-dash-health-latency" class="badge badge-gray" style="font-size:11px;font-family:monospace"><i class="fas fa-bolt"></i> -- ms</span>
+                  <span id="pa-dash-health-subsystems" style="display:inline-flex;gap:4px;flex-wrap:wrap;margin-left:4px">
+                    <span class="badge badge-success" style="font-size:10px">DB: OK</span>
+                    <span class="badge badge-success" style="font-size:10px">Storage: OK</span>
+                    <span class="badge badge-success" style="font-size:10px">Auth: OK</span>
+                    <span class="badge badge-success" style="font-size:10px">ATS: OK</span>
+                  </span>
                 </div>
-                <div id="pa-dash-health-desc" style="font-size:12px;color:var(--text-3);margin-top:2px">All critical platform services (Database, Storage, Auth, ATS) are functioning properly.</div>
+                <div id="pa-dash-health-desc" style="font-size:12px;color:var(--text-3);margin-top:2px">All 8 core platform subsystems (Database, Storage, Auth, ATS Engine, Parser, Job Matcher) are functioning properly.</div>
               </div>
             </div>
-            <div>
+            <div style="display:flex;gap:8px;align-items:center">
               <button class="btn btn-sm btn-outline" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=system]'));Router.inner('platform-admin','system');fetchPlatformAdminSystemHealth()">
                 <i class="fas fa-stethoscope"></i> Full Diagnostics
               </button>
@@ -2516,8 +2545,9 @@
           <!-- Analytics Charts in 2x2 Grid -->
           <div class="dash-grid" style="margin-top:20px">
             <div class="card">
-              <div class="card-header">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
                 <span class="card-title"><i class="fas fa-user-tag" style="color:#6366f1;margin-right:6px"></i> Users by Role</span>
+                <span style="font-size:11px;color:var(--text-3)">Click segment to filter</span>
               </div>
               <div style="height:260px;position:relative">
                 <canvas id="pa-role-chart"></canvas>
@@ -2525,8 +2555,9 @@
             </div>
 
             <div class="card">
-              <div class="card-header">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
                 <span class="card-title"><i class="fas fa-funnel-dollar" style="color:#10b981;margin-right:6px"></i> Recruitment Pipeline Funnel</span>
+                <span style="font-size:11px;color:var(--text-3)">Application Stages</span>
               </div>
               <div style="height:260px;position:relative">
                 <canvas id="pa-funnel-chart"></canvas>
@@ -2534,8 +2565,9 @@
             </div>
 
             <div class="card">
-              <div class="card-header">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
                 <span class="card-title"><i class="fas fa-chart-pie" style="color:#f59e0b;margin-right:6px"></i> Job Postings by Status</span>
+                <span style="font-size:11px;color:var(--text-3)">Internal Inventory</span>
               </div>
               <div style="height:260px;position:relative">
                 <canvas id="pa-jobs-chart"></canvas>
@@ -2543,8 +2575,9 @@
             </div>
 
             <div class="card">
-              <div class="card-header">
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
                 <span class="card-title"><i class="fas fa-chart-bar" style="color:#ec4899;margin-right:6px"></i> ATS Score Distribution</span>
+                <span style="font-size:11px;color:var(--text-3)">Candidate Score Bands</span>
               </div>
               <div style="height:260px;position:relative">
                 <canvas id="pa-ats-chart"></canvas>
@@ -2554,11 +2587,17 @@
 
           <!-- Recent System Activity -->
           <div class="card" style="margin-top:20px">
-            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-              <span class="card-title"><i class="fas fa-stream" style="color:#2563eb;margin-right:8px"></i> Recent System Activity</span>
-              <button class="btn btn-sm btn-outline" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=security-audit]'));Router.inner('platform-admin','security-audit');switchPaSecAuditTab('audit');fetchPlatformAdminAudit(1)">
-                View All Activity <i class="fas fa-arrow-right"></i>
-              </button>
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+              <div style="display:flex;align-items:center;gap:10px">
+                <span class="card-title"><i class="fas fa-stream" style="color:#2563eb;margin-right:8px"></i> Recent System Activity</span>
+                <input id="pa-dash-activity-search" class="form-control form-control-sm" placeholder="Filter activity..." style="width:160px;padding:4px 8px;font-size:12px" oninput="filterPaRecentActivity(this.value)">
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="btn btn-sm btn-outline" onclick="fetchPlatformAdminRecentActivity();Toast.show('Activity refreshed.','info')"><i class="fas fa-sync-alt"></i></button>
+                <button class="btn btn-sm btn-outline" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=security-audit]'));Router.inner('platform-admin','security-audit');switchPaSecAuditTab('audit');fetchPlatformAdminAudit(1)">
+                  View All Activity <i class="fas fa-arrow-right"></i>
+                </button>
+              </div>
             </div>
             <div class="table-wrap">
               <table class="table">

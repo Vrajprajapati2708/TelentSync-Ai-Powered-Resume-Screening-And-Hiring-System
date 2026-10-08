@@ -5705,10 +5705,114 @@ function switchPaSystemTab(tab) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SECTION 1: DASHBOARD
+// SECTION 1: DASHBOARD (Overview & Operations)
 // ═══════════════════════════════════════════════════════════
 
+let _paRecentActivityCache = [];
+
+function navigateToPaSection(section, filterObj = {}) {
+  let targetSection = section;
+  if (section === 'jobs' || section === 'apps') {
+    targetSection = 'jobs-apps';
+  }
+
+  const sbItem = document.querySelector(`#sb-platform-admin .sb-item[data-section="${targetSection}"]`);
+  if (sbItem) Sidebar.setActive(sbItem);
+  Router.inner('platform-admin', targetSection);
+
+  if (section === 'users') {
+    if (filterObj.status) {
+      const el = document.getElementById('pa-user-status-filter');
+      if (el) el.value = filterObj.status;
+    }
+    if (filterObj.role) {
+      const el = document.getElementById('pa-user-role-filter');
+      if (el) el.value = filterObj.role;
+    }
+    fetchPlatformAdminUsers(1);
+  } else if (section === 'jobs') {
+    switchPaJobsAppsTab('jobs');
+    fetchPlatformAdminJobs(1);
+  } else if (section === 'apps') {
+    switchPaJobsAppsTab('applications');
+    if (filterObj.status) {
+      const el = document.getElementById('pa-apps-status-filter');
+      if (el) el.value = filterObj.status;
+    }
+    fetchPlatformAdminApplications(1);
+  } else if (section === 'resumes') {
+    fetchPlatformAdminResumes(1);
+  } else if (section === 'pipeline') {
+    loadMLPipelineStatus();
+  }
+}
+
+function exportPlatformMasterCSV() {
+  const data = PlatformAdminState.analyticsCache;
+  if (!data) {
+    Toast.show('Loading analytics data for export...', 'info');
+    fetch('/api/platform-admin/analytics')
+      .then(r => r.json())
+      .then(res => {
+        if (res && res.success) {
+          PlatformAdminState.analyticsCache = res.data;
+          exportPlatformMasterCSV();
+        } else {
+          Toast.show('Failed to fetch analytics for export.', 'error');
+        }
+      });
+    return;
+  }
+
+  const sanitizeCSV = (val) => {
+    let str = String(val == null ? '' : val);
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const rows = [
+    ['TALENTSYNC PLATFORM INTELLIGENCE REPORT', '', ''],
+    ['Generated At', new Date().toISOString(), ''],
+    ['', '', ''],
+    ['SECTION', 'METRIC / CATEGORY', 'VALUE'],
+    ['User Governance', 'Total Users', data.users.total],
+    ['User Governance', 'Active Accounts', data.users.active],
+    ['User Governance', 'Inactive Accounts', data.users.inactive],
+    ['User Governance', 'Candidate Accounts', data.users.by_role.candidate || 0],
+    ['User Governance', 'HR / Recruiter Accounts', data.users.by_role.hr || 0],
+    ['User Governance', 'Platform Administrator Accounts', data.users.by_role.admin || 0],
+    ['Job Inventory', 'Total Internal Jobs', data.jobs.total],
+    ['Job Inventory', 'Active Job Openings', data.jobs.active],
+    ['Job Inventory', 'Closed Job Openings', data.jobs.closed],
+    ['Job Inventory', 'Draft Job Openings', data.jobs.draft],
+    ['Recruitment Funnel', 'Total Applications', data.applications.total],
+    ['Recruitment Funnel', 'Pending Applications', data.applications.pending || 0],
+    ['Recruitment Funnel', 'Reviewing Applications', data.applications.reviewing || 0],
+    ['Recruitment Funnel', 'Shortlisted Applications', data.applications.shortlisted || 0],
+    ['Recruitment Funnel', 'Rejected Applications', data.applications.rejected || 0],
+    ['Resume Intelligence', 'Total Resumes', data.resumes ? data.resumes.total : 'N/A'],
+    ['Resume Intelligence', 'Processed & Scored', data.resumes ? data.resumes.processed : 'N/A'],
+    ['Resume Intelligence', 'Processing / In-Flight', data.resumes ? data.resumes.pending : 'N/A'],
+    ['Resume Intelligence', 'Failed / Exceptions', data.resumes ? data.resumes.failed : 'N/A'],
+    ['ATS Scoring Engine', 'Platform Average ATS Score', `${data.ats.average}/100`],
+    ['ATS Scoring Engine', 'Total Scored Candidates', data.ats.total_candidates_scored]
+  ];
+
+  const csv = rows.map(r => r.map(sanitizeCSV).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TalentSync_Platform_Summary_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.show('Platform master summary exported to CSV! 📊', 'success');
+}
+
 function fetchPlatformAdminAnalytics() {
+  const startTime = Date.now();
   fetch('/api/platform-admin/analytics')
     .then(r => {
       if (r.status === 401 || r.status === 403) {
@@ -5744,7 +5848,7 @@ function fetchPlatformAdminAnalytics() {
       setEl('pa-stat-ats-sub', `Scored Candidates: ${data.ats.total_candidates_scored}`);
 
       // 2. Render Charts
-      // Users by Role
+      // Users by Role (Interactive segment click)
       Charts.create('pa-role-chart', {
         type: 'doughnut',
         data: {
@@ -5766,11 +5870,18 @@ function fetchPlatformAdminAnalytics() {
           plugins: {
             legend: { position: 'bottom', labels: { font: { family: 'DM Sans', size: 12 }, padding: 12 } }
           },
-          cutout: '62%'
+          cutout: '62%',
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              const roleMap = ['candidate', 'hr', 'admin'];
+              navigateToPaSection('users', { role: roleMap[idx] });
+            }
+          }
         }
       });
 
-      // Recruitment Funnel
+      // Recruitment Funnel (Interactive bar click)
       Charts.create('pa-funnel-chart', {
         type: 'bar',
         data: {
@@ -5794,6 +5905,13 @@ function fetchPlatformAdminAnalytics() {
           scales: {
             y: { beginAtZero: true, grid: { color: '#f0f4f9' }, ticks: { stepSize: 1 } },
             x: { grid: { display: false } }
+          },
+          onClick: (evt, elements) => {
+            if (elements.length > 0) {
+              const idx = elements[0].index;
+              const statusMap = ['Pending', 'Reviewing', 'Shortlisted', 'Rejected'];
+              navigateToPaSection('apps', { status: statusMap[idx] });
+            }
           }
         }
       });
@@ -5860,17 +5978,35 @@ function fetchPlatformAdminAnalytics() {
       fetchPlatformAdminRecentActivity();
 
       // 4. Quick probe for Health Summary Banner
+      const probeStart = Date.now();
       fetch('/api/platform-admin/system/health')
         .then(r => r.json())
         .then(hRes => {
+          const latency = Date.now() - probeStart;
           if (!hRes || !hRes.success) return;
           const h = hRes.data;
           const badge = document.getElementById('pa-dash-health-badge');
           const desc = document.getElementById('pa-dash-health-desc');
           const banner = document.getElementById('pa-dash-health-banner');
+          const latencyEl = document.getElementById('pa-dash-health-latency');
+          const subsystemsEl = document.getElementById('pa-dash-health-subsystems');
+
           if (badge) {
             badge.className = `badge ${h.overall === 'Healthy' ? 'badge-success' : (h.overall === 'Degraded' ? 'badge-warning' : 'badge-danger')}`;
             badge.textContent = h.overall.toUpperCase();
+          }
+          if (latencyEl) {
+            latencyEl.innerHTML = `<i class="fas fa-bolt"></i> ${latency} ms`;
+          }
+          if (subsystemsEl && h.services) {
+            const keys = ['database', 'file_storage', 'authentication', 'ats_engine'];
+            const labels = { database: 'DB', file_storage: 'Storage', authentication: 'Auth', ats_engine: 'ATS' };
+            subsystemsEl.innerHTML = keys.map(k => {
+              const s = h.services[k];
+              const ok = s && s.status === 'Healthy';
+              const badgeClass = ok ? 'badge-success' : 'badge-warning';
+              return `<span class="badge ${badgeClass}" style="font-size:10px">${labels[k] || k}: ${ok ? 'OK' : 'ATTN'}</span>`;
+            }).join(' ');
           }
           if (desc) {
             desc.textContent = h.overall === 'Healthy'
@@ -5910,37 +6046,80 @@ function getAuditSeverity(action, sourceTable) {
   return '<span class="badge badge-teal" style="font-size:11px;font-weight:700">INFO</span>';
 }
 
+function formatRelativeTime(timestamp) {
+  if (!timestamp) return 'N/A';
+  const then = new Date(timestamp).getTime();
+  const diffSec = Math.floor((Date.now() - then) / 1000);
+  if (isNaN(diffSec) || diffSec < 0) return new Date(timestamp).toLocaleDateString();
+  if (diffSec < 60) return 'Just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 604800) return `${Math.floor(diffSec / 86400)}d ago`;
+  return new Date(timestamp).toLocaleDateString();
+}
+
+function renderPaRecentActivityTable(events) {
+  const tbody = document.getElementById('pa-dash-activity-tbody');
+  if (!tbody) return;
+
+  if (!events || events.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-3)">No matching system activity found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = events.map(e => {
+    let detailsFormatted = '';
+    if (typeof e.details === 'object' && e.details !== null) {
+      detailsFormatted = Object.entries(e.details).map(([k, v]) => `<strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}`).join(' · ');
+    } else {
+      detailsFormatted = escapeHTML(String(e.details || ''));
+    }
+    const severityBadge = getAuditSeverity(e.action, e.source_table);
+    const relTime = formatRelativeTime(e.timestamp);
+
+    return `
+      <tr style="cursor:pointer" onclick="Sidebar.setActive(document.querySelector('#sb-platform-admin [data-section=security-audit]'));Router.inner('platform-admin','security-audit');switchPaSecAuditTab('audit');fetchPlatformAdminAudit(1)" title="Click to view in Audit Log">
+        <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${e.id}</td>
+        <td>${severityBadge}</td>
+        <td><span class="badge badge-primary" style="font-size:11px">${escapeHTML(e.source_table)}</span></td>
+        <td style="font-size:12px;color:var(--text-3)">${relTime}</td>
+        <td style="font-weight:600;font-size:13px">${escapeHTML(e.actor || 'System')}</td>
+        <td><span class="badge badge-gray" style="font-size:11px">${escapeHTML(e.action)}</span></td>
+        <td style="font-size:12px;color:var(--text-2);max-width:320px">${detailsFormatted || '<span class="text-muted">None</span>'}</td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterPaRecentActivity(query) {
+  const q = (query || '').toLowerCase().trim();
+  if (!q) {
+    renderPaRecentActivityTable(_paRecentActivityCache);
+    return;
+  }
+  const filtered = _paRecentActivityCache.filter(e => {
+    const actor = (e.actor || '').toLowerCase();
+    const action = (e.action || '').toLowerCase();
+    const source = (e.source_table || '').toLowerCase();
+    const details = typeof e.details === 'object' ? JSON.stringify(e.details).toLowerCase() : (e.details || '').toLowerCase();
+    return actor.includes(q) || action.includes(q) || source.includes(q) || details.includes(q);
+  });
+  renderPaRecentActivityTable(filtered);
+}
+
 function fetchPlatformAdminRecentActivity() {
   const tbody = document.getElementById('pa-dash-activity-tbody');
-  fetch('/api/platform-admin/audit?limit=6')
+  fetch('/api/platform-admin/audit?limit=8')
     .then(r => r.json())
     .then(res => {
       if (!res || !res.success || !tbody) return;
-      const events = res.data.events || [];
-      if (events.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-3)">No system events recorded yet.</td></tr>';
-        return;
+      _paRecentActivityCache = res.data.events || [];
+      const searchInput = document.getElementById('pa-dash-activity-search');
+      if (searchInput && searchInput.value) {
+        filterPaRecentActivity(searchInput.value);
+      } else {
+        renderPaRecentActivityTable(_paRecentActivityCache);
       }
-      tbody.innerHTML = events.map(e => {
-        let detailsFormatted = '';
-        if (typeof e.details === 'object' && e.details !== null) {
-          detailsFormatted = Object.entries(e.details).map(([k, v]) => `<strong>${escapeHTML(k)}:</strong> ${escapeHTML(String(v))}`).join(' · ');
-        } else {
-          detailsFormatted = escapeHTML(String(e.details || ''));
-        }
-        const severityBadge = getAuditSeverity(e.action, e.source_table);
-        return `
-          <tr>
-            <td style="color:var(--text-3);font-size:12px;font-family:monospace">#${e.id}</td>
-            <td>${severityBadge}</td>
-            <td><span class="badge badge-primary" style="font-size:11px">${escapeHTML(e.source_table)}</span></td>
-            <td style="font-size:12px;color:var(--text-3)">${e.timestamp ? new Date(e.timestamp).toLocaleString() : 'N/A'}</td>
-            <td style="font-weight:600;font-size:13px">${escapeHTML(e.actor || 'System')}</td>
-            <td><span class="badge badge-gray" style="font-size:11px">${escapeHTML(e.action)}</span></td>
-            <td style="font-size:12px;color:var(--text-2);max-width:320px">${detailsFormatted || '<span class="text-muted">None</span>'}</td>
-          </tr>
-        `;
-      }).join('');
     })
     .catch(() => {
       if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--danger)">Error loading activity feed.</td></tr>';
@@ -7181,6 +7360,9 @@ window.switchPaSystemTab             = switchPaSystemTab;
 // Section 1
 window.fetchPlatformAdminAnalytics   = fetchPlatformAdminAnalytics;
 window.fetchPlatformAdminRecentActivity = fetchPlatformAdminRecentActivity;
+window.navigateToPaSection           = navigateToPaSection;
+window.exportPlatformMasterCSV       = exportPlatformMasterCSV;
+window.filterPaRecentActivity        = filterPaRecentActivity;
 
 // Section 2
 window.fetchPlatformAdminUsers       = fetchPlatformAdminUsers;
