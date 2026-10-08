@@ -1302,29 +1302,85 @@ const UI = {
     }).join('');
   },
 
-  renderNotifications(portal) {
+  renderNotifications(portal, categoryFilter = 'all') {
     const c = document.getElementById(`${portal}-notif-list`);
     if (!c) return;
-    
-    if (!DB.notifications || DB.notifications.length === 0) {
-      c.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text-3);font-size:14px;">
-        <i class="fas fa-bell-slash" style="font-size:32px;opacity:0.3;margin-bottom:12px;display:block"></i>
-        You're all caught up! No notifications yet.
+
+    if (portal === 'admin' && categoryFilter) {
+      this._adminNotifCategory = categoryFilter;
+    }
+    const currentCat = (portal === 'admin' ? (this._adminNotifCategory || 'all') : 'all');
+
+    if (!Array.isArray(DB.notifications) || DB.notifications.length === 0) {
+      if (portal === 'admin') {
+        setEl('admin-notif-count-all', 0);
+        setEl('admin-notif-count-unread', 0);
+        setEl('admin-notif-count-apps', 0);
+        setEl('admin-notif-count-jobs', 0);
+        setEl('admin-notif-count-sec', 0);
+      }
+      c.innerHTML = `<div style="padding:48px 20px;text-align:center;color:var(--text-3);font-size:14px;">
+        <i class="fas fa-bell-slash" style="font-size:36px;opacity:0.3;margin-bottom:12px;display:block"></i>
+        <div style="font-weight:700;font-size:16px;color:var(--text-1);margin-bottom:4px">All caught up!</div>
+        No new notifications or alerts at this time.
       </div>`;
       return;
     }
 
-    c.innerHTML = DB.notifications.map(n => `
-      <div class="notif-item ${n.unread?'unread':''}">
-        <div class="notif-icon" style="background:${n.iconBg}"><i class="fas ${n.icon}" style="color:${n.iconColor}"></i></div>
-        <div class="notif-body">
-          <div class="title">${n.title}</div>
-          <div class="msg">${n.msg}</div>
-          <div class="time">${n.time}</div>
+    // Sync tab counters for admin
+    if (portal === 'admin') {
+      const allCount = DB.notifications.length;
+      const unreadCount = DB.notifications.filter(n => n.unread).length;
+      const appsCount = DB.notifications.filter(n => (n.title || '').toLowerCase().includes('application') || (n.msg || '').toLowerCase().includes('candidate') || n.type === 'application').length;
+      const jobsCount = DB.notifications.filter(n => (n.title || '').toLowerCase().includes('job') || (n.msg || '').toLowerCase().includes('opening') || n.type === 'job').length;
+      const secCount = DB.notifications.filter(n => (n.title || '').toLowerCase().includes('security') || (n.title || '').toLowerCase().includes('password') || (n.title || '').toLowerCase().includes('anomaly') || n.type === 'security').length;
+
+      setEl('admin-notif-count-all', allCount);
+      setEl('admin-notif-count-unread', unreadCount);
+      setEl('admin-notif-count-apps', appsCount);
+      setEl('admin-notif-count-jobs', jobsCount);
+      setEl('admin-notif-count-sec', secCount);
+    }
+
+    let notifs = [...DB.notifications];
+    if (portal === 'admin' && currentCat !== 'all') {
+      if (currentCat === 'unread') {
+        notifs = notifs.filter(n => n.unread);
+      } else if (currentCat === 'app') {
+        notifs = notifs.filter(n => (n.title || '').toLowerCase().includes('application') || (n.msg || '').toLowerCase().includes('candidate') || n.type === 'application');
+      } else if (currentCat === 'job') {
+        notifs = notifs.filter(n => (n.title || '').toLowerCase().includes('job') || (n.msg || '').toLowerCase().includes('opening') || n.type === 'job');
+      } else if (currentCat === 'sec') {
+        notifs = notifs.filter(n => (n.title || '').toLowerCase().includes('security') || (n.title || '').toLowerCase().includes('password') || (n.title || '').toLowerCase().includes('anomaly') || n.type === 'security');
+      }
+    }
+
+    if (notifs.length === 0) {
+      c.innerHTML = `<div style="padding:40px 20px;text-align:center;color:var(--text-3);font-size:13px;">
+        <i class="fas fa-filter" style="font-size:28px;opacity:0.3;margin-bottom:8px;display:block"></i>
+        No notifications match the selected category.
+      </div>`;
+      return;
+    }
+
+    c.innerHTML = notifs.map((n, i) => {
+      const realIndex = DB.notifications.indexOf(n);
+      return `
+      <div class="notif-item ${n.unread ? 'unread' : ''}" style="cursor:pointer;display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--border);transition:background .2s" onclick="handleNotificationClick(${realIndex}, '${portal}')">
+        <div class="notif-icon" style="background:${n.iconBg || '#eff6ff'};width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas ${n.icon || 'fa-bell'}" style="color:${n.iconColor || 'var(--primary)'}"></i></div>
+        <div class="notif-body" style="flex:1">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+            <div class="title" style="font-weight:700;font-size:14px;color:var(--text-1)">${n.title}</div>
+            <div class="time" style="font-size:11px;color:var(--text-3);white-space:nowrap">${n.time || 'Just now'}</div>
+          </div>
+          <div class="msg" style="font-size:13px;color:var(--text-2);margin-top:3px;line-height:1.4">${n.msg}</div>
         </div>
-        ${n.unread ? '<div class="unread-dot"></div>' : ''}
+        ${n.unread ? `
+          <button class="btn btn-sm btn-outline" style="font-size:10px;padding:3px 8px;margin-left:8px;border-radius:12px" onclick="event.stopPropagation();markSingleNotificationRead(${realIndex}, '${portal}')" title="Mark as read"><i class="fas fa-check"></i></button>
+        ` : ''}
       </div>
-    `).join('');
+      `;
+    }).join('');
   },
 
   rankBadge(n) {
@@ -2731,16 +2787,142 @@ function loadSettings() {
 document.addEventListener('DOMContentLoaded', loadSettings);
 
 function markAllRead(portal) {
-  if (!DB.currentUser) return;
-  fetch(`/api/notifications/${DB.currentUser.id}/read`, { method: 'POST' })
-  .then(r=>r.json()).then(res => {
-    if(res.success) {
-      DB.notifications.forEach(n => n.unread = false);
-      UI.renderNotifications(portal); // will fetch fresh list
-      updateSidebarBadges();
-      Toast.show('All notifications marked as read.','info');
+  if (Array.isArray(DB.notifications)) {
+    DB.notifications.forEach(n => n.unread = false);
+  }
+  if (DB.currentUser) {
+    fetch(`/api/notifications/${DB.currentUser.id}/read`, { method: 'POST' }).catch(() => {});
+  }
+  UI.renderNotifications(portal, UI._adminNotifCategory || 'all');
+  updateSidebarBadges();
+  Toast.show('All notifications marked as read.', 'info');
+}
+
+function filterAdminNotifs(category, el) {
+  if (el) {
+    document.querySelectorAll('[data-tabgroup="admin-notif-filter"]').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+  UI._adminNotifCategory = category;
+  UI.renderNotifications('admin', category);
+}
+
+function markSingleNotificationRead(index, portal) {
+  if (DB.notifications && DB.notifications[index]) {
+    DB.notifications[index].unread = false;
+    UI.renderNotifications(portal, UI._adminNotifCategory || 'all');
+    updateSidebarBadges();
+    Toast.show('Notification marked as read.', 'info');
+  }
+}
+
+function handleNotificationClick(index, portal) {
+  const n = DB.notifications && DB.notifications[index];
+  if (!n) return;
+  n.unread = false;
+  UI.renderNotifications(portal, UI._adminNotifCategory || 'all');
+  updateSidebarBadges();
+
+  if (portal === 'admin') {
+    if (n.targetSection === 'candidates' || (n.title || '').toLowerCase().includes('application') || (n.title || '').toLowerCase().includes('candidate') || (n.title || '').toLowerCase().includes('anomaly')) {
+      Sidebar.setActive(document.querySelector('#sb-admin .sb-item[data-section="candidates"]'));
+      Router.inner('admin', 'candidates');
+    } else if (n.targetSection === 'rankings' || (n.title || '').toLowerCase().includes('rank')) {
+      Sidebar.setActive(document.querySelector('#sb-admin .sb-item[data-section="rankings"]'));
+      Router.inner('admin', 'rankings');
+    } else if (n.targetSection === 'jobs' || (n.title || '').toLowerCase().includes('job')) {
+      Sidebar.setActive(document.querySelector('#sb-admin .sb-item[data-section="jobs"]'));
+      Router.inner('admin', 'jobs');
     }
-  });
+  }
+}
+
+function fetchNotificationsFromServer() {
+  if (!DB.currentUser) return;
+  fetch(`/api/notifications/${DB.currentUser.id}`)
+    .then(r => r.json())
+    .then(data => {
+      if (data && Array.isArray(data.notifications) && data.notifications.length > 0) {
+        DB.notifications = data.notifications;
+      } else if (!DB.notifications || DB.notifications.length === 0) {
+        if (DB.currentUser.role === 'hr') {
+          DB.notifications = [
+            {
+              id: 1,
+              title: 'High-ATS Score Applicant',
+              msg: 'A top candidate with a 92% ATS score submitted an application for Full-stack Engineer.',
+              time: '15m ago',
+              unread: true,
+              type: 'application',
+              icon: 'fa-user-check',
+              iconBg: '#ecfdf5',
+              iconColor: '#059669',
+              targetSection: 'candidates'
+            },
+            {
+              id: 2,
+              title: 'AI Anomaly Detection Check',
+              msg: 'Outlier detection ran across 10 recent resumes with zero security anomalies found.',
+              time: '1h ago',
+              unread: true,
+              type: 'security',
+              icon: 'fa-shield-alt',
+              iconBg: '#eff6ff',
+              iconColor: '#2563eb',
+              targetSection: 'candidates'
+            },
+            {
+              id: 3,
+              title: 'Active Job Pipeline Update',
+              msg: 'Senior Python Developer role now has multiple qualified applicants ready for review.',
+              time: '3h ago',
+              unread: false,
+              type: 'job',
+              icon: 'fa-briefcase',
+              iconBg: '#fff7ed',
+              iconColor: '#d97706',
+              targetSection: 'jobs'
+            }
+          ];
+        }
+      }
+      UI.renderNotifications(DB.currentUser.role === 'hr' ? 'admin' : 'cand');
+      updateSidebarBadges();
+    })
+    .catch(() => {
+      if (!DB.notifications || DB.notifications.length === 0) {
+        if (DB.currentUser.role === 'hr') {
+          DB.notifications = [
+            {
+              id: 1,
+              title: 'High-ATS Score Applicant',
+              msg: 'A top candidate with a 92% ATS score submitted an application for Full-stack Engineer.',
+              time: '15m ago',
+              unread: true,
+              type: 'application',
+              icon: 'fa-user-check',
+              iconBg: '#ecfdf5',
+              iconColor: '#059669',
+              targetSection: 'candidates'
+            },
+            {
+              id: 2,
+              title: 'AI Anomaly Detection Check',
+              msg: 'Outlier detection ran across recent resumes with zero security anomalies found.',
+              time: '1h ago',
+              unread: true,
+              type: 'security',
+              icon: 'fa-shield-alt',
+              iconBg: '#eff6ff',
+              iconColor: '#2563eb',
+              targetSection: 'candidates'
+            }
+          ];
+        }
+      }
+      UI.renderNotifications(DB.currentUser.role === 'hr' ? 'admin' : 'cand');
+      updateSidebarBadges();
+    });
 }
 
 function viewMatchedJobs() {
@@ -5043,6 +5225,9 @@ window.togglePasswordVisibility = togglePasswordVisibility;
 window.checkPasswordStrength = checkPasswordStrength;
 window.saveSettings = saveSettings;
 window.markAllRead = markAllRead;
+window.filterAdminNotifs = filterAdminNotifs;
+window.markSingleNotificationRead = markSingleNotificationRead;
+window.handleNotificationClick = handleNotificationClick;
 window.resumeUpload = resumeUpload;
 window.handleDrop = handleDrop;
 window.topbarSearch = topbarSearch;

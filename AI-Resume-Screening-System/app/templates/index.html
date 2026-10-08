@@ -2014,10 +2014,26 @@
 
         <!-- ── ADMIN: Notifications ── -->
         <div id="admin-notif" data-portal="admin" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
-            <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Notifications</div>
-            <button class="btn btn-outline btn-sm" onclick="markAllRead('admin')"><i class="fas fa-check-double"></i> Mark All Read</button>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
+            <div>
+              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Notification &amp; Activity Center</div>
+              <div style="font-size:13px;color:var(--text-3)">Real-time applicant alerts, job pipeline updates, and system events.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn btn-outline btn-sm" onclick="markAllRead('admin')"><i class="fas fa-check-double"></i> Mark All Read</button>
+              <button class="btn btn-outline btn-sm" onclick="fetchNotificationsFromServer();Toast.show('Notifications refreshed.','info')"><i class="fas fa-sync-alt"></i> Refresh</button>
+            </div>
           </div>
+
+          <!-- Category filter tabs -->
+          <div class="tab-bar mb-3" style="margin-bottom:16px;flex-wrap:wrap">
+            <button class="tab-btn active" data-tabgroup="admin-notif-filter" data-filter="all" onclick="filterAdminNotifs('all', this)"><i class="fas fa-inbox"></i> All (<span id="admin-notif-count-all">0</span>)</button>
+            <button class="tab-btn" data-tabgroup="admin-notif-filter" data-filter="unread" onclick="filterAdminNotifs('unread', this)"><i class="fas fa-envelope"></i> Unread (<span id="admin-notif-count-unread">0</span>)</button>
+            <button class="tab-btn" data-tabgroup="admin-notif-filter" data-filter="app" onclick="filterAdminNotifs('app', this)"><i class="fas fa-user-plus"></i> Applications (<span id="admin-notif-count-apps">0</span>)</button>
+            <button class="tab-btn" data-tabgroup="admin-notif-filter" data-filter="job" onclick="filterAdminNotifs('job', this)"><i class="fas fa-briefcase"></i> Job Updates (<span id="admin-notif-count-jobs">0</span>)</button>
+            <button class="tab-btn" data-tabgroup="admin-notif-filter" data-filter="sec" onclick="filterAdminNotifs('sec', this)"><i class="fas fa-shield-alt"></i> Security (<span id="admin-notif-count-sec">0</span>)</button>
+          </div>
+
           <div class="card"><div id="admin-notif-list" class="notif-list"></div></div>
         </div>
 
