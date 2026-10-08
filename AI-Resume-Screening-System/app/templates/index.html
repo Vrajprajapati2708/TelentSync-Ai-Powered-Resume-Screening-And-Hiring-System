@@ -1943,37 +1943,70 @@
 
         <!-- ── ADMIN: Profile ── -->
         <div id="admin-profile" data-portal="admin" class="hidden">
-          <div class="profile-hero">
-            <div class="avatar avatar-xl admin-avatar" style="background:#e11d48;color:#fff;border:4px solid rgba(255,255,255,.3)">--</div>
+          <div class="profile-hero" style="position:relative;overflow:hidden">
+            <div class="avatar avatar-xl admin-avatar" id="admin-hero-avatar" style="background:#1260cc;color:#fff;border:4px solid rgba(255,255,255,.3)">HR</div>
             <div class="profile-hero-info">
-              <div class="name admin-name">HR Admin</div>
-              <div class="subtitle">HR Admin · TalentSync</div>
-              <div class="skills-cloud">
-                <span class="badge" style="background:rgba(255,255,255,.15);color:#fff">&#10003; Verified HR</span>
-                <span class="badge" style="background:rgba(0,201,167,.2);color:var(--teal)">Admin Access</span>
+              <div class="name admin-name" id="admin-hero-name">HR Administrator</div>
+              <div class="subtitle" id="admin-hero-subtitle">HR Manager · TalentSync Recruitment Suite</div>
+              <div class="skills-cloud" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                <span class="badge" style="background:rgba(255,255,255,.2);color:#fff"><i class="fas fa-shield-alt"></i> Verified HR Lead</span>
+                <span class="badge" style="background:rgba(0,201,167,.25);color:var(--teal)"><i class="fas fa-bolt"></i> Full Hiring Authority</span>
+                <span class="badge" id="admin-hero-jobs-badge" style="background:rgba(255,255,255,.15);color:#fff"><i class="fas fa-briefcase"></i> Active Openings</span>
               </div>
             </div>
           </div>
-          <div class="dash-grid-equal">
+
+          <div class="dash-grid-equal" style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:20px">
+            <!-- Card 1: Personal & Organization Info -->
             <div class="card">
-              <div class="card-header"><span class="card-title">Personal Information</span></div>
+              <div class="card-header"><span class="card-title"><i class="fas fa-id-card" style="color:var(--primary);margin-right:8px"></i> Personal &amp; Organization Details</span></div>
               <div class="card-body">
-                <div class="form-group"><label class="form-label">Full Name</label><input id="admin-profile-name" class="form-control" placeholder="Your Name"></div>
-                <div class="form-group"><label class="form-label">Email</label><input id="admin-profile-email" class="form-control" type="email" placeholder="your@email.com"></div>
-                <div class="form-group"><label class="form-label">Phone</label><input id="admin-profile-phone" class="form-control" type="tel" placeholder="+91 97654 32109"></div>
-                <div class="form-group"><label class="form-label">Company</label><input class="form-control" value="TechCorp India" disabled></div>
-                <div class="form-group"><label class="form-label">Department</label><input class="form-control" value="Human Resources" disabled></div>
-                <div class="form-group"><label class="form-label">Location</label><input id="admin-profile-loc" class="form-control" placeholder="Bangalore, Karnataka"></div>
-                <button class="btn btn-primary" onclick="saveProfile('admin')"><i class="fas fa-save"></i> Save Changes</button>
+                <div class="form-group"><label class="form-label">Full Name</label><input id="admin-profile-name" class="form-control" placeholder="HR Manager Name"></div>
+                <div class="form-group"><label class="form-label">Email Address</label><input id="admin-profile-email" class="form-control" type="email" placeholder="hr@company.com"></div>
+                <div class="form-group"><label class="form-label">Contact Phone</label><input id="admin-profile-phone" class="form-control" type="tel" placeholder="+91 98765 43210"></div>
+                <div class="form-group"><label class="form-label">Organization Name</label><input id="admin-profile-company" class="form-control" placeholder="Company Name"></div>
+                <div class="form-group"><label class="form-label">Department / Unit</label><input id="admin-profile-dept" class="form-control" placeholder="Talent Acquisition / HR"></div>
+                <div class="form-group"><label class="form-label">Office Location</label><input id="admin-profile-loc" class="form-control" placeholder="City, Country"></div>
+                <button class="btn btn-primary" onclick="saveProfile('admin')"><i class="fas fa-save"></i> Save Profile Changes</button>
               </div>
             </div>
+
+            <!-- Card 2: Security & Password Management -->
             <div class="card">
-              <div class="card-header"><span class="card-title">Change Password</span></div>
+              <div class="card-header"><span class="card-title"><i class="fas fa-lock" style="color:var(--primary);margin-right:8px"></i> Security &amp; Password</span></div>
               <div class="card-body">
-                <div class="form-group"><label class="form-label">Current Password</label><input id="admin-cur-pwd" class="form-control" type="password" placeholder="••••••••"></div>
-                <div class="form-group"><label class="form-label">New Password</label><input id="admin-new-pwd" class="form-control" type="password" placeholder="Min 10 characters"></div>
-                <div class="form-group"><label class="form-label">Confirm New Password</label><input id="admin-conf-pwd" class="form-control" type="password" placeholder="Repeat"></div>
-                <button class="btn btn-navy" onclick="changePwd('admin')"><i class="fas fa-key"></i> Change Password</button>
+                <div class="form-group">
+                  <label class="form-label">Current Password</label>
+                  <div style="position:relative">
+                    <input id="admin-cur-pwd" class="form-control" type="password" placeholder="••••••••" style="padding-right:36px">
+                    <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('admin-cur-pwd', this)"></i>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">New Password</label>
+                  <div style="position:relative">
+                    <input id="admin-new-pwd" class="form-control" type="password" placeholder="Min 10 characters" style="padding-right:36px" oninput="checkPasswordStrength(this.value, 'admin-pwd-strength')">
+                    <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('admin-new-pwd', this)"></i>
+                  </div>
+                  <div id="admin-pwd-strength" style="font-size:11px;margin-top:4px;color:var(--text-3)">Password strength: Minimum 10 characters with numbers/symbols</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Confirm New Password</label>
+                  <div style="position:relative">
+                    <input id="admin-conf-pwd" class="form-control" type="password" placeholder="Repeat new password" style="padding-right:36px">
+                    <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('admin-conf-pwd', this)"></i>
+                  </div>
+                </div>
+                <button class="btn btn-navy" onclick="changePwd('admin')"><i class="fas fa-key"></i> Update Password</button>
+
+                <div style="margin-top:24px;padding-top:16px;border-top:1px solid var(--border)">
+                  <div style="font-size:13px;font-weight:700;color:var(--text-1);margin-bottom:8px"><i class="fas fa-shield-virus" style="color:#16a34a;margin-right:6px"></i> Active Session &amp; Security Status</div>
+                  <div style="font-size:12px;color:var(--text-3);line-height:1.5;margin-bottom:12px">
+                    Session Protocol: Secure HTTPS Token · Role: <strong>HR Recruiter</strong><br>
+                    Status: <span class="badge badge-success" style="font-size:10px;padding:2px 6px">Active &amp; Authenticated</span>
+                  </div>
+                  <button class="btn btn-outline-danger btn-sm" onclick="Auth.logout()"><i class="fas fa-sign-out-alt"></i> Sign Out of Session</button>
+                </div>
               </div>
             </div>
           </div>

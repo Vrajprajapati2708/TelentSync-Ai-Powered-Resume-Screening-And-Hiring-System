@@ -642,7 +642,28 @@ const Auth = {
     setVal('cand-profile-sum', user.summary || '');
     setVal('cand-profile-edu', user.education || '');
 
-    if (!isHR) {
+    if (isHR) {
+      setVal('admin-profile-name', user.name || '');
+      setVal('admin-profile-email', user.email || '');
+      setVal('admin-profile-phone', user.phone || '');
+      setVal('admin-profile-company', user.company || 'TechCorp India');
+      setVal('admin-profile-dept', user.department || 'Human Resources');
+      setVal('admin-profile-loc', user.location || 'Bangalore, India');
+
+      const heroName = document.getElementById('admin-hero-name');
+      if (heroName) heroName.textContent = user.name || 'HR Administrator';
+      const heroSub = document.getElementById('admin-hero-subtitle');
+      if (heroSub) heroSub.textContent = `${user.company || 'TechCorp India'} · ${user.department || 'Human Resources'}`;
+      const heroAvatar = document.getElementById('admin-hero-avatar');
+      if (heroAvatar) {
+        heroAvatar.textContent = avatar;
+        heroAvatar.style.background = UI.avatarColor(user.name);
+      }
+      const heroJobs = document.getElementById('admin-hero-jobs-badge');
+      if (heroJobs && Array.isArray(DB.jobs)) {
+        heroJobs.innerHTML = `<i class="fas fa-briefcase"></i> ${DB.jobs.length} Active Positions`;
+      }
+    } else {
       loadResumeHistory();
     }
 
@@ -2452,12 +2473,17 @@ function saveProfile(portal) {
   if (!DB.currentUser) return;
   
   let name;
+  let company = '';
+  let department = '';
+
   if (portal === 'cand') {
     const fname = (document.getElementById('cand-profile-name')?.value || '').trim();
     const lname = (document.getElementById('cand-profile-lname')?.value || '').trim();
     name = lname ? `${fname} ${lname}` : fname;
   } else {
     name = (document.getElementById('admin-profile-name')?.value || '').trim();
+    company = (document.getElementById('admin-profile-company')?.value || '').trim();
+    department = (document.getElementById('admin-profile-dept')?.value || '').trim();
   }
   
   const data = {
@@ -2465,6 +2491,8 @@ function saveProfile(portal) {
     email:     (document.getElementById(`${portal}-profile-email`)?.value || '').trim(),
     phone:     (document.getElementById(`${portal}-profile-phone`)?.value || '').trim(),
     location:  (document.getElementById(`${portal}-profile-loc`)?.value || '').trim(),
+    company:   company || DB.currentUser.company || '',
+    department: department || DB.currentUser.department || '',
     linkedin:  (document.getElementById(`${portal}-profile-link`)?.value || '').trim(),
     github:    (document.getElementById(`${portal}-profile-git`)?.value || '').trim(),
     summary:   (document.getElementById(`${portal}-profile-sum`)?.value || '').trim(),
@@ -2512,10 +2540,48 @@ function changePwd(portal) {
     if (data.success) {
       Toast.show('Password changed successfully! 🔒', 'success');
       ['cur-pwd','new-pwd','conf-pwd'].forEach(s => { const el=document.getElementById(`${portal}-${s}`); if(el) el.value=''; });
+      const strEl = document.getElementById(`${portal}-pwd-strength`);
+      if (strEl) strEl.innerHTML = 'Password strength: Minimum 10 characters with numbers/symbols';
     } else {
       Toast.show(data.message || 'Failed to change password.', 'error');
     }
   }).catch(() => Toast.show('Server error.', 'error'));
+}
+
+function togglePasswordVisibility(inputId, iconEl) {
+  const input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (iconEl) { iconEl.classList.remove('fa-eye'); iconEl.classList.add('fa-eye-slash'); }
+  } else {
+    input.type = 'password';
+    if (iconEl) { iconEl.classList.remove('fa-eye-slash'); iconEl.classList.add('fa-eye'); }
+  }
+}
+
+function checkPasswordStrength(pwd, targetElId) {
+  const el = document.getElementById(targetElId);
+  if (!el) return;
+  if (!pwd) {
+    el.innerHTML = 'Password strength: Minimum 10 characters with numbers/symbols';
+    el.style.color = 'var(--text-3)';
+    return;
+  }
+  let strength = 0;
+  if (pwd.length >= 8) strength++;
+  if (pwd.length >= 10) strength++;
+  if (/[A-Z]/.test(pwd)) strength++;
+  if (/[0-9]/.test(pwd)) strength++;
+  if (/[^A-Za-z0-9]/.test(pwd)) strength++;
+
+  if (strength <= 2) {
+    el.innerHTML = '<span style="color:#dc2626;font-weight:700">⚠️ Weak password</span> (add uppercase, numbers, or symbols)';
+  } else if (strength <= 4) {
+    el.innerHTML = '<span style="color:#d97706;font-weight:700">Moderate password</span>';
+  } else {
+    el.innerHTML = '<span style="color:#16a34a;font-weight:700">✓ Strong secure password</span>';
+  }
 }
 
 function saveSettings() {
@@ -4973,6 +5039,8 @@ window.toggleJobStatus = toggleJobStatus;
 window.viewJobApplicants = viewJobApplicants;
 window.saveProfile = saveProfile;
 window.changePwd = changePwd;
+window.togglePasswordVisibility = togglePasswordVisibility;
+window.checkPasswordStrength = checkPasswordStrength;
 window.saveSettings = saveSettings;
 window.markAllRead = markAllRead;
 window.resumeUpload = resumeUpload;
