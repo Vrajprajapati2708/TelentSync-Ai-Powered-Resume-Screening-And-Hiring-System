@@ -155,13 +155,11 @@ class TFIDFVectorizer:
     """
 
     def __init__(self):
-        _load_sklearn_model()
-        self._fallback  = _PurePythonTFIDF()
-        self._use_sklearn = _sklearn_available
+        self._fallback = _PurePythonTFIDF()
 
     def fit(self, documents: list[str]) -> 'TFIDFVectorizer':
         """Fit the vectorizer. No-op if the sklearn model is already loaded."""
-        if not self._use_sklearn:
+        if not self.is_sklearn:
             self._fallback.fit(documents)
         return self
 
@@ -172,31 +170,25 @@ class TFIDFVectorizer:
         Returns:
             scipy sparse matrix row (sklearn) or dict (fallback).
         """
-        if self._use_sklearn:
-            if _sklearn_vectorizer is None:
-                raise RuntimeError("Vectorizer not initialized")
+        if self.is_sklearn:
             processed = preprocess_to_string(text)
             return _sklearn_vectorizer.transform([processed])
         return self._fallback.transform(text)
 
     def fit_transform(self, documents: list[str]):
         """Fit and transform all documents."""
-        if self._use_sklearn:
-            if _sklearn_vectorizer is None:
-                raise RuntimeError("Vectorizer not initialized")
+        if self.is_sklearn:
             processed = [preprocess_to_string(d) for d in documents]
             return _sklearn_vectorizer.transform(processed)
         return self._fallback.fit_transform(documents)
 
     @property
     def is_sklearn(self) -> bool:
-        return self._use_sklearn
+        return is_sklearn_available()
 
     @property
     def vocab_size(self) -> int:
-        if self._use_sklearn:
-            if _sklearn_vectorizer is None:
-                raise RuntimeError("Vectorizer not initialized")
+        if self.is_sklearn:
             return len(_sklearn_vectorizer.vocabulary_)
         return len(self._fallback.vocabulary)
 
@@ -212,11 +204,11 @@ def get_vectorizer() -> TFIDFVectorizer:
 
 def get_model_info() -> dict:
     """Return metadata about the active TF-IDF model."""
-    _load_sklearn_model()
-    if _sklearn_available:
+    if is_sklearn_available():
         import json
-        meta_path = _BASE_DIR / "trained_models" / "tfidf_recommender" / "metadata.json"
+        meta_path = _MODEL_PATH.parent / "metadata.json"
         if meta_path.exists():
             with open(meta_path) as f:
                 return json.load(f)
     return {"model": "pure_python_fallback", "status": "not_trained"}
+

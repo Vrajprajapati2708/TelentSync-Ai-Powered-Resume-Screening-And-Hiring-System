@@ -125,6 +125,9 @@ def recommend_jobs(candidate_skills: list[str],
 
         enriched = dict(job)
         enriched['match_percentage'] = match_pct
+        enriched['score']            = round(final_score, 4)
+        enriched['hybrid_score']     = round(final_score, 4)
+        enriched['tfidf_score']      = round(semantic, 4)
         enriched['matched_skills']   = matched
         enriched['missing_skills']   = missing
         enriched['semantic_score']   = round(semantic, 4)

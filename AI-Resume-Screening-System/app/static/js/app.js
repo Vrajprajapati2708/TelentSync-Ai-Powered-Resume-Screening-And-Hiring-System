@@ -5033,79 +5033,11 @@ function renderResumeIntelligence(intel, resumeMeta = {}) {
 
 
 
-// ── ML Pipeline Status ──────────────────────────────────
-function loadMLPipelineStatus() {
-  if (DB.currentUser && DB.currentUser.role !== 'admin') {
-    console.warn('Unauthorized access to ML Pipeline status');
-    return;
+// ── ML Pipeline Status Delegation ─────────────────────────
+function loadMLPipelineStatusLegacy() {
+  if (typeof loadMLPipelineStatus === 'function') {
+    return loadMLPipelineStatus();
   }
-  const btn = document.getElementById('pipeline-refresh-btn');
-  if(btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...'; }
-
-  fetch('/api/ml/status')
-    .then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
-    .then(data => {
-      // Pipeline Status
-      const isReady = data.status === 'ready';
-      setEl('ml-pipeline-status', isReady ? '● Online' : '○ Not Trained');
-      const statusEl = document.getElementById('ml-pipeline-status');
-      if(statusEl) statusEl.style.color = isReady ? '#16a34a' : '#dc2626';
-      setEl('ml-pipeline-status-sub', isReady ? 'All models loaded & operational' : 'Run training to activate');
-
-      // TF-IDF Model
-      const tfidf = data.models?.tfidf_recommender || {};
-      setEl('ml-vocab-size', tfidf.vocab_size ? tfidf.vocab_size.toLocaleString() : '--');
-      setEl('ml-tfidf-vocab', tfidf.vocab_size ? `${tfidf.vocab_size.toLocaleString()} terms` : '--');
-      setEl('ml-corpus-size', tfidf.corpus_size || '--');
-      setEl('ml-corpus-detail', `${tfidf.corpus_size || '800'} documents trained on`);
-      setEl('ml-tfidf-corpus', `${tfidf.corpus_size || '--'} docs (resumes + job descriptions)`);
-
-      const tfidfBadge = document.getElementById('ml-tfidf-badge');
-      if(tfidfBadge) {
-        tfidfBadge.className = tfidf.trained ? 'badge badge-success' : 'badge badge-danger';
-        tfidfBadge.textContent = tfidf.trained ? '✓ Trained' : '✗ Not Trained';
-      }
-
-      // Hit rates
-      const hr = tfidf.hit_rate || {};
-      setEl('ml-tfidf-hit1', hr.hit_rate_top1 != null ? `${(hr.hit_rate_top1 * 100).toFixed(0)}%` : '--');
-      setEl('ml-tfidf-hit3', hr.hit_rate_top3 != null ? `${(hr.hit_rate_top3 * 100).toFixed(0)}%` : '--');
-      setEl('ml-tfidf-hit5', hr.hit_rate_top5 != null ? `${(hr.hit_rate_top5 * 100).toFixed(0)}%` : '--');
-      setEl('ml-hit-rate', hr.hit_rate_top5 != null ? `${(hr.hit_rate_top5 * 100).toFixed(0)}%` : '--');
-
-      // spaCy NER Model
-      const ner = data.models?.spacy_ner || {};
-      const nerBadge = document.getElementById('ml-ner-badge');
-      if(nerBadge) {
-        nerBadge.className = ner.trained ? 'badge badge-success' : 'badge badge-danger';
-        nerBadge.textContent = ner.trained ? '✓ Trained' : '✗ Not Trained';
-      }
-      setEl('ml-ner-f1', ner.best_f1 != null ? `${(ner.best_f1 * 100).toFixed(1)}%` : '--');
-      setEl('ml-ner-epochs', ner.epochs || '--');
-      setEl('ml-ner-method', data.extraction_method || 'spaCy NER + Regex');
-      setEl('ml-extraction-method', data.extraction_method || 'spaCy NER + Regex');
-
-      // Dataset info
-      const ds = data.dataset || {};
-      setEl('ml-dataset-resumes', ds.num_resumes || '600');
-      setEl('ml-dataset-jobs', ds.num_jobs || '200');
-      setEl('ml-dataset-ner', ds.num_ner_samples || '~4,800');
-
-      // Live jobs count from DB
-      fetch('/api/admin/jobs').then(r=>r.json()).then(jobs => {
-        setEl('ml-live-jobs', (jobs && jobs.length) || '--');
-      }).catch(() => {});
-
-      if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
-    })
-    .catch(err => {
-      console.error('ML Pipeline status error:', err);
-      setEl('ml-pipeline-status', '● Error');
-      if(btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
-    });
 }
 
 
@@ -8287,8 +8219,571 @@ function fetchPlatformAdminIntegrations() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SECTION 7: AI/ML PIPELINE CONTROLS
+// SECTION 7: AI/ML PIPELINE ORCHESTRATION & DIAGNOSTICS
 // ═══════════════════════════════════════════════════════════
+
+const ML_PRESETS = {
+  fullstack: `ALEX RIVERA
+Senior Full-Stack Software Engineer
+San Francisco, CA | alex.rivera@example.com | (555) 342-9102 | linkedin.com/in/alexrivera-dev | github.com/alexrivera-tech
+
+PROFESSIONAL SUMMARY
+Dynamic and results-driven Senior Full-Stack Engineer with 7+ years of experience architecting and delivering high-throughput enterprise SaaS applications. Proficient across modern JavaScript/TypeScript ecosystems, microservices with Node.js and Go, and high-performance relational databases. Proven track record scaling systems to 5M+ monthly active users.
+
+CORE SKILLS & COMPETENCIES
+- Programming Languages: JavaScript, TypeScript, Python, Go, SQL, HTML5, CSS3
+- Frontend & Frameworks: React, Next.js, Redux Toolkit, Tailwind CSS, Vue.js, GraphQL, Webpack
+- Backend & Architecture: Node.js, Express, FastAPI, RESTful APIs, Microservices, Event-Driven Architecture
+- Databases & Caching: PostgreSQL, MongoDB, Redis, Elasticsearch, TypeORM, Prisma
+- Cloud, DevOps & Tools: AWS (ECS, Lambda, S3, RDS), Docker, Kubernetes, CI/CD (GitHub Actions), Terraform, Jest, Cypress, Git, Linux
+
+EXPERIENCE
+Staff Full-Stack Engineer | CloudSphere Solutions | 2022 – Present
+- Architected and deployed a multi-tenant SaaS analytics platform using React, TypeScript, and Node.js microservices handling 25,000+ RPS.
+- Optimized PostgreSQL queries and implemented Redis caching layer, decreasing p99 API response latency by 45%.
+- Led cloud migration from legacy EC2 to AWS ECS and Kubernetes, reducing operational overhead by 30%.
+
+Senior Software Engineer | Apex Financial Systems | 2019 – 2022
+- Built interactive client wealth management dashboards using React, Redux, and D3.js.
+- Developed real-time streaming notifications service using WebSocket and Redis Pub/Sub.
+
+EDUCATION
+Bachelor of Science in Computer Science | University of California, Berkeley (2015 – 2019)`,
+
+  ml_ai: `DR. PRIYA SHARMA
+Lead Data Scientist & Machine Learning Engineer
+New York, NY | priya.sharma@example.com | (555) 782-4190 | linkedin.com/in/priya-sharma-ai | github.com/priyasharma-nlp
+
+PROFESSIONAL SUMMARY
+Staff Data Scientist and AI/ML Practitioner with 8+ years specializing in Natural Language Processing (NLP), Large Language Models (LLMs), deep learning, and scalable MLOps inference pipelines. Deep expertise with PyTorch, Scikit-learn, HuggingFace transformers, and production vector databases.
+
+CORE TECHNICAL SKILLS
+- Machine Learning & AI: Natural Language Processing (NLP), Named Entity Recognition (NER), Transformers, LLMs, Computer Vision, Recommendation Systems, TF-IDF, Cosine Similarity
+- Frameworks & Libraries: PyTorch, TensorFlow, Scikit-learn, HuggingFace, spaCy, NLTK, Pandas, NumPy, SciPy, OpenCV
+- MLOps & Infrastructure: MLflow, Kubeflow, Ray, Triton Inference Server, Docker, Kubernetes, AWS SageMaker, FastAPI
+- Programming & Query: Python, R, SQL, C++, Cython, Bash, PySpark
+- Databases: PostgreSQL, Pinecone, Milvus, ChromaDB, Redis
+
+PROFESSIONAL EXPERIENCE
+Lead ML & NLP Scientist | DataVanguard AI | 2021 – Present
+- Designed and trained custom domain-adapted BERT and spaCy NER models for resume parsing and skill ontology extraction achieving 96.4% F1 score.
+- Built low-latency recommendation engine combining TF-IDF lexical matching and dense semantic vector embeddings.
+- Scaled inference endpoints with Triton and FastAPI on Kubernetes cluster serving 10M+ daily predictions at <35ms p95 latency.
+
+Senior Machine Learning Engineer | CogniTech Analytics | 2018 – 2021
+- Developed automated text classification and anomaly detection pipelines using Scikit-learn and PyTorch.
+- Reduced model retraining and hyperparameter tuning time by 60% using distributed Ray clusters.
+
+EDUCATION
+Ph.D. in Computer Science (Machine Learning & NLP) | Columbia University (2014 – 2018)
+B.Tech in Computer Science | Indian Institute of Technology (2010 – 2014)`,
+
+  frontend: `EMILY CHEN
+Senior Frontend UI/UX Engineer & Design Technologist
+Seattle, WA | emily.chen@example.com | (555) 219-8374 | linkedin.com/in/emilychen-design | github.com/emilychen-ui
+
+PROFESSIONAL SUMMARY
+Senior Frontend UI/UX Engineer with 6+ years specializing in design systems, micro-frontend architecture, WebGL/Canvas data visualizations, and high-conversion web applications. Passionate about accessibility (WCAG AAA), CSS animations, and pixel-perfect design fidelity.
+
+TECHNICAL PROFICIENCIES
+- Core Technologies: JavaScript (ESNext), TypeScript, HTML5 Semantic Markup, CSS3/SCSS, WebGL
+- Frameworks & UI: React, Vue.js, Next.js, Svelte, Tailwind CSS, Material-UI, Framer Motion, D3.js
+- Design & Prototyping: Figma, Adobe XD, Design Systems, Storybook, User Research, Wireframing
+- Build & Performance: Vite, Webpack, Turbopack, Core Web Vitals, Lighthouse Optimization, PWA
+- Testing & Tooling: Jest, React Testing Library, Playwright, Cypress, Git, Figma Tokens
+
+PROFESSIONAL EXPERIENCE
+Lead Frontend Architect | PixelCraft Digital | 2022 – Present
+- Built and maintained enterprise multi-brand design system with 80+ accessible components in React, TypeScript, and Tailwind CSS used by 45 product teams.
+- Improved Core Web Vitals across company sites, boosting Lighthouse performance scores from 68 to 98+.
+- Architected responsive data dashboards with real-time SVG charting and glassmorphic micro-animations.
+
+Frontend Engineer | Nimbus Interactive | 2019 – 2022
+- Developed high-traffic e-commerce storefronts using Next.js and Vue.js with sub-second page loads.
+- Implemented WCAG 2.1 AA accessibility compliance across all candidate application workflows.
+
+EDUCATION
+B.S. in Human-Computer Interaction & Digital Media | University of Washington (2015 – 2019)`,
+
+  devops: `MARCUS VANCE
+Principal Cloud Infrastructure & DevOps Architect
+Austin, TX | marcus.vance@example.com | (555) 901-4433 | linkedin.com/in/marcusvance-devops | github.com/marcusvance-infra
+
+PROFESSIONAL SUMMARY
+Principal Cloud & Platform Engineer with 9+ years of expertise designing resilient, multi-region cloud infrastructures, automated zero-downtime CI/CD pipelines, and secure Kubernetes microservices platforms. Proven leader in cloud cost optimization, SOC2 compliance, and Site Reliability Engineering (SRE).
+
+TECHNICAL SKILLS & CERTIFICATIONS
+- Cloud & Infrastructure: AWS (EKS, IAM, CloudFront, VPC), Google Cloud (GKE), Azure, Terraform, Terragrunt, CloudFormation
+- Containerization & Orchestration: Kubernetes, Docker, Helm, ArgoCD, Istio Service Mesh, Nomad
+- CI/CD & Automation: GitHub Actions, GitLab CI, Jenkins, Ansible, Python, Bash, Go
+- Observability & Reliability: Prometheus, Grafana, Datadog, OpenTelemetry, ELK Stack, Jaeger
+- Security & Compliance: HashiCorp Vault, Trivy, SonarQube, SOC2, HIPAA, Zero-Trust Architecture
+
+PROFESSIONAL EXPERIENCE
+Principal Platform Architect | Horizon Cloud Systems | 2021 – Present
+- Designed and provisioned multi-region AWS Kubernetes (EKS) infrastructure using Terraform managing 400+ microservices with 99.995% uptime SLA.
+- Architected automated GitOps deployment pipeline with ArgoCD and GitHub Actions, cutting release deployment cycles from 4 hours to 6 minutes.
+- Implemented automated autoscaling and Spot instance provisioning, reducing annual cloud compute spend by $420,000 (38%).
+
+Senior Site Reliability Engineer | Nexus Telecom | 2017 – 2021
+- Built centralized observability and distributed tracing stack with Prometheus, Grafana, and Jaeger.
+- Led incident response protocol automation, decreasing Mean Time to Resolution (MTTR) by 55%.
+
+EDUCATION & CERTIFICATIONS
+AWS Certified Solutions Architect – Professional | CKA (Certified Kubernetes Administrator)
+B.S. in Computer Systems Engineering | Texas A&M University (2013 – 2017)`
+};
+
+function loadMLPipelineStatus() {
+  const btn = document.getElementById('pipeline-refresh-btn');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Loading...'; }
+
+  fetch('/api/ml/status')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      // Pipeline Status
+      const isReady = data.status === 'ready';
+      const statusEl = document.getElementById('ml-pipeline-status');
+      if (statusEl) {
+        statusEl.innerHTML = isReady ? '● Operational' : (data.health === 'degraded' ? '● Degraded' : '○ Not Trained');
+        statusEl.style.color = isReady ? '#10b981' : (data.health === 'degraded' ? '#f59e0b' : '#dc2626');
+      }
+      setEl('ml-pipeline-status-sub', isReady ? 'All models loaded & operational in-memory' : 'Trigger retraining to compile models');
+
+      const flowBadge = document.getElementById('ml-flow-badge');
+      if (flowBadge) {
+        flowBadge.className = isReady ? 'badge badge-success' : 'badge badge-warning';
+        flowBadge.innerHTML = isReady ? '<i class="fas fa-check-circle"></i> Operational' : '<i class="fas fa-exclamation-triangle"></i> Degraded';
+      }
+
+      // TF-IDF Model
+      const tfidf = data.models?.tfidf_recommender || {};
+      const vocabCount = tfidf.vocab_size ? tfidf.vocab_size.toLocaleString() : '--';
+      setEl('ml-vocab-size', vocabCount);
+      setEl('ml-tfidf-vocab', tfidf.vocab_size ? `${tfidf.vocab_size.toLocaleString()} unique terms` : '--');
+      setEl('ml-corpus-size', tfidf.corpus_size ? tfidf.corpus_size.toLocaleString() : '--');
+      setEl('ml-corpus-detail', `${tfidf.corpus_size || '800'} documents trained on`);
+      setEl('ml-tfidf-corpus', `${tfidf.corpus_size || '--'} docs (resumes + JDs)`);
+
+      const tfidfBadge = document.getElementById('ml-tfidf-badge');
+      if (tfidfBadge) {
+        tfidfBadge.className = tfidf.trained ? 'badge badge-success' : 'badge badge-danger';
+        tfidfBadge.textContent = tfidf.trained ? '✓ Trained & Active' : '✗ Not Trained';
+      }
+
+      const tfidfCacheStatus = document.getElementById('ml-tfidf-cache-status');
+      if (tfidfCacheStatus) {
+        tfidfCacheStatus.innerHTML = tfidf.loaded ? '<span class="badge badge-success">Loaded In Memory</span>' : '<span class="badge badge-gray">Idle (Disk)</span>';
+      }
+
+      // Hit rates
+      const hr = tfidf.hit_rate || {};
+      setEl('ml-tfidf-hit1', hr.hit_rate_top1 != null ? `${(hr.hit_rate_top1 * 100).toFixed(1)}%` : '--');
+      setEl('ml-tfidf-hit3', hr.hit_rate_top3 != null ? `${(hr.hit_rate_top3 * 100).toFixed(1)}%` : '--');
+      setEl('ml-tfidf-hit5', hr.hit_rate_top5 != null ? `${(hr.hit_rate_top5 * 100).toFixed(1)}%` : '--');
+      setEl('ml-hit-rate', hr.hit_rate_top5 != null ? `${(hr.hit_rate_top5 * 100).toFixed(0)}%` : '--');
+
+      // spaCy NER Model
+      const ner = data.models?.spacy_ner || {};
+      const nerBadge = document.getElementById('ml-ner-badge');
+      if (nerBadge) {
+        nerBadge.className = ner.trained ? 'badge badge-success' : 'badge badge-danger';
+        nerBadge.textContent = ner.trained ? '✓ Trained & Active' : '✗ Not Trained';
+      }
+      setEl('ml-ner-f1', ner.best_f1 != null ? `${(ner.best_f1 * 100).toFixed(1)}%` : '--');
+      setEl('ml-ner-epochs', ner.epochs ? `${ner.epochs} iterations` : '--');
+      setEl('ml-ner-method', data.extraction_method || 'spaCy NER + Regex Hybrid');
+      setEl('ml-extraction-method', data.extraction_method || 'spaCy NER + Regex');
+      if (ner.path) setEl('ml-ner-path', escapeHTML(ner.path));
+
+      const nerCacheStatus = document.getElementById('ml-ner-cache-status');
+      if (nerCacheStatus) {
+        nerCacheStatus.innerHTML = ner.loaded ? '<span class="badge badge-success">Loaded In Memory</span>' : '<span class="badge badge-gray">Idle (Disk)</span>';
+      }
+
+      // Dataset info
+      const ds = data.dataset || {};
+      setEl('ml-dataset-resumes', ds.num_resumes ? Number(ds.num_resumes).toLocaleString() : '600');
+      setEl('ml-dataset-jobs', ds.num_jobs ? Number(ds.num_jobs).toLocaleString() : '200');
+      setEl('ml-dataset-ner', ds.num_ner_samples ? Number(ds.num_ner_samples).toLocaleString() : '~4,800');
+
+      // Live jobs count from DB
+      fetch('/api/admin/jobs').then(r => r.json()).then(jobs => {
+        setEl('ml-live-jobs', (jobs && jobs.length) ? jobs.length.toLocaleString() : '0');
+      }).catch(() => {});
+
+      // Runtime version telemetry
+      if (data.version_info) {
+        const v = data.version_info;
+        if (v.python) {
+          setEl('ml-runtime-badge', `Python ${escapeHTML(v.python)}`);
+          setEl('ml-ver-python', `<i class="fab fa-python" style="color:#3b82f6;margin-right:4px"></i> Python ${escapeHTML(v.python)}`);
+        }
+        if (v.spacy) setEl('ml-ver-spacy', `<i class="fas fa-brain" style="color:#7c3aed;margin-right:4px"></i> spaCy ${escapeHTML(v.spacy)}`);
+        if (v.scikit_learn) setEl('ml-ver-sklearn', `<i class="fas fa-cogs" style="color:#f59e0b;margin-right:4px"></i> scikit-learn ${escapeHTML(v.scikit_learn)}`);
+        if (v.numpy) setEl('ml-ver-numpy', `<i class="fas fa-cube" style="color:#06b6d4;margin-right:4px"></i> NumPy ${escapeHTML(v.numpy)}`);
+        if (v.joblib) setEl('ml-ver-joblib', `<i class="fas fa-archive" style="color:#10b981;margin-right:4px"></i> Joblib ${escapeHTML(v.joblib)}`);
+      }
+
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
+    })
+    .catch(err => {
+      console.error('ML Pipeline status error:', err);
+      const statusEl = document.getElementById('ml-pipeline-status');
+      if (statusEl) {
+        statusEl.innerHTML = '● Error';
+        statusEl.style.color = '#dc2626';
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
+    });
+}
+
+function onMLPresetChange(presetKey) {
+  const textarea = document.getElementById('ml-playground-text');
+  if (!textarea) return;
+  if (presetKey && ML_PRESETS[presetKey]) {
+    textarea.value = ML_PRESETS[presetKey];
+  } else if (!presetKey) {
+    textarea.value = '';
+  }
+  updateMLPlaygroundCharCount();
+}
+
+function updateMLPlaygroundCharCount() {
+  const textarea = document.getElementById('ml-playground-text');
+  const countEl = document.getElementById('ml-playground-char-count');
+  if (textarea && countEl) {
+    const len = textarea.value.length;
+    countEl.textContent = `${len.toLocaleString()} characters`;
+  }
+}
+
+function clearMLPlayground() {
+  const textarea = document.getElementById('ml-playground-text');
+  const presetSel = document.getElementById('ml-playground-preset');
+  const out = document.getElementById('ml-playground-output');
+  if (textarea) textarea.value = '';
+  if (presetSel) presetSel.value = '';
+  if (out) out.style.display = 'none';
+  updateMLPlaygroundCharCount();
+}
+
+function scrollToMLPlayground() {
+  const card = document.getElementById('ml-playground-card');
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const textarea = document.getElementById('ml-playground-text');
+    if (textarea && !textarea.value.trim()) {
+      const presetSel = document.getElementById('ml-playground-preset');
+      if (presetSel) {
+        presetSel.value = 'fullstack';
+        onMLPresetChange('fullstack');
+      }
+    }
+  }
+}
+
+function runLiveMLInference() {
+  const textarea = document.getElementById('ml-playground-text');
+  const text = textarea ? textarea.value.trim() : '';
+  if (!text || text.length < 20) {
+    showToast('Please enter or select a resume payload with at least 20 characters.', 'warning');
+    return;
+  }
+
+  const topnSelect = document.getElementById('ml-playground-topn');
+  const topN = topnSelect ? parseInt(topnSelect.value, 10) || 5 : 5;
+
+  const btn = document.getElementById('ml-run-inference-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Executing Inference...';
+  }
+
+  fetch('/api/ml/pipeline', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ resume_text: text, top_n: topN })
+  })
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(res => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-play"></i> Run Live Inference';
+      }
+      renderMLPlaygroundResults(res);
+      showToast('Live ML Inference completed successfully!', 'success');
+    })
+    .catch(err => {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-play"></i> Run Live Inference';
+      }
+      console.error('Inference execution error:', err);
+      showToast(`Inference failed: ${err.message}`, 'error');
+    });
+}
+
+function renderMLPlaygroundResults(res) {
+  const out = document.getElementById('ml-playground-output');
+  if (!out) return;
+  out.style.display = 'block';
+
+  const meta = res.pipeline_meta || {};
+  const totalMs = meta.total_time_s != null ? Math.round(meta.total_time_s * 1000) : '--';
+  const prepMs = meta.preprocess_time_s != null ? Math.round(meta.preprocess_time_s * 1000) : '--';
+  const nerMs = meta.extraction_time_s != null ? Math.round(meta.extraction_time_s * 1000) : '--';
+  const atsMs = meta.ats_time_s != null ? Math.round(meta.ats_time_s * 1000) : '--';
+  const recMs = meta.recommend_time_s != null ? Math.round(meta.recommend_time_s * 1000) : '--';
+
+  setEl('ml-diag-time-total', `${totalMs} ms`);
+  setEl('ml-diag-time-prep', `${prepMs} ms`);
+  setEl('ml-diag-time-ner', `${nerMs} ms`);
+  setEl('ml-diag-time-ats', `${atsMs} ms`);
+  setEl('ml-diag-time-rec', `${recMs} ms`);
+  setEl('ml-diag-meta-method', `Method: ${escapeHTML(meta.extraction_method || 'spaCy NER + Regex Hybrid')}`);
+
+  // Skills
+  const skills = res.skills || [];
+  const skillsByCat = res.skills_by_cat || {};
+  setEl('ml-diag-skills-count', skills.length);
+
+  const skillsContainer = document.getElementById('ml-diag-skills-container');
+  if (skillsContainer) {
+    if (!skills.length) {
+      skillsContainer.innerHTML = '<div style="color:var(--text-3);font-size:13px;text-align:center;padding:12px">No competencies identified in payload.</div>';
+    } else {
+      let catHtml = '';
+      const catKeys = Object.keys(skillsByCat);
+      if (catKeys.length > 0) {
+        catHtml = catKeys.map(cat => {
+          const list = skillsByCat[cat] || [];
+          if (!list.length) return '';
+          return `
+            <div style="margin-bottom:10px">
+              <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;margin-bottom:4px">${escapeHTML(cat)} (${list.length})</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${list.map(s => `<span class="badge badge-primary" style="font-size:11px;padding:4px 8px">${escapeHTML(s)}</span>`).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        catHtml = `
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            ${skills.map(s => `<span class="badge badge-primary" style="font-size:11px;padding:4px 8px">${escapeHTML(s)}</span>`).join('')}
+          </div>
+        `;
+      }
+      skillsContainer.innerHTML = catHtml;
+    }
+  }
+
+  // ATS Breakdown
+  const ats = res.ats || {};
+  const atsScore = ats.score != null ? Math.round(ats.score) : 0;
+  const atsBadge = document.getElementById('ml-diag-ats-badge');
+  if (atsBadge) {
+    atsBadge.textContent = `${atsScore} / 100`;
+    atsBadge.className = atsScore >= 70 ? 'badge badge-success' : (atsScore >= 50 ? 'badge badge-warning' : 'badge badge-danger');
+  }
+
+  const atsContainer = document.getElementById('ml-diag-ats-container');
+  if (atsContainer) {
+    const breakdown = ats.breakdown || {};
+    atsContainer.innerHTML = `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:700;margin-bottom:4px">
+          <span>Overall ATS Benchmark Score</span>
+          <span style="color:var(--primary)">${atsScore}%</span>
+        </div>
+        <div style="width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+          <div style="width:${atsScore}%;height:100%;background:linear-gradient(90deg,var(--primary),#10b981)"></div>
+        </div>
+      </div>
+      <table class="table" style="font-size:12px;margin-bottom:0;border:1px solid var(--border);border-radius:8px">
+        <tr><td style="color:var(--text-3);width:140px">Contact Info</td><td><strong>${breakdown.contact_info != null ? breakdown.contact_info + ' pts' : 'Pass'}</strong></td></tr>
+        <tr><td style="color:var(--text-3)">Standard Sections</td><td><strong>${breakdown.sections_detected ? breakdown.sections_detected.length + ' detected' : 'Pass'}</strong></td></tr>
+        <tr><td style="color:var(--text-3)">Word Count / Volume</td><td><strong>${breakdown.word_count || '--'} words (${breakdown.length_status || 'normal'})</strong></td></tr>
+        <tr><td style="color:var(--text-3)">Heuristic Status</td><td><span class="badge ${atsScore >= 70 ? 'badge-success' : 'badge-warning'}">${ats.summary || (atsScore >= 70 ? 'Strong Candidate Profile' : 'Needs Optimization')}</span></td></tr>
+      </table>
+    `;
+  }
+
+  // Recommendations Table
+  const recs = res.recommendations || [];
+  setEl('ml-diag-rec-count', `${recs.length} ${recs.length === 1 ? 'Match' : 'Matches'}`);
+  const recTbody = document.getElementById('ml-diag-rec-tbody');
+  if (recTbody) {
+    if (!recs.length) {
+      recTbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--text-3);padding:18px">No matching internal jobs found in system database.</td></tr>';
+    } else {
+      recTbody.innerHTML = recs.map((r, idx) => {
+        const score = Math.round((r.score || r.hybrid_score || 0) * 100);
+        const tfidfScore = r.tfidf_score != null ? Math.round(r.tfidf_score * 100) : '--';
+        const skillScore = r.skill_score != null ? Math.round(r.skill_score * 100) : '--';
+        const gaps = r.skill_gap || [];
+
+        return `
+          <tr>
+            <td style="font-weight:800;color:var(--text-3);font-family:monospace">#${idx + 1}</td>
+            <td>
+              <strong style="color:var(--text);font-size:13.5px">${escapeHTML(r.title || r.role || 'Job Posting')}</strong>
+              <div style="font-size:11.5px;color:var(--text-3);margin-top:2px">${escapeHTML(r.experience_level || r.job_type || 'Full-time')}</div>
+            </td>
+            <td>
+              <div style="font-weight:600;color:var(--text-2)">${escapeHTML(r.company || 'TalentSync Internal')}</div>
+              <div style="font-size:11.5px;color:var(--text-3)">${escapeHTML(r.location || 'Remote / Hybrid')}</div>
+            </td>
+            <td>
+              <span class="badge ${score >= 70 ? 'badge-success' : (score >= 45 ? 'badge-warning' : 'badge-gray')}" style="font-size:12px;font-weight:800">
+                ${score}% Match
+              </span>
+            </td>
+            <td style="font-size:12px;color:var(--text-2);font-family:monospace">
+              <div>TF-IDF: ${tfidfScore}%</div>
+              <div>Overlap: ${skillScore}%</div>
+            </td>
+            <td>
+              ${gaps.length > 0 
+                ? gaps.slice(0, 3).map(g => `<span class="badge badge-gray" style="font-size:10px;margin-right:3px;margin-bottom:3px">${escapeHTML(g)}</span>`).join('') + (gaps.length > 3 ? `<span style="font-size:10px;color:var(--text-3)">+${gaps.length - 3}</span>` : '')
+                : '<span class="badge badge-success" style="font-size:10px">Full Match</span>'}
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+}
+
+function openMLRetrainModal() {
+  const pBar = document.getElementById('pa-retrain-progress-bar');
+  if (pBar) pBar.style.width = '0%';
+  setEl('pa-retrain-stage-label', 'Idle');
+  const logBox = document.getElementById('pa-retrain-log');
+  if (logBox) logBox.textContent = 'Ready to initiate pipeline retraining. Click "Start Retraining" to begin.';
+  
+  [1, 2, 3, 4].forEach(i => {
+    const el = document.getElementById(`pa-step-${i}`);
+    if (el) {
+      el.style.borderColor = 'var(--border)';
+      el.style.background = 'var(--bg)';
+      const st = el.querySelector('.step-status');
+      if (st) { st.textContent = 'Pending'; st.style.color = 'var(--text-3)'; }
+    }
+  });
+
+  const btn = document.getElementById('pa-retrain-submit-btn');
+  if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Start Retraining'; }
+
+  Modal.open('pa-ml-retrain-modal');
+}
+
+function executeMLRetrain() {
+  const skipNer = document.getElementById('pa-retrain-skip-ner')?.checked || false;
+  const btn = document.getElementById('pa-retrain-submit-btn');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retraining Active...';
+  }
+
+  const logBox = document.getElementById('pa-retrain-log');
+  const appendLog = (msg) => {
+    if (!logBox) return;
+    const ts = new Date().toLocaleTimeString();
+    logBox.textContent += `\n[${ts}] ${msg}`;
+    logBox.scrollTop = logBox.scrollHeight;
+  };
+
+  appendLog(`Initiating model retraining pipeline (skip_ner=${skipNer})...`);
+  setEl('pa-retrain-stage-label', 'Running');
+
+  // Activate Stage 1
+  const updateStep = (stepNum, statusText, isActive, isDone) => {
+    const el = document.getElementById(`pa-step-${stepNum}`);
+    if (!el) return;
+    if (isDone) {
+      el.style.borderColor = '#10b981';
+      el.style.background = 'rgba(16,185,129,0.06)';
+      const st = el.querySelector('.step-status');
+      if (st) { st.textContent = 'Completed ✓'; st.style.color = '#10b981'; }
+    } else if (isActive) {
+      el.style.borderColor = 'var(--primary)';
+      el.style.background = 'rgba(37,99,235,0.08)';
+      const st = el.querySelector('.step-status');
+      if (st) { st.textContent = statusText || 'In Progress...'; st.style.color = 'var(--primary)'; }
+    }
+  };
+
+  updateStep(1, 'Ingesting...', true, false);
+  const pBar = document.getElementById('pa-retrain-progress-bar');
+  if (pBar) pBar.style.width = '25%';
+
+  fetch('/api/ml/train', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skip_ner: skipNer })
+  })
+    .then(r => r.json())
+    .then(res => {
+      appendLog(res.message || 'Background training worker assigned.');
+      updateStep(1, 'Completed', false, true);
+      updateStep(2, 'Fitting TF-IDF...', true, false);
+      if (pBar) pBar.style.width = '50%';
+
+      let elapsedSteps = 0;
+      const pollTimer = setInterval(() => {
+        elapsedSteps++;
+        if (elapsedSteps === 2 && !skipNer) {
+          updateStep(2, 'Completed', false, true);
+          updateStep(3, 'Training spaCy...', true, false);
+          if (pBar) pBar.style.width = '75%';
+          appendLog('Compiling spaCy NER transition weights & entity bounds...');
+        }
+
+        fetch('/api/ml/status')
+          .then(r => r.json())
+          .then(data => {
+            if (!data.training_running) {
+              clearInterval(pollTimer);
+              if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Retraining Finished'; }
+              if (pBar) pBar.style.width = '100%';
+              [1, 2, 3, 4].forEach(i => updateStep(i, 'Done', false, true));
+
+              if (data.last_training && data.last_training.success) {
+                appendLog(`Success: Retraining completed in ${data.last_training.elapsed_s}s!`);
+                setEl('pa-retrain-stage-label', 'Success');
+                showToast(`Retraining completed in ${data.last_training.elapsed_s}s!`, 'success');
+              } else if (data.last_training && data.last_training.error) {
+                appendLog(`Error: ${data.last_training.error}`);
+                setEl('pa-retrain-stage-label', 'Failed');
+                showToast(`Training failed: ${data.last_training.error}`, 'error');
+              } else {
+                appendLog('Pipeline state updated.');
+                setEl('pa-retrain-stage-label', 'Ready');
+              }
+              loadMLPipelineStatus();
+            }
+          })
+          .catch(err => {
+            clearInterval(pollTimer);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Start Retraining'; }
+            appendLog(`Polling error: ${err.message}`);
+          });
+      }, 2000);
+    })
+    .catch(err => {
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-play"></i> Start Retraining'; }
+      appendLog(`Failed to trigger training: ${err.message}`);
+      showToast('Failed to trigger ML training.', 'error');
+    });
+}
 
 function flushMLCache() {
   if (!confirm('Are you sure you want to flush in-memory ML model caches and recommendation vectors?')) {
@@ -8318,46 +8813,7 @@ function flushMLCache() {
 }
 
 function triggerMLTraining() {
-  if (!confirm('Start backend ML pipeline retraining on full corpus? This runs asynchronously on the server.')) {
-    return;
-  }
-  const btn = document.getElementById('pipeline-retrain-btn');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Retraining...'; }
-
-  fetch('/api/ml/train', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ skip_ner: false })
-  })
-    .then(r => r.json())
-    .then(res => {
-      showToast(res.message || 'Model training task started.', 'info');
-      // Poll progress every 3 seconds until completed
-      const pollTimer = setInterval(() => {
-        fetch('/api/ml/status')
-          .then(r => r.json())
-          .then(data => {
-            if (!data.training_running) {
-              clearInterval(pollTimer);
-              if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
-              if (data.last_training && data.last_training.success) {
-                showToast(`Training complete in ${data.last_training.elapsed_s}s!`, 'success');
-              } else if (data.last_training && data.last_training.error) {
-                showToast(`Training failed: ${data.last_training.error}`, 'error');
-              }
-              loadMLPipelineStatus();
-            }
-          })
-          .catch(() => {
-            clearInterval(pollTimer);
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
-          });
-      }, 3000);
-    })
-    .catch(err => {
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cogs"></i> Retrain Model'; }
-      showToast('Failed to trigger ML training.', 'error');
-    });
+  openMLRetrainModal();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -8441,6 +8897,15 @@ window.fetchPlatformAdminIntegrations = fetchPlatformAdminIntegrations;
 window.flushMLCache                  = flushMLCache;
 window.triggerMLTraining             = triggerMLTraining;
 window.loadMLPipelineStatus          = loadMLPipelineStatus;
+window.ML_PRESETS                    = ML_PRESETS;
+window.onMLPresetChange              = onMLPresetChange;
+window.updateMLPlaygroundCharCount   = updateMLPlaygroundCharCount;
+window.clearMLPlayground             = clearMLPlayground;
+window.scrollToMLPlayground          = scrollToMLPlayground;
+window.runLiveMLInference            = runLiveMLInference;
+window.renderMLPlaygroundResults     = renderMLPlaygroundResults;
+window.openMLRetrainModal            = openMLRetrainModal;
+window.executeMLRetrain              = executeMLRetrain;
 
 // Candidate Notification Center
 window.CandidateNotifCenter          = CandidateNotifCenter;

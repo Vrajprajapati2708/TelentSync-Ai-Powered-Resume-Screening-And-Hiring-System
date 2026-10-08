@@ -28,14 +28,14 @@ logger = get_logger(__name__)
 
 
 def run_full_pipeline(resume_text: str,
-                      jobs: list[dict],
+                      jobs: list[dict] = None,
                       top_n: int = 10) -> dict:
     """
     Run the complete TalentSync ML inference pipeline.
 
     Args:
         resume_text: Raw text extracted from the candidate's resume PDF.
-        jobs:        List of job dicts from the database.
+        jobs:        List of job dicts from the database (optional, fetches active DB jobs if omitted).
         top_n:       Maximum recommended jobs to return.
 
     Returns:
@@ -49,6 +49,19 @@ def run_full_pipeline(resume_text: str,
     """
     t_start = time.time()
     logger.info("ML Pipeline: Starting full inference...")
+
+    # Load active jobs from DB if not provided
+    if jobs is None or len(jobs) == 0:
+        try:
+            from app.database.connection import get_db
+            with get_db() as conn:
+                rows = conn.execute("SELECT * FROM jobs WHERE status='Active' ORDER BY id DESC LIMIT 50").fetchall()
+                if not rows:
+                    rows = conn.execute("SELECT * FROM jobs ORDER BY id DESC LIMIT 50").fetchall()
+                jobs = [dict(r) for r in rows]
+        except Exception as e:
+            logger.warning(f"Could not load jobs from database: {e}")
+            jobs = []
 
     # ── Stage 1: Preprocess ───────────────────────────────────
     t1 = time.time()
@@ -65,7 +78,7 @@ def run_full_pipeline(resume_text: str,
     t3 = time.time()
     # Extract required skills from all jobs for keyword boost
     all_job_skills = list({
-        s.strip() for j in jobs
+        s.strip() for j in (jobs or [])
         for s in j.get('skills', '').split(',') if s.strip()
     })
     ats_result = compute_ats_score(resume_text, job_skills=all_job_skills)

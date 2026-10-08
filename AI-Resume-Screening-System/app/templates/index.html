@@ -3242,15 +3242,18 @@
           <!-- Pipeline Header -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">AI/ML Pipeline</div>
-              <div class="text-muted text-sm">Monitor TalentSync's resume intelligence, matching, scoring, and recommendation infrastructure.</div>
+              <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">AI/ML Pipeline &amp; Intelligence Architecture</div>
+              <div style="font-size:13px;color:var(--text-2);margin-top:2px">Real-time orchestration monitor, model telemetry, live inference playground, and lifecycle retraining governance.</div>
             </div>
-            <div style="display:flex;gap:10px;flex-wrap:wrap">
-              <button class="btn btn-outline" onclick="flushMLCache()" id="pipeline-flush-btn">
+            <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+              <button class="btn btn-outline" onclick="scrollToMLPlayground()" title="Jump to interactive inference playground">
+                <i class="fas fa-flask"></i> Diagnostics Playground
+              </button>
+              <button class="btn btn-outline" onclick="flushMLCache()" id="pipeline-flush-btn" title="Purge in-memory ML model caches and recommendation vectors">
                 <i class="fas fa-broom"></i> Flush Cache
               </button>
-              <button class="btn btn-outline" onclick="triggerMLTraining()" id="pipeline-retrain-btn">
-                <i class="fas fa-cogs"></i> Retrain Model
+              <button class="btn btn-outline" onclick="openMLRetrainModal()" id="pipeline-retrain-btn" title="Trigger asynchronous corpus retraining">
+                <i class="fas fa-cogs"></i> Retrain Models
               </button>
               <button class="btn btn-primary" onclick="loadMLPipelineStatus()" id="pipeline-refresh-btn">
                 <i class="fas fa-sync-alt"></i> Refresh Status
@@ -3261,142 +3264,350 @@
           <!-- Pipeline Status Cards -->
           <div class="stats-grid mb-2">
             <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Pipeline Status</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-heartbeat" style="color:#16a34a"></i></div></div>
-              <div class="stat-value" id="ml-pipeline-status" style="color:#16a34a">Loading...</div>
+              <div class="stat-top">
+                <div class="stat-label">Pipeline Engine Status</div>
+                <div class="stat-icon" style="background:rgba(16,185,129,0.12)"><i class="fas fa-heartbeat" style="color:#10b981"></i></div>
+              </div>
+              <div class="stat-value" id="ml-pipeline-status" style="color:#10b981;font-size:22px">Loading...</div>
               <div class="stat-change up" id="ml-pipeline-status-sub">checking models...</div>
             </div>
             <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">TF-IDF Vocabulary</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-book" style="color:var(--primary)"></i></div></div>
-              <div class="stat-value" id="ml-vocab-size">--</div>
-              <div class="stat-change up">unique terms (unigrams + bigrams)</div>
+              <div class="stat-top">
+                <div class="stat-label">TF-IDF Vocabulary</div>
+                <div class="stat-icon" style="background:rgba(59,130,246,0.12)"><i class="fas fa-book" style="color:#2563eb"></i></div>
+              </div>
+              <div class="stat-value" id="ml-vocab-size" style="font-size:22px">--</div>
+              <div class="stat-change up" id="ml-vocab-sub">unique terms (unigrams + bigrams)</div>
             </div>
             <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Training Corpus</div><div class="stat-icon" style="background:#fdf4ff"><i class="fas fa-database" style="color:#7c3aed"></i></div></div>
-              <div class="stat-value" id="ml-corpus-size">--</div>
+              <div class="stat-top">
+                <div class="stat-label">Training Corpus</div>
+                <div class="stat-icon" style="background:rgba(139,92,246,0.12)"><i class="fas fa-database" style="color:#7c3aed"></i></div>
+              </div>
+              <div class="stat-value" id="ml-corpus-size" style="font-size:22px">--</div>
               <div class="stat-change up" id="ml-corpus-detail">documents trained on</div>
             </div>
             <div class="stat-card">
-              <div class="stat-top"><div class="stat-label">Hit Rate (Top-5)</div><div class="stat-icon" style="background:#fff7ed"><i class="fas fa-bullseye" style="color:#d97706"></i></div></div>
-              <div class="stat-value" id="ml-hit-rate" style="color:#16a34a">--</div>
-              <div class="stat-change up">recommendation accuracy</div>
+              <div class="stat-top">
+                <div class="stat-label">Hit Rate (Top-5)</div>
+                <div class="stat-icon" style="background:rgba(245,158,11,0.12)"><i class="fas fa-bullseye" style="color:#d97706"></i></div>
+              </div>
+              <div class="stat-value" id="ml-hit-rate" style="color:#10b981;font-size:22px">--</div>
+              <div class="stat-change up" id="ml-hit-rate-sub">recommendation benchmark</div>
             </div>
           </div>
 
           <!-- Pipeline Architecture Diagram -->
           <div class="card mb-2">
-            <div class="card-header"><span class="card-title"><i class="fas fa-project-diagram" style="color:var(--primary);margin-right:8px"></i>Pipeline Architecture — Live Flow</span></div>
-            <div class="card-body" style="padding:24px">
-              <div id="pipeline-flow" style="display:flex;align-items:center;gap:0;overflow-x:auto;padding:16px 0;flex-wrap:wrap;justify-content:center">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <i class="fas fa-project-diagram" style="color:var(--primary)"></i> Pipeline Architecture — End-to-End Orchestration Flow
+              </span>
+              <span class="badge badge-success" id="ml-flow-badge" style="font-size:11px"><i class="fas fa-check-circle"></i> Operational</span>
+            </div>
+            <div class="card-body" style="padding:24px 16px">
+              <div id="pipeline-flow" style="display:flex;align-items:center;gap:10px;overflow-x:auto;padding:12px 4px;flex-wrap:nowrap;justify-content:space-between">
                 <!-- Stage 1 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(59,130,246,.3)"><i class="fas fa-file-pdf"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">PDF Upload</div>
-                  <div style="font-size:11px;color:#64748b">Resume Parser</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center;position:relative">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#1d4ed8);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(59,130,246,.25)">
+                    <i class="fas fa-file-pdf"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">1. Resume Ingest</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px">PyMuPDF / pdfplumber</div>
+                  <span class="badge badge-primary" style="font-size:9.5px;margin-top:8px">Text Extraction</span>
                 </div>
-                <div style="font-size:24px;color:#3b82f6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <div style="color:var(--text-3);font-size:16px;flex-shrink:0"><i class="fas fa-chevron-right"></i></div>
+
                 <!-- Stage 2 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(139,92,246,.3)"><i class="fas fa-broom"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Preprocessing</div>
-                  <div style="font-size:11px;color:#64748b">Clean &amp; Tokenize</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#8b5cf6,#6d28d9);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(139,92,246,.25)">
+                    <i class="fas fa-broom"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">2. Preprocessing</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px">Clean, Tokenize &amp; Stopwords</div>
+                  <span class="badge badge-gray" style="font-size:9.5px;margin-top:8px">Normalized Text</span>
                 </div>
-                <div style="font-size:24px;color:#8b5cf6;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <div style="color:var(--text-3);font-size:16px;flex-shrink:0"><i class="fas fa-chevron-right"></i></div>
+
                 <!-- Stage 3 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(245,158,11,.3)"><i class="fas fa-tags"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Skill Extraction</div>
-                  <div style="font-size:11px;color:#64748b" id="ml-extraction-method">spaCy NER + Regex</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#f59e0b,#d97706);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(245,158,11,.25)">
+                    <i class="fas fa-tags"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">3. Skill Extraction</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px" id="ml-extraction-method">spaCy NER + Regex</div>
+                  <span class="badge badge-warning" style="font-size:9.5px;margin-top:8px">Categorized Skills</span>
                 </div>
-                <div style="font-size:24px;color:#f59e0b;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <div style="color:var(--text-3);font-size:16px;flex-shrink:0"><i class="fas fa-chevron-right"></i></div>
+
                 <!-- Stage 4 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(16,185,129,.3)"><i class="fas fa-trophy"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">ATS Scoring</div>
-                  <div style="font-size:11px;color:#64748b">Section Heuristic</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#10b981,#059669);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(16,185,129,.25)">
+                    <i class="fas fa-trophy"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">4. ATS Scoring</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px">Section &amp; Quality Heuristics</div>
+                  <span class="badge badge-success" style="font-size:9.5px;margin-top:8px">0-100 Benchmark</span>
                 </div>
-                <div style="font-size:24px;color:#10b981;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <div style="color:var(--text-3);font-size:16px;flex-shrink:0"><i class="fas fa-chevron-right"></i></div>
+
                 <!-- Stage 5 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#ef4444,#dc2626);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(239,68,68,.3)"><i class="fas fa-brain"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">TF-IDF Matching</div>
-                  <div style="font-size:11px;color:#64748b">Cosine Similarity</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#ec4899,#be185d);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(236,72,153,.25)">
+                    <i class="fas fa-brain"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">5. TF-IDF Vectors</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px">Sublinear Cosine Matrix</div>
+                  <span class="badge badge-primary" style="font-size:9.5px;margin-top:8px">Semantic Overlap</span>
                 </div>
-                <div style="font-size:24px;color:#ef4444;margin:0 4px"><i class="fas fa-chevron-right"></i></div>
+                <div style="color:var(--text-3);font-size:16px;flex-shrink:0"><i class="fas fa-chevron-right"></i></div>
+
                 <!-- Stage 6 -->
-                <div style="display:flex;flex-direction:column;align-items:center;min-width:130px">
-                  <div style="width:60px;height:60px;border-radius:16px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;box-shadow:0 4px 12px rgba(6,182,212,.3)"><i class="fas fa-list-ol"></i></div>
-                  <div style="font-weight:700;font-size:13px;margin-top:8px;color:#1e293b">Job Rankings</div>
-                  <div style="font-size:11px;color:#64748b">Hybrid Score</div>
+                <div style="flex:1;min-width:130px;background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:16px 12px;text-align:center">
+                  <div style="width:48px;height:48px;margin:0 auto 10px;border-radius:12px;background:linear-gradient(135deg,#06b6d4,#0891b2);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;box-shadow:0 4px 12px rgba(6,182,212,.25)">
+                    <i class="fas fa-list-ol"></i>
+                  </div>
+                  <div style="font-weight:700;font-size:13px;color:var(--text)">6. Job Ranking</div>
+                  <div style="font-size:11px;color:var(--text-3);margin-top:2px">Hybrid Score &amp; Skill Gaps</div>
+                  <span class="badge badge-success" style="font-size:9.5px;margin-top:8px">Ranked Matches</span>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- Model Details Grid -->
-          <div class="dash-grid">
+          <div class="dash-grid mb-2">
             <!-- TF-IDF Recommender Card -->
             <div class="card">
-              <div class="card-header">
-                <span class="card-title"><i class="fas fa-vector-square" style="color:#3b82f6;margin-right:8px"></i>TF-IDF Recommender Model</span>
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                  <i class="fas fa-vector-square" style="color:#2563eb"></i> TF-IDF Recommender Model
+                </span>
                 <span class="badge badge-success" id="ml-tfidf-badge">Loading...</span>
               </div>
               <div class="card-body">
-                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
-                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">scikit-learn TfidfVectorizer</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Vocabulary Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-vocab">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">N-gram Range</td><td style="font-weight:600;padding:6px 12px">Unigrams + Bigrams (1, 2)</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Scoring Formula</td><td style="font-weight:600;padding:6px 12px">40% TF-IDF Cosine + 60% Skill Overlap</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Sublinear TF</td><td style="font-weight:600;padding:6px 12px">✅ Enabled (log normalization)</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-1)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit1">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-3)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit3">--</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Hit Rate (Top-5)</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-tfidf-hit5">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Corpus Size</td><td style="font-weight:600;padding:6px 12px" id="ml-tfidf-corpus">--</td></tr>
+                <table class="table" style="width:100%;font-size:13px;border-collapse:separate;border-spacing:0 4px;margin-bottom:0">
+                  <tr><td style="color:var(--text-3);padding:6px 10px;width:150px">Model Architecture</td><td style="font-weight:600;color:var(--text)">scikit-learn TfidfVectorizer</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Vocabulary Size</td><td style="font-weight:700;color:var(--text)" id="ml-tfidf-vocab">--</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">N-gram Range</td><td style="font-weight:600;color:var(--text)">Unigrams + Bigrams (1, 2)</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Scoring Formula</td><td style="font-weight:600;color:var(--text)">40% TF-IDF Cosine + 60% Skill Overlap</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Sublinear TF Scaling</td><td style="font-weight:600;color:#10b981"><i class="fas fa-check-circle"></i> Enabled (log normalization)</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Hit Rate (Top-1)</td><td style="font-weight:700;color:#10b981" id="ml-tfidf-hit1">--</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Hit Rate (Top-3)</td><td style="font-weight:700;color:#10b981" id="ml-tfidf-hit3">--</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Hit Rate (Top-5)</td><td style="font-weight:700;color:#10b981" id="ml-tfidf-hit5">--</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Corpus Size</td><td style="font-weight:600;color:var(--text)" id="ml-tfidf-corpus">--</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">In-Memory Cache</td><td style="font-weight:600;color:var(--text)" id="ml-tfidf-cache-status"><span class="badge badge-success">Loaded</span></td></tr>
                 </table>
               </div>
             </div>
 
             <!-- spaCy NER Card -->
             <div class="card">
-              <div class="card-header">
-                <span class="card-title"><i class="fas fa-tag" style="color:#8b5cf6;margin-right:8px"></i>spaCy NER Skill Extractor</span>
+              <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                  <i class="fas fa-tag" style="color:#7c3aed"></i> spaCy NER Skill Extractor
+                </span>
                 <span class="badge badge-success" id="ml-ner-badge">Loading...</span>
               </div>
               <div class="card-body">
-                <table style="width:100%;font-size:14px;border-collapse:separate;border-spacing:0 6px">
-                  <tr><td style="color:#64748b;padding:6px 12px">Model Type</td><td style="font-weight:600;padding:6px 12px">spaCy v3 Named Entity Recognition</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Entity Label</td><td style="font-weight:600;padding:6px 12px">SKILL</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Best F1 Score</td><td style="font-weight:600;padding:6px 12px;color:#16a34a" id="ml-ner-f1">--</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Training Epochs</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-epochs">--</td></tr>
-                  <tr><td style="color:#64748b;padding:6px 12px">Fallback</td><td style="font-weight:600;padding:6px 12px">Regex boundary matching</td></tr>
-                  <tr style="background:#f8fafc;border-radius:8px"><td style="color:#64748b;padding:6px 12px">Extraction Method</td><td style="font-weight:600;padding:6px 12px" id="ml-ner-method">--</td></tr>
+                <table class="table" style="width:100%;font-size:13px;border-collapse:separate;border-spacing:0 4px;margin-bottom:0">
+                  <tr><td style="color:var(--text-3);padding:6px 10px;width:150px">Model Architecture</td><td style="font-weight:600;color:var(--text)">spaCy v3 Transition-Based NER</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Entity Label</td><td style="font-weight:700;color:#7c3aed"><code>SKILL</code></td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Best F1 Score</td><td style="font-weight:700;color:#10b981" id="ml-ner-f1">--</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Training Epochs</td><td style="font-weight:600;color:var(--text)" id="ml-ner-epochs">--</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Fallback Strategy</td><td style="font-weight:600;color:var(--text)">Regex boundary + Taxonomy match</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Active Extraction Mode</td><td style="font-weight:600;color:var(--text)" id="ml-ner-method">--</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">Taxonomy Dictionary</td><td style="font-weight:600;color:var(--text)">8 Categories (Lang, Frameworks, Cloud...)</td></tr>
+                  <tr style="background:var(--bg);border-radius:6px"><td style="color:var(--text-3);padding:6px 10px">Model Storage Path</td><td style="font-family:monospace;font-size:11.5px;color:var(--text-2)" id="ml-ner-path">trained_models/spacy_skill_ner</td></tr>
+                  <tr><td style="color:var(--text-3);padding:6px 10px">In-Memory Weights</td><td style="font-weight:600;color:var(--text)" id="ml-ner-cache-status"><span class="badge badge-success">Loaded</span></td></tr>
                 </table>
               </div>
             </div>
           </div>
 
-          <!-- Training Dataset Info -->
-          <div class="card mt-2">
-            <div class="card-header">
-              <span class="card-title"><i class="fas fa-layer-group" style="color:#f59e0b;margin-right:8px"></i>Training Dataset</span>
+          <!-- Live Interactive Pipeline Playground & Diagnostics -->
+          <div class="card mb-2" id="ml-playground-card">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+              <div>
+                <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                  <i class="fas fa-flask" style="color:var(--primary)"></i> Live Pipeline Inference &amp; Diagnostics Playground
+                </span>
+                <div style="font-size:12px;color:var(--text-3);margin-top:2px">Test end-to-end skill extraction, ATS scoring heuristics, and job recommendation ranking in real time.</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+                <span style="font-size:12px;font-weight:700;color:var(--text-3)">Quick Presets:</span>
+                <select id="ml-playground-preset" class="form-control" style="width:230px;font-size:12.5px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);color:var(--text)" onchange="onMLPresetChange(this.value)">
+                  <option value="">Select Candidate Preset...</option>
+                  <option value="fullstack">Senior Full-Stack Engineer (React/Node)</option>
+                  <option value="ml_ai">Lead Data Scientist &amp; ML Engineer</option>
+                  <option value="frontend">UI/UX &amp; Frontend Web Architect</option>
+                  <option value="devops">DevOps &amp; Cloud Infrastructure Lead</option>
+                </select>
+              </div>
+            </div>
+            <div class="card-body" style="padding:20px">
+              <div style="margin-bottom:12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <label for="ml-playground-text" style="font-size:13px;font-weight:700;color:var(--text)">
+                    Resume Text Payload (Raw OCR / PDF Extracted Text)
+                  </label>
+                  <span id="ml-playground-char-count" style="font-size:12px;color:var(--text-3);font-family:monospace">0 characters</span>
+                </div>
+                <textarea id="ml-playground-text" class="form-control" rows="6" style="width:100%;font-family:monospace;font-size:12.5px;padding:12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);resize:vertical" placeholder="Paste resume plain text here, or choose an executive preset from the dropdown above..." oninput="updateMLPlaygroundCharCount()"></textarea>
+              </div>
+
+              <!-- Controls Row -->
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+                <div style="display:flex;align-items:center;gap:12px">
+                  <label for="ml-playground-topn" style="font-size:12.5px;font-weight:600;color:var(--text-3)">Max Recommendations (Top-N):</label>
+                  <select id="ml-playground-topn" class="form-control" style="width:90px;font-size:12.5px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:var(--bg-card);color:var(--text)">
+                    <option value="5" selected>5</option>
+                    <option value="10">10</option>
+                    <option value="15">15</option>
+                    <option value="20">20</option>
+                  </select>
+                </div>
+                <div style="display:flex;gap:10px">
+                  <button class="btn btn-outline btn-sm" onclick="clearMLPlayground()">
+                    <i class="fas fa-eraser"></i> Clear
+                  </button>
+                  <button class="btn btn-primary btn-sm" id="ml-run-inference-btn" onclick="runLiveMLInference()">
+                    <i class="fas fa-play"></i> Run Live Inference
+                  </button>
+                </div>
+              </div>
+
+              <!-- Diagnostics Results Container -->
+              <div id="ml-playground-output" style="display:none;border-top:1px solid var(--border);padding-top:20px">
+                <!-- Latency Breakdown Banner -->
+                <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:14px 18px;margin-bottom:18px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="width:36px;height:36px;border-radius:10px;background:rgba(37,99,235,0.12);color:#2563eb;display:flex;align-items:center;justify-content:center;font-size:16px">
+                      <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <div>
+                      <div style="font-size:14px;font-weight:800;color:var(--text)">Live Inference Latency</div>
+                      <div style="font-size:11.5px;color:var(--text-3)" id="ml-diag-meta-method">Method: --</div>
+                    </div>
+                  </div>
+                  <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+                    <div style="text-align:center">
+                      <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">Total Latency</div>
+                      <div style="font-size:16px;font-weight:800;color:var(--primary);font-family:monospace" id="ml-diag-time-total">-- ms</div>
+                    </div>
+                    <div style="text-align:center">
+                      <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">Preprocess</div>
+                      <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace" id="ml-diag-time-prep">-- ms</div>
+                    </div>
+                    <div style="text-align:center">
+                      <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">NER Extract</div>
+                      <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace" id="ml-diag-time-ner">-- ms</div>
+                    </div>
+                    <div style="text-align:center">
+                      <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">ATS Scoring</div>
+                      <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace" id="ml-diag-time-ats">-- ms</div>
+                    </div>
+                    <div style="text-align:center">
+                      <div style="font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase">Matching</div>
+                      <div style="font-size:13px;font-weight:700;color:var(--text);font-family:monospace" id="ml-diag-time-rec">-- ms</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 2-Column Results: Skills & ATS -->
+                <div class="dash-grid mb-2">
+                  <!-- Skills Card -->
+                  <div class="card" style="margin-bottom:0">
+                    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                      <span class="card-title" style="font-size:14px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-tags" style="color:#7c3aed"></i> Detected Competencies (<span id="ml-diag-skills-count">0</span>)
+                      </span>
+                    </div>
+                    <div class="card-body" style="padding:16px" id="ml-diag-skills-container">
+                      <!-- Populated dynamically with categorized chips -->
+                    </div>
+                  </div>
+
+                  <!-- ATS Score Breakdown Card -->
+                  <div class="card" style="margin-bottom:0">
+                    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                      <span class="card-title" style="font-size:14px;display:flex;align-items:center;gap:6px">
+                        <i class="fas fa-star" style="color:#10b981"></i> ATS Structure &amp; Heuristic Score
+                      </span>
+                      <span class="badge badge-success" id="ml-diag-ats-badge">-- / 100</span>
+                    </div>
+                    <div class="card-body" style="padding:16px" id="ml-diag-ats-container">
+                      <!-- Populated dynamically with ATS Breakdown -->
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Job Recommendations Table -->
+                <div class="card mt-2" style="margin-bottom:0">
+                  <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="card-title" style="font-size:14px;display:flex;align-items:center;gap:6px">
+                      <i class="fas fa-briefcase" style="color:var(--primary)"></i> Hybrid Job Match Rankings &amp; Skill Gap Analysis
+                    </span>
+                    <span class="badge badge-primary" id="ml-diag-rec-count">0 Matches</span>
+                  </div>
+                  <div class="table-wrap" style="max-height:260px;overflow-y:auto">
+                    <table class="table" style="font-size:13px">
+                      <thead>
+                        <tr>
+                          <th style="width:60px">Rank</th>
+                          <th>Job Listing</th>
+                          <th>Company / Location</th>
+                          <th>Hybrid Score</th>
+                          <th>TF-IDF / Skill %</th>
+                          <th>Skill Gap Report</th>
+                        </tr>
+                      </thead>
+                      <tbody id="ml-diag-rec-tbody">
+                        <!-- Populated dynamically -->
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Training Dataset & Runtime Architecture Info -->
+          <div class="card">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+              <span class="card-title" style="display:flex;align-items:center;gap:8px">
+                <i class="fas fa-layer-group" style="color:#f59e0b"></i> Training Corpus &amp; System Runtime Architecture
+              </span>
+              <span class="badge badge-gray" id="ml-runtime-badge" style="font-size:11px">Python 3.11</span>
             </div>
             <div class="card-body">
-              <div class="stats-grid">
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:var(--primary)" id="ml-dataset-resumes">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Synthetic Resumes</div>
+              <div class="stats-grid" style="margin-bottom:18px">
+                <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="ml-dataset-resumes">--</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Synthetic Resumes</div>
                 </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#8b5cf6" id="ml-dataset-jobs">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Job Descriptions</div>
+                <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#7c3aed" id="ml-dataset-jobs">--</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Job Descriptions in Corpus</div>
                 </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#f59e0b" id="ml-dataset-ner">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">NER Training Samples</div>
+                <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#d97706" id="ml-dataset-ner">--</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">NER Training Annotations</div>
                 </div>
-                <div style="text-align:center;padding:16px">
-                  <div style="font-size:28px;font-weight:800;color:#16a34a" id="ml-live-jobs">--</div>
-                  <div style="font-size:13px;color:#64748b;margin-top:4px">Live Jobs in DB</div>
+                <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#10b981" id="ml-live-jobs">--</div>
+                  <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Live Active Jobs in DB</div>
                 </div>
+              </div>
+
+              <!-- Runtime dependency versions -->
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:12px;border-top:1px solid var(--border)">
+                <span style="font-size:12px;font-weight:700;color:var(--text-3);margin-right:4px">Runtime Stack:</span>
+                <span class="badge badge-gray" id="ml-ver-python"><i class="fab fa-python" style="color:#3b82f6;margin-right:4px"></i> Python: --</span>
+                <span class="badge badge-gray" id="ml-ver-spacy"><i class="fas fa-brain" style="color:#7c3aed;margin-right:4px"></i> spaCy: --</span>
+                <span class="badge badge-gray" id="ml-ver-sklearn"><i class="fas fa-cogs" style="color:#f59e0b;margin-right:4px"></i> scikit-learn: --</span>
+                <span class="badge badge-gray" id="ml-ver-numpy"><i class="fas fa-cube" style="color:#06b6d4;margin-right:4px"></i> NumPy: --</span>
+                <span class="badge badge-gray" id="ml-ver-joblib"><i class="fas fa-archive" style="color:#10b981;margin-right:4px"></i> Joblib: --</span>
               </div>
             </div>
           </div>
@@ -3883,6 +4094,85 @@
         </button>
         <button class="btn btn-outline btn-sm" onclick="Modal.close('pa-resume-modal')">Close</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODAL 5: PLATFORM ADMIN ML MODEL RETRAINING & COMPILATION
+═══════════════════════════════════════════════════════════ -->
+<div id="pa-ml-retrain-modal" class="modal-backdrop">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-cogs" style="color:var(--primary)"></i> Model Retraining &amp; Corpus Compilation
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-ml-retrain-modal')">✕</button>
+    </div>
+
+    <!-- Notice Banner -->
+    <div style="background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);color:var(--text);border-radius:10px;padding:14px 16px;font-size:13px;margin-bottom:18px">
+      <i class="fas fa-info-circle" style="color:#2563eb;margin-right:6px"></i>
+      <strong>Asynchronous Execution:</strong> Full ML training runs on a background daemon worker. The system will continue processing candidate traffic with existing cached weights until new artifact weights pass validation and reload atomically.
+    </div>
+
+    <!-- Retraining Options -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px">Training Configuration</div>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text)">
+        <input type="checkbox" id="pa-retrain-skip-ner" style="width:16px;height:16px;cursor:pointer">
+        <span><strong>Skip spaCy NER training (Fast Retrain):</strong> Rebuilds TF-IDF vectorizer and recommendation matrix only (~3s). Uncheck for full spaCy transition-based NER weights re-optimization.</span>
+      </label>
+    </div>
+
+    <!-- 4-Step Progress Stepper -->
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">Retraining Pipeline Stages</div>
+        <span id="pa-retrain-stage-label" class="badge badge-gray" style="font-size:11px">Idle</span>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px" id="pa-retrain-stepper">
+        <div id="pa-step-1" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3)">STAGE 1</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-top:2px">Corpus Ingest</div>
+          <div class="step-status" style="font-size:10px;color:var(--text-3);margin-top:4px">Pending</div>
+        </div>
+        <div id="pa-step-2" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3)">STAGE 2</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-top:2px">TF-IDF Vectorizer</div>
+          <div class="step-status" style="font-size:10px;color:var(--text-3);margin-top:4px">Pending</div>
+        </div>
+        <div id="pa-step-3" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3)">STAGE 3</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-top:2px">spaCy NER Weights</div>
+          <div class="step-status" style="font-size:10px;color:var(--text-3);margin-top:4px">Pending</div>
+        </div>
+        <div id="pa-step-4" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;text-align:center">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3)">STAGE 4</div>
+          <div style="font-size:12px;font-weight:700;color:var(--text);margin-top:2px">Cache Reload</div>
+          <div class="step-status" style="font-size:10px;color:var(--text-3);margin-top:4px">Pending</div>
+        </div>
+      </div>
+
+      <!-- Progress Bar -->
+      <div style="width:100%;height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:16px">
+        <div id="pa-retrain-progress-bar" style="width:0%;height:100%;background:linear-gradient(90deg,var(--primary),#7c3aed);transition:width 0.4s ease"></div>
+      </div>
+
+      <!-- Execution Log Box -->
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--text-3);margin-bottom:6px">Execution Console Output</div>
+        <div id="pa-retrain-log" style="background:#0f172a;color:#38bdf8;font-family:monospace;font-size:12px;padding:12px;border-radius:8px;height:120px;overflow-y:auto;line-height:1.5;white-space:pre-wrap">Ready to initiate pipeline retraining. Click 'Start Retraining' to begin.</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:14px;border-top:1px solid var(--border)">
+      <button class="btn btn-outline" onclick="Modal.close('pa-ml-retrain-modal')">Close</button>
+      <button class="btn btn-primary" id="pa-retrain-submit-btn" onclick="executeMLRetrain()">
+        <i class="fas fa-play"></i> Start Retraining
+      </button>
     </div>
   </div>
 </div>
