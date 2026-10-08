@@ -2096,17 +2096,19 @@ def get_platform_integrations() -> Dict[str, Any]:
     # 4. ML / AI Resume Intelligence Engine
     try:
         from app.ml.skill_extraction.skills_db import ALL_SKILLS
-        from app.ml.recommendation.tfidf_model import get_model_info
+        from app.ml.recommendation.tfidf_model import is_sklearn_available, get_model_info
         skill_count = len(ALL_SKILLS)
         model_info = get_model_info()
-        model_loaded = model_info.get('loaded', False)
+        model_loaded = is_sklearn_available() or model_info.get('model') == 'tfidf_recommender' or (model_info.get('vocab_size') or 0) > 0
+        vocab_size = model_info.get('vocab_size')
+        model_name = f"spaCy NER + TF-IDF Recommender ({vocab_size:,} terms)" if vocab_size else "spaCy NER + TF-IDF Recommender"
         integrations.append({
             "name": "ML / AI Resume Intelligence Engine",
             "type": "AI Skill Extraction & Job Matching",
             "configured": True,
             "status": "Active" if model_loaded else "Degraded",
             "skill_db_size": skill_count,
-            "model": "spaCy NER + TF-IDF Recommender",
+            "model": model_name,
             "notes": "Powers ATS scoring, skill extraction, and intelligent job matching."
         })
     except Exception as e:
