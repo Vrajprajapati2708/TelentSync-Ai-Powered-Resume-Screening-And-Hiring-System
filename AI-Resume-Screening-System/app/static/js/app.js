@@ -8357,7 +8357,7 @@ function fetchPlatformAdminSystemHealth() {
         if (grid) grid.innerHTML = '<div class="stat-card" style="grid-column:1/-1;color:var(--danger)">Failed to run system diagnostics.</div>';
         return;
       }
-      const data = res.data;
+      const data = res.data || res;
       const overall = data.overall || 'Healthy';
 
       const overallBadge = document.getElementById('pa-health-overall-badge');
@@ -8365,8 +8365,8 @@ function fetchPlatformAdminSystemHealth() {
         overallBadge.className = `badge ${overall === 'Healthy' ? 'badge-success' : (overall === 'Degraded' ? 'badge-warning' : 'badge-danger')}`;
         overallBadge.textContent = overall.toUpperCase();
       }
-      setEl('pa-health-last-checked', new Date(data.timestamp).toLocaleTimeString());
-      setEl('pa-health-overall-summary', `Probing 8 core platform subsystems. Overall status is currently ${overall}.`);
+      setEl('pa-health-last-checked', data.timestamp ? new Date(data.timestamp).toLocaleTimeString() : new Date().toLocaleTimeString());
+      setEl('pa-health-overall-summary', `Probing ${data.total_services || 8} core platform subsystems (${data.healthy_count || 0} healthy). Overall status is currently ${overall}.`);
 
       const serviceIcons = {
         database: 'fa-database',
@@ -8383,26 +8383,28 @@ function fetchPlatformAdminSystemHealth() {
         'Healthy': { badge: 'badge-success', iconColor: '#10b981', border: '#10b981' },
         'Degraded': { badge: 'badge-warning', iconColor: '#f59e0b', border: '#f59e0b' },
         'Unavailable': { badge: 'badge-danger', iconColor: '#ef4444', border: '#ef4444' },
-        'Not Configured': { badge: 'badge-gray', iconColor: '#64748b', border: '#cbd5e1' }
+        'Not Configured': { badge: 'badge-gray', iconColor: '#64748b', border: '#94a3b8' }
       };
 
       if (grid && data.services) {
         grid.innerHTML = Object.entries(data.services).map(([key, s]) => {
           const cfg = statusMap[s.status] || statusMap['Healthy'];
           const icon = serviceIcons[key] || 'fa-server';
-          const latencyText = s.latency_ms !== undefined && s.latency_ms !== null ? `${s.latency_ms} ms` : 'N/A';
+          const hasLatency = s.latency_ms !== undefined && s.latency_ms !== null;
+          const latencyBadgeClass = !hasLatency ? 'badge-gray' : (s.latency_ms < 50 ? 'badge-success' : (s.latency_ms < 200 ? 'badge-warning' : 'badge-danger'));
+          const latencyText = hasLatency ? `${s.latency_ms} ms` : 'N/A';
 
           return `
             <div class="stat-card" style="border-top:3px solid ${cfg.border};padding:18px">
               <div class="stat-top" style="margin-bottom:10px">
                 <div style="font-weight:700;font-size:14px;color:var(--text)">${escapeHTML(s.name)}</div>
-                <div class="stat-icon" style="background:#f8fafc"><i class="fas ${icon}" style="color:${cfg.iconColor}"></i></div>
+                <div class="stat-icon" style="background:var(--surface-2, var(--surface))"><i class="fas ${icon}" style="color:${cfg.iconColor}"></i></div>
               </div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px">
                 <span class="badge ${cfg.badge}" style="font-size:11px;font-weight:700">${escapeHTML(s.status)}</span>
-                <span style="font-size:11px;color:var(--text-3);font-family:monospace">Latency: ${latencyText}</span>
+                <span class="badge ${latencyBadgeClass}" style="font-size:10px;font-family:monospace"><i class="fas fa-bolt"></i> ${latencyText}</span>
               </div>
-              <div style="font-size:12px;color:var(--text-2);line-height:1.4">${escapeHTML(s.details)}</div>
+              <div style="font-size:12px;color:var(--text-2);line-height:1.4">${escapeHTML(s.details || '')}</div>
             </div>
           `;
         }).join('');
@@ -8422,30 +8424,42 @@ function fetchPlatformAdminIntegrations() {
     .then(r => r.json())
     .then(res => {
       if (!res || !res.success || !grid) return;
-      const list = res.data.integrations || [];
+      const list = (res.data && res.data.integrations) || res.integrations || [];
       grid.innerHTML = list.map(item => {
-        const isHealthy = item.status === 'Healthy';
-        const isNotConfig = item.status === 'Not Configured';
+        const isHealthy = item.status === 'Active' || item.status === 'Healthy' || item.status === 'Available' || item.status.startsWith('Active');
+        const isNotConfig = item.status === 'Not Configured' || item.status === 'Unconfigured' || item.status === 'Disabled';
         const badgeClass = isHealthy ? 'badge-success' : (isNotConfig ? 'badge-gray' : 'badge-warning');
 
+        let rows = [];
+        rows.push(`<tr><td style="color:var(--text-3);width:140px">Configuration</td><td><strong>${item.configured ? '<span class="badge badge-success" style="font-size:10px">Configured</span>' : '<span class="badge badge-gray" style="font-size:10px">Not Configured</span>'}</strong></td></tr>`);
+        if (item.type) rows.push(`<tr><td style="color:var(--text-3)">Type</td><td>${escapeHTML(item.type)}</td></tr>`);
+        if (item.provider_type) rows.push(`<tr><td style="color:var(--text-3)">Provider</td><td><code>${escapeHTML(item.provider_type)}</code></td></tr>`);
+        if (item.host) rows.push(`<tr><td style="color:var(--text-3)">Host / Outbox</td><td><code>${escapeHTML(item.host)}</code></td></tr>`);
+        if (item.from_email) rows.push(`<tr><td style="color:var(--text-3)">Sender Address</td><td><code>${escapeHTML(item.from_email)}</code></td></tr>`);
+        if (item.country) rows.push(`<tr><td style="color:var(--text-3)">Region / Country</td><td><span class="badge badge-info" style="font-size:10px">${escapeHTML(item.country)}</span></td></tr>`);
+        if (item.engine) rows.push(`<tr><td style="color:var(--text-3)">OCR Engine</td><td>${escapeHTML(item.engine)}</td></tr>`);
+        if (item.model) rows.push(`<tr><td style="color:var(--text-3)">AI/ML Models</td><td><code>${escapeHTML(item.model)}</code></td></tr>`);
+        if (item.skill_db_size !== undefined) rows.push(`<tr><td style="color:var(--text-3)">Skill Knowledge Base</td><td><strong>${Number(item.skill_db_size).toLocaleString()}</strong> canonical skills</td></tr>`);
+        if (item.cached_queries !== undefined) rows.push(`<tr><td style="color:var(--text-3)">Query Cache</td><td><strong>${item.cached_queries}</strong> items cached</td></tr>`);
+        if (item.last_status) rows.push(`<tr><td style="color:var(--text-3)">Last Health Result</td><td>${escapeHTML(item.last_status)}</td></tr>`);
+        if (item.last_checked) rows.push(`<tr><td style="color:var(--text-3)">Last Verified</td><td>${new Date(item.last_checked).toLocaleString()}</td></tr>`);
+
         return `
-          <div class="card" style="padding:20px">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-              <div style="font-weight:800;font-size:15px;color:var(--text)">
-                <i class="fas fa-plug" style="color:#2563eb;margin-right:8px"></i> ${escapeHTML(item.name)}
+          <div class="card" style="padding:20px;display:flex;flex-direction:column;justify-content:space-between">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:8px;flex-wrap:wrap">
+                <div style="font-weight:800;font-size:15px;color:var(--text)">
+                  <i class="fas fa-plug" style="color:var(--primary);margin-right:8px"></i> ${escapeHTML(item.name)}
+                </div>
+                <span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(item.status)}</span>
               </div>
-              <span class="badge ${badgeClass}" style="font-size:11px">${escapeHTML(item.status)}</span>
+              <table class="table" style="font-size:12px;margin-bottom:12px">
+                <tbody>
+                  ${rows.join('')}
+                </tbody>
+              </table>
             </div>
-            <table class="table" style="font-size:12px;margin-bottom:12px">
-              <tr><td style="color:var(--text-3);width:130px">Configuration</td><td><strong>${item.configured ? 'Configured' : 'Missing'}</strong></td></tr>
-              ${item.masked_app_id ? `<tr><td style="color:var(--text-3)">App ID</td><td><code>${escapeHTML(item.masked_app_id)}</code></td></tr>` : ''}
-              ${item.endpoint ? `<tr><td style="color:var(--text-3)">Endpoint</td><td><code>${escapeHTML(item.endpoint)}</code></td></tr>` : ''}
-              ${item.sender ? `<tr><td style="color:var(--text-3)">Sender</td><td><code>${escapeHTML(item.sender)}</code></td></tr>` : ''}
-              ${item.smtp_host ? `<tr><td style="color:var(--text-3)">Host:Port</td><td><code>${escapeHTML(item.smtp_host)}:${escapeHTML(String(item.smtp_port))}</code></td></tr>` : ''}
-              ${item.tesseract_installed !== undefined ? `<tr><td style="color:var(--text-3)">Tesseract Binary</td><td>${item.tesseract_installed ? '<span class="badge badge-success">Installed</span>' : '<span class="badge badge-gray">Not Found</span>'}</td></tr>` : ''}
-              <tr><td style="color:var(--text-3)">Last Result</td><td>${escapeHTML(item.last_status || 'Idle')}</td></tr>
-            </table>
-            <div style="font-size:11px;color:var(--text-3);border-top:1px solid var(--border);padding-top:8px">${escapeHTML(item.notes || '')}</div>
+            <div style="font-size:11px;color:var(--text-3);border-top:1px solid var(--border);padding-top:10px;margin-top:4px;line-height:1.4">${escapeHTML(item.notes || '')}</div>
           </div>
         `;
       }).join('');

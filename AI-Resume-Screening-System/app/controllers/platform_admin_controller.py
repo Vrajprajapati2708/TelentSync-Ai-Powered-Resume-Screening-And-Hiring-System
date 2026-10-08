@@ -1767,145 +1767,171 @@ def get_platform_system_health() -> Dict[str, Any]:
 
     # 2. File Storage (Resumes directory)
     try:
+        t0 = time.time()
         upload_dir = os.path.join(os.getcwd(), "uploads", "resumes")
-        if os.path.isdir(upload_dir):
-            probe_path = os.path.join(upload_dir, ".health_probe.tmp")
-            with open(probe_path, "w") as f:
-                f.write("probe")
-            if os.path.isfile(probe_path):
-                os.remove(probe_path)
-                services["file_storage"] = {
-                    "name": "Resume File Storage",
-                    "status": "Healthy",
-                    "details": "Directory mounted and writable"
-                }
-            else:
-                services["file_storage"] = {
-                    "name": "Resume File Storage",
-                    "status": "Degraded",
-                    "details": "Probe file creation failed"
-                }
-        else:
+        os.makedirs(upload_dir, exist_ok=True)
+        probe_path = os.path.join(upload_dir, ".health_probe.tmp")
+        with open(probe_path, "w") as f:
+            f.write("probe")
+        if os.path.isfile(probe_path):
+            os.remove(probe_path)
+            lat = round((time.time() - t0) * 1000, 2)
             services["file_storage"] = {
                 "name": "Resume File Storage",
-                "status": "Unavailable",
-                "details": "Upload directory does not exist"
+                "status": "Healthy",
+                "latency_ms": lat,
+                "details": f"Directory mounted and writable ({lat} ms)"
+            }
+        else:
+            lat = round((time.time() - t0) * 1000, 2)
+            services["file_storage"] = {
+                "name": "Resume File Storage",
+                "status": "Degraded",
+                "latency_ms": lat,
+                "details": "Probe file creation failed"
             }
     except Exception as e:
         services["file_storage"] = {
             "name": "Resume File Storage",
             "status": "Degraded",
+            "latency_ms": None,
             "details": f"File storage write test failed: {e}"
         }
 
     # 3. Authentication Subsystem
     try:
+        t0 = time.time()
         from flask import current_app
         secret = current_app.config.get("SECRET_KEY", "") if current_app else os.getenv("SECRET_KEY", "")
+        lat = round((time.time() - t0) * 1000, 2)
         if secret and len(secret) >= 16:
             services["authentication"] = {
                 "name": "Authentication & RBAC",
                 "status": "Healthy",
-                "details": "Session signer & tokens active"
+                "latency_ms": lat,
+                "details": f"Session signer & tokens active ({lat} ms)"
             }
         else:
             services["authentication"] = {
                 "name": "Authentication & RBAC",
                 "status": "Degraded",
+                "latency_ms": lat,
                 "details": "Weak or default secret key detected"
             }
     except Exception as e:
         services["authentication"] = {
             "name": "Authentication & RBAC",
             "status": "Degraded",
+            "latency_ms": None,
             "details": str(e)
         }
 
     # 4. Resume Parser
     try:
+        t0 = time.time()
         import PyPDF2
+        lat = round((time.time() - t0) * 1000, 2)
         services["resume_parser"] = {
             "name": "Resume Parser Pipeline",
             "status": "Healthy",
-            "details": "PDF parser engines loaded"
+            "latency_ms": lat,
+            "details": f"PDF parser engines loaded ({lat} ms)"
         }
     except Exception as e:
         services["resume_parser"] = {
             "name": "Resume Parser Pipeline",
             "status": "Unavailable",
+            "latency_ms": None,
             "details": f"Parser dependency missing: {e}"
         }
 
     # 5. ATS & Skill Intelligence Engine
     try:
+        t0 = time.time()
         from app.ml.skill_extraction.skills_db import ALL_SKILLS, JOB_ROLE_SKILLS
+        lat = round((time.time() - t0) * 1000, 2)
         if len(ALL_SKILLS) > 0 and len(JOB_ROLE_SKILLS) > 0:
             services["ats_engine"] = {
                 "name": "ATS & Skill Engine",
                 "status": "Healthy",
-                "details": f"Loaded {len(ALL_SKILLS)} canonical skills"
+                "latency_ms": lat,
+                "details": f"Loaded {len(ALL_SKILLS)} canonical skills ({lat} ms)"
             }
         else:
             services["ats_engine"] = {
                 "name": "ATS & Skill Engine",
                 "status": "Degraded",
+                "latency_ms": lat,
                 "details": "Skill database dictionary is empty"
             }
     except Exception as e:
         services["ats_engine"] = {
             "name": "ATS & Skill Engine",
             "status": "Unavailable",
+            "latency_ms": None,
             "details": f"ATS engine error: {e}"
         }
 
     # 6. Job Matcher
     try:
+        t0 = time.time()
         from app.ml.recommendation.cosine_similarity import skill_overlap_score
         score = skill_overlap_score(["Python"], ["Python", "Flask"])
+        lat = round((time.time() - t0) * 1000, 2)
         services["job_matcher"] = {
             "name": "Job Matching Engine",
             "status": "Healthy",
-            "details": f"Matcher operational (probe={round(score * 100)}%)"
+            "latency_ms": lat,
+            "details": f"Matcher operational ({lat} ms, probe={round(score * 100)}%)"
         }
     except Exception as e:
         services["job_matcher"] = {
             "name": "Job Matching Engine",
             "status": "Degraded",
+            "latency_ms": None,
             "details": f"Matcher error: {e}"
         }
 
     # 7. Adzuna Integration
     try:
+        t0 = time.time()
         from app.services.adzuna_client import adzuna_client
         app_id = adzuna_client.app_id or ""
         app_key = adzuna_client.app_key or ""
+        lat = round((time.time() - t0) * 1000, 2)
         if app_id and app_key and len(app_id) > 2 and len(app_key) > 5:
             services["adzuna"] = {
                 "name": "Adzuna Live Jobs",
                 "status": "Healthy",
+                "latency_ms": lat,
                 "details": f"Configured ({adzuna_client.country.upper()})"
             }
         else:
             services["adzuna"] = {
                 "name": "Adzuna Live Jobs",
                 "status": "Not Configured",
+                "latency_ms": lat,
                 "details": "Credentials not set in environment"
             }
     except Exception as e:
         services["adzuna"] = {
             "name": "Adzuna Live Jobs",
             "status": "Degraded",
+            "latency_ms": None,
             "details": f"Client initialization error: {e}"
         }
 
     # 8. Email Service
     try:
+        t0 = time.time()
         from app.services.email_service import get_email_provider, SMTPEmailProvider, TestEmailProvider
         provider = get_email_provider()
+        lat = round((time.time() - t0) * 1000, 2)
         if isinstance(provider, TestEmailProvider):
             services["email"] = {
                 "name": "Email Delivery",
                 "status": "Healthy",
+                "latency_ms": lat,
                 "details": "In-memory test provider active"
             }
         elif isinstance(provider, SMTPEmailProvider):
@@ -1913,24 +1939,28 @@ def get_platform_system_health() -> Dict[str, Any]:
                 services["email"] = {
                     "name": "Email Delivery (SMTP)",
                     "status": "Healthy",
+                    "latency_ms": lat,
                     "details": "SMTP server configured"
                 }
             else:
                 services["email"] = {
                     "name": "Email Delivery (SMTP)",
                     "status": "Not Configured",
+                    "latency_ms": lat,
                     "details": "SMTP host not specified"
                 }
         else:
             services["email"] = {
                 "name": "Email Delivery",
                 "status": "Not Configured",
+                "latency_ms": lat,
                 "details": "Provider unconfigured"
             }
     except Exception as e:
         services["email"] = {
             "name": "Email Delivery",
             "status": "Degraded",
+            "latency_ms": None,
             "details": f"Email service error: {e}"
         }
 
@@ -1945,13 +1975,16 @@ def get_platform_system_health() -> Dict[str, Any]:
 
     healthy_count = sum(1 for st in statuses if st == "Healthy")
     total_count = len(services)
+    from datetime import datetime, timezone
+    iso_now = datetime.now(timezone.utc).isoformat()
 
     payload = {
         "overall": overall,
         "overall_status": overall,
         "healthy_count": healthy_count,
         "total_services": total_count,
-        "services": services
+        "services": services,
+        "timestamp": iso_now
     }
 
     return {

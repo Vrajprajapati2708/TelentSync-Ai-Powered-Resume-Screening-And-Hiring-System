@@ -3252,8 +3252,12 @@
               <div style="display:flex;align-items:center;gap:8px;background:var(--surface);padding:6px 12px;border:1px solid var(--border);border-radius:8px">
                 <span style="font-size:12px;font-weight:600;color:var(--text-2)"><i class="fas fa-clock" style="color:var(--primary);margin-right:4px"></i> Auto-Refresh (30s)</span>
                 <label class="toggle-switch"><input type="checkbox" id="pa-system-auto-refresh" onchange="togglePlatformAdminAutoRefresh(this.checked)"><span class="toggle-slider"></span></label>
+                <span id="pa-system-live-indicator" style="font-size:11px;font-weight:700;color:var(--text-3);margin-left:4px"><span style="color:var(--text-3)">○ Auto-refresh: <strong>OFF</strong></span></span>
               </div>
-              <a href="/api/platform-admin/export?format=json" class="btn btn-sm btn-outline" download><i class="fas fa-download"></i> Export Data (JSON)</a>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <a href="/api/platform-admin/export?format=json" class="btn btn-sm btn-outline" download><i class="fas fa-file-code"></i> Export JSON</a>
+                <a href="/api/platform-admin/export?format=csv&type=all" class="btn btn-sm btn-outline" download><i class="fas fa-file-csv"></i> Export Master CSV</a>
+              </div>
             </div>
           </div>
 
@@ -3284,9 +3288,9 @@
 
           <!-- Tab 2: Integrations -->
           <div id="pa-content-system-integrations" class="hidden">
-            <div class="card" style="margin-bottom:20px;padding:16px 20px;background:#f8fafc;border-left:4px solid #2563eb">
+            <div class="card" style="margin-bottom:20px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary)">
               <div style="font-size:13px;color:var(--text-2);line-height:1.5">
-                <i class="fas fa-shield-alt" style="color:#2563eb;margin-right:6px"></i>
+                <i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px"></i>
                 <strong>Security Protection:</strong> Secret credentials, API keys, passwords, and environment configuration values are strictly masked and never transmitted to the browser.
               </div>
             </div>
