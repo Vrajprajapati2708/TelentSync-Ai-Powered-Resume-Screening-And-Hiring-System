@@ -906,6 +906,18 @@ const UI = {
 
     if (page === 0) c.innerHTML = '';
 
+    if (page === 0 && jobs.length === 0) {
+      c.innerHTML = `
+        <div style="grid-column: 1 / -1; text-align: center; padding: 48px 20px; background: var(--surface); border: 1px dashed var(--border); border-radius: var(--radius-lg);">
+          <i class="fas fa-briefcase" style="font-size: 36px; color: var(--text-3); opacity: 0.5; margin-bottom: 12px; display: block;"></i>
+          <div style="font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 6px;">No job postings found</div>
+          <div style="font-size: 13px; color: var(--text-3); max-width: 400px; margin: 0 auto 16px;">No jobs match your current search and filter criteria. Try clearing filters or post a new job.</div>
+          ${!isCandidateView ? `<button class="btn btn-primary btn-sm" onclick="Modal.open('post-job-modal')"><i class="fas fa-plus"></i> Post New Job</button>` : ''}
+        </div>
+      `;
+      return;
+    }
+
     const temp = document.createElement('div');
     temp.innerHTML = slice.map(j => {
       registerKnownJob(j);
@@ -931,14 +943,20 @@ const UI = {
            >`
         : `<div style="width:44px;height:44px;border-radius:8px;background:${color};color:${tcolor};display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;font-family:'Syne',sans-serif;">${abbr}</div>`;
 
+      const jobApps = Array.isArray(DB.candidates) ? DB.candidates.filter(cand => (cand.job || '').toLowerCase().trim() === (j.title || '').toLowerCase().trim()) : [];
+      const totalApps = jobApps.length || j.applicants || 0;
+      const shortlistedApps = jobApps.filter(cand => cand.status === 'Shortlisted').length;
+      const isClosed = (j.status || '').toLowerCase() === 'closed';
+
       return `
-      <div class="job-card ${j.match >= 85 ? 'featured' : ''}">
+      <div class="job-card ${j.match >= 85 ? 'featured' : ''} ${isClosed ? 'job-card-closed' : ''}" style="${isClosed ? 'opacity:0.85;border-left:3px solid var(--text-3);' : ''}">
         <div class="job-card-badge" style="display:flex;gap:6px;align-items:center;">
           ${(j.is_external || j.source === 'adzuna')
             ? '<span class="badge badge-success" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;font-size:11px;font-weight:600;"><i class="fas fa-bolt" style="font-size:10px;margin-right:3px;"></i> Live</span>'
             : '<span class="badge badge-secondary" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;font-size:11px;font-weight:600;"><i class="fas fa-database" style="font-size:10px;margin-right:3px;"></i> Saved</span>'
           }
           ${j.match >= 85 ? '<span class="badge badge-teal">⭐ Top Match</span>' : ''}
+          ${isClosed ? '<span class="badge badge-danger" style="font-size:10px;">Closed</span>' : ''}
         </div>
         <div class="company-row">
           <div class="company-logo" style="background:#fff;">${logoHTML}</div>
@@ -955,7 +973,7 @@ const UI = {
         </div>
         <div class="job-skills" style="margin-bottom: 8px;">
           <div style="font-size: 11px; color: var(--text-3); margin-bottom: 4px;">Matching Skills:</div>
-          ${(j.matching_skills || j.skills).slice(0,5).map(s => `<span class="job-skill-tag" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">${s}</span>`).join('')}
+          ${(j.matching_skills || j.skills || []).slice(0,5).map(s => `<span class="job-skill-tag" style="background:#dcfce7;color:#166534;border:1px solid #bbf7d0">${s}</span>`).join('')}
         </div>
         <div style="font-size: 12px; color: var(--text-2); margin-bottom: 12px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
           ${j.description || ''}
@@ -989,12 +1007,21 @@ const UI = {
         </button>
         `}
         ` : `
-        <div style="display:flex;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
-          <button class="btn btn-navy" style="flex:1;font-size:13px" onclick="viewJobRankings(${j.id})">View Rankings</button>
-          <button class="btn btn-outline btn-sm" onclick="editJob(${j.id})"><i class="fas fa-edit"></i></button>
-          <button class="btn btn-outline btn-sm" onclick="deleteJob(${j.id})"><i class="fas fa-trash"></i></button>
+        <div style="background:var(--bg-2);padding:8px 12px;border-radius:8px;margin-top:10px;display:flex;justify-content:space-between;align-items:center;font-size:12px">
+          <div>
+            <span style="font-weight:700;color:var(--text-1)"><i class="fas fa-users" style="color:var(--primary);margin-right:4px"></i> ${totalApps} Applicants</span>
+            ${shortlistedApps > 0 ? `<span style="margin-left:6px;background:#dcfce7;color:#166534;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px">${shortlistedApps} Shortlisted</span>` : ''}
+          </div>
+          <button class="btn btn-sm ${isClosed ? 'btn-outline-danger' : 'btn-outline-success'}" style="font-size:11px;padding:2px 8px;border-radius:12px" onclick="toggleJobStatus(${j.id})" title="Click to toggle job active/closed">
+            <i class="fas ${isClosed ? 'fa-pause-circle' : 'fa-check-circle'}"></i> ${isClosed ? 'Closed' : 'Active'}
+          </button>
         </div>
-        <div style="margin-top:10px;font-size:12px;color:var(--text-3)"><i class="fas fa-users"></i> ${j.applicants} applicants · <span class="badge ${j.status==='Active'?'badge-success':'badge-warning'}" style="font-size:11px">${j.status}</span></div>
+        <div style="display:flex;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);flex-wrap:wrap">
+          <button class="btn btn-navy btn-sm" style="flex:1;font-size:12px;min-width:100px" onclick="viewJobRankings(${j.id})"><i class="fas fa-chart-line"></i> AI Rankings</button>
+          <button class="btn btn-outline btn-sm" style="font-size:12px" onclick="viewJobApplicants('${escapeHTML(j.title || '')}')" title="View applicants for this role"><i class="fas fa-user-check"></i> Applicants</button>
+          <button class="btn btn-outline btn-sm" onclick="editJob(${j.id})" title="Edit Job"><i class="fas fa-edit"></i></button>
+          <button class="btn btn-outline-danger btn-sm" onclick="deleteJob(${j.id})" title="Delete Job"><i class="fas fa-trash"></i></button>
+        </div>
         `}
       </div>
     `}).join('');
@@ -1775,11 +1802,59 @@ function filterJobs(portal) {
     if (typeof LiveJobsManager !== 'undefined') LiveJobsManager.fetchJobs();
     return;
   }
-  const loc  = document.getElementById(`${portal}-filter-loc`).value;
-  const type = document.getElementById(`${portal}-filter-type`).value;
-  let jobs = [...DB.jobs];
-  if (loc && loc !== 'All') jobs = jobs.filter(j => j.location.includes(loc) || (loc==='Remote'&&j.type==='Contract'));
-  if (type && type !== 'All') jobs = jobs.filter(j => j.type === type);
+
+  // Populate dynamic location options for admin if not already populated
+  const locSelect = document.getElementById('admin-filter-loc');
+  if (locSelect && locSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
+    const rawLocations = DB.jobs.map(j => (j.location || '').split(',')[0].trim()).filter(Boolean);
+    const locations = Array.from(new Set(rawLocations)).sort();
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc;
+      opt.textContent = loc;
+      locSelect.appendChild(opt);
+    });
+  }
+
+  const q = (document.getElementById('admin-jobs-search-input')?.value || '').toLowerCase().trim();
+  const loc = document.getElementById('admin-filter-loc')?.value || 'All';
+  const type = document.getElementById('admin-filter-type')?.value || 'All';
+  const status = document.getElementById('admin-filter-status')?.value || 'All';
+
+  let jobs = Array.isArray(DB.jobs) ? [...DB.jobs] : [];
+
+  if (q) {
+    jobs = jobs.filter(j => 
+      (j.title || '').toLowerCase().includes(q) ||
+      (j.company || '').toLowerCase().includes(q) ||
+      (j.location || '').toLowerCase().includes(q) ||
+      (j.type || '').toLowerCase().includes(q) ||
+      (Array.isArray(j.skills) && j.skills.some(s => s.toLowerCase().includes(q))) ||
+      (j.description || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (loc && loc !== 'All') {
+    jobs = jobs.filter(j => 
+      (j.location || '').toLowerCase().includes(loc.toLowerCase()) || 
+      (loc.toLowerCase() === 'remote' && ((j.type || '').toLowerCase() === 'contract' || (j.location || '').toLowerCase().includes('remote')))
+    );
+  }
+
+  if (type && type !== 'All') {
+    jobs = jobs.filter(j => (j.type || '').toLowerCase() === type.toLowerCase());
+  }
+
+  if (status && status !== 'All') {
+    jobs = jobs.filter(j => (j.status || 'Active').toLowerCase() === status.toLowerCase());
+  }
+
+  const countEl = document.getElementById('admin-jobs-header-count');
+  if (countEl) {
+    const totalCount = Array.isArray(DB.jobs) ? DB.jobs.length : 0;
+    countEl.textContent = `Showing ${jobs.length} of ${totalCount} total openings`;
+  }
+
   UI.renderJobCards('admin-jobs-grid', jobs, false);
 }
 
@@ -1788,9 +1863,64 @@ function resetFilters(portal) {
     if (typeof LiveJobsManager !== 'undefined') LiveJobsManager.resetAll();
     return;
   }
-  document.getElementById(`${portal}-filter-loc`).value  = 'All';
-  document.getElementById(`${portal}-filter-type`).value = 'All';
-  UI.renderJobCards('admin-jobs-grid', DB.jobs, false);
+  const sInput = document.getElementById('admin-jobs-search-input');
+  if (sInput) sInput.value = '';
+  const locEl = document.getElementById('admin-filter-loc');
+  if (locEl) locEl.value = 'All';
+  const typeEl = document.getElementById('admin-filter-type');
+  if (typeEl) typeEl.value = 'All';
+  const statusEl = document.getElementById('admin-filter-status');
+  if (statusEl) statusEl.value = 'All';
+
+  filterJobs('admin');
+  Toast.show('Job filters reset.', 'info');
+}
+
+function toggleJobStatus(jobId) {
+  const job = DB.jobs.find(j => j.id === jobId);
+  if (!job) return;
+  const newStatus = (job.status || 'Active').toLowerCase() === 'active' ? 'Closed' : 'Active';
+  job.status = newStatus;
+  
+  // Persist status change to backend
+  fetch(`/api/admin/jobs/${jobId}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title: job.title,
+      company: job.company,
+      location: job.location,
+      type: job.type,
+      salary: job.salary,
+      skills: Array.isArray(job.skills) ? job.skills.join(', ') : (job.skills || ''),
+      status: newStatus
+    })
+  }).catch(() => {});
+
+  filterJobs('admin');
+  Toast.show(`Job "${job.title}" marked as ${newStatus}.`, newStatus === 'Active' ? 'success' : 'info');
+}
+
+function viewJobApplicants(jobTitle) {
+  Sidebar.setActive(document.querySelector('#sb-admin .sb-item[data-section="candidates"]'));
+  Router.inner('admin', 'candidates');
+  const jobSelect = document.getElementById('candidates-filter-job');
+  if (jobSelect) {
+    // Check if option exists, otherwise append
+    let exists = false;
+    for (let i = 0; i < jobSelect.options.length; i++) {
+      if (jobSelect.options[i].value === jobTitle) { exists = true; break; }
+    }
+    if (!exists) {
+      const opt = document.createElement('option');
+      opt.value = jobTitle;
+      opt.textContent = jobTitle;
+      jobSelect.appendChild(opt);
+    }
+    jobSelect.value = jobTitle;
+  }
+  UI.renderCandidatesTable('All', jobTitle, '');
+  Toast.show(`Showing applicants for: ${jobTitle}`, 'info');
 }
 
 // ── Highlight Search Term ──────────────────────────────────────
@@ -4688,6 +4818,8 @@ window.exportRankingsCSV = exportRankingsCSV;
 window.searchCandidates = searchCandidates;
 window.filterJobs = filterJobs;
 window.resetFilters = resetFilters;
+window.toggleJobStatus = toggleJobStatus;
+window.viewJobApplicants = viewJobApplicants;
 window.saveProfile = saveProfile;
 window.changePwd = changePwd;
 window.saveSettings = saveSettings;
