@@ -6308,7 +6308,7 @@ function fetchPlatformAdminUsers(page = 1) {
               <td style="font-size:12px">${lastLoginText}</td>
               <td style="text-align:right;white-space:nowrap">
                 <div style="display:inline-flex;gap:6px;align-items:center">
-                  <button class="btn btn-sm btn-outline" onclick="openPlatformUserModal(${u.id})" title="Manage User Permissions &amp; Profile">
+                  <button class="btn btn-sm btn-primary" onclick="openPlatformUserModal(${u.id})" title="Manage User Permissions &amp; Profile">
                     <i class="fas fa-user-cog"></i> Manage
                   </button>
                   ${!isCurrentUser ? (

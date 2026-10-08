@@ -3336,90 +3336,107 @@
      MODAL 1: PLATFORM ADMIN USER DETAIL & ROLE MANAGEMENT
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-user-modal" class="modal-backdrop">
-  <div class="modal-box" style="max-width:680px">
+  <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-user-title"><i class="fas fa-user-cog" style="color:var(--primary);margin-right:8px"></i> User Administration</div>
-      <button class="modal-close" onclick="Modal.close('pa-user-modal')">&times;</button>
+      <div class="modal-title" id="pa-modal-user-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-user-cog" style="color:var(--primary)"></i> User Administration &amp; Governance
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-user-modal')">✕</button>
     </div>
-    <div class="modal-body" style="padding:24px">
-      <!-- Self-Protection Warning Banner (Shown when admin views their own profile) -->
-      <div id="pa-modal-self-banner" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:18px">
-        <i class="fas fa-shield-alt" style="margin-right:6px"></i> <strong>Active Admin Session:</strong> You are managing your current administrator account. Self-demotion, self-deactivation, and deletion are disabled for governance safety.
-      </div>
 
-      <div style="display:flex;gap:16px;align-items:center;margin-bottom:20px">
-        <div id="pa-modal-avatar" class="avatar avatar-lg" style="background:#4338ca;color:#fff;font-size:20px">--</div>
-        <div>
-          <div id="pa-modal-name" style="font-size:18px;font-weight:800;color:var(--text)">--</div>
-          <div id="pa-modal-email" style="font-size:13px;color:var(--text-3)">--</div>
-          <div style="display:flex;gap:8px;margin-top:6px">
-            <span id="pa-modal-role-badge" class="badge">--</span>
-            <span id="pa-modal-status-badge" class="badge">--</span>
-          </div>
+    <!-- Self-Protection Warning Banner (Shown when admin views their own profile) -->
+    <div id="pa-modal-self-banner" style="display:none;background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:18px">
+      <i class="fas fa-shield-alt" style="margin-right:6px"></i> <strong>Active Admin Session:</strong> You are managing your current administrator account. Self-demotion, self-deactivation, and deletion are disabled for governance safety.
+    </div>
+
+    <!-- Profile Hero Card -->
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
+      <div id="pa-modal-avatar" class="avatar avatar-lg" style="background:var(--primary);color:#fff;font-size:20px;font-weight:800;flex-shrink:0">--</div>
+      <div style="flex:1;min-width:0">
+        <div id="pa-modal-name" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div id="pa-modal-email" style="font-size:13px;color:var(--text-2);margin-top:2px">--</div>
+        <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
+          <span id="pa-modal-role-badge" class="badge">--</span>
+          <span id="pa-modal-status-badge" class="badge">--</span>
         </div>
       </div>
+    </div>
 
-      <table class="table" style="margin-bottom:20px">
-        <tr><td style="color:var(--text-3);font-weight:600;width:140px">User ID</td><td id="pa-modal-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Location</td><td id="pa-modal-location">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Phone</td><td id="pa-modal-phone">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">LinkedIn / GitHub</td><td id="pa-modal-links">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Education</td><td id="pa-modal-education">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">ATS Score</td><td id="pa-modal-ats">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Created At</td><td id="pa-modal-created">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Last Login</td><td id="pa-modal-last-login">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Activity Counts</td><td id="pa-modal-stats">--</td></tr>
-      </table>
+    <!-- 3-Metric Summary Grid -->
+    <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Account ID</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-id">--</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">ATS Score</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-ats">--</div>
+      </div>
+      <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Activity Records</div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-top:4px" id="pa-modal-stats">--</div>
+      </div>
+    </div>
 
-      <!-- Skills Cloud -->
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Candidate Skills</div>
-        <div class="skills-cloud" id="pa-modal-skills">None listed</div>
+    <!-- Detailed Information Table -->
+    <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Location</td><td id="pa-modal-location">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Phone Number</td><td id="pa-modal-phone">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">LinkedIn / GitHub</td><td id="pa-modal-links">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Education</td><td id="pa-modal-education">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Registered On</td><td id="pa-modal-created">--</td></tr>
+      <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Last Login Session</td><td id="pa-modal-last-login">--</td></tr>
+    </table>
+
+    <!-- Skills Cloud -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text)">Candidate Skills</div>
+      <div class="skills-cloud" id="pa-modal-skills">None listed</div>
+    </div>
+
+    <!-- Recent Activity for this User -->
+    <div style="margin-bottom:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Recent Activity Stream</div>
+      <div id="pa-modal-user-activity" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border)">
+        No recent user activity recorded.
+      </div>
+    </div>
+
+    <!-- Administrative Controls Box -->
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px">
+      <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px">
+        <i class="fas fa-shield-alt" style="color:#4338ca"></i> Role &amp; Access Governance
       </div>
 
-      <!-- Recent Activity for this User -->
-      <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Recent User Activity</div>
-        <div id="pa-modal-user-activity" style="font-size:12px;color:var(--text-2);background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border)">
-          No recent user activity recorded.
-        </div>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+        <label style="font-size:13px;font-weight:700;color:var(--text)">Assigned Role:</label>
+        <select id="pa-modal-role-select" class="form-control" style="width:170px;padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px">
+          <option value="candidate">Candidate</option>
+          <option value="hr">HR / Recruiter</option>
+          <option value="admin">Platform Admin</option>
+        </select>
+        <button id="pa-modal-btn-role" class="btn btn-sm btn-primary" onclick="submitPlatformUserRoleChange()">
+          <i class="fas fa-save"></i> Update Role
+        </button>
       </div>
 
-      <!-- Administrative Controls Box -->
-      <div style="background:var(--bg-card);border:1px solid var(--border);border-radius:10px;padding:18px">
-        <div style="font-size:14px;font-weight:800;color:var(--text);margin-bottom:12px">
-          <i class="fas fa-user-shield" style="color:#6366f1;margin-right:6px"></i> Administrative Role &amp; Access Controls
+      <div style="display:flex;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:13px;font-weight:700;color:var(--text)">Account Lifecycle</div>
+          <div style="font-size:12px;color:var(--text-3)">Suspend authentication access or permanently remove this user account.</div>
         </div>
-
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
-          <label style="font-size:13px;font-weight:600;color:var(--text)">Assigned Role:</label>
-          <select id="pa-modal-role-select" class="form-control" style="width:160px;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:13px">
-            <option value="candidate">Candidate</option>
-            <option value="hr">HR / Recruiter</option>
-            <option value="admin">Platform Admin</option>
-          </select>
-          <button id="pa-modal-btn-role" class="btn btn-sm btn-primary" onclick="submitPlatformUserRoleChange()">
-            <i class="fas fa-save"></i> Update Role
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <button id="pa-modal-btn-toggle-status" class="btn btn-sm btn-outline" onclick="togglePlatformUserStatus()">
+            Toggle Status
+          </button>
+          <button id="pa-modal-btn-delete" class="btn btn-sm btn-outline-danger" onclick="deletePlatformUser()" title="Permanently delete user">
+            <i class="fas fa-trash-alt"></i> Delete
           </button>
         </div>
-
-        <div style="display:flex;gap:12px;align-items:center;border-top:1px solid var(--border);padding-top:14px;flex-wrap:wrap">
-          <div style="flex:1;min-width:200px">
-            <div style="font-size:13px;font-weight:700;color:var(--text)">Account Access &amp; Lifecycle</div>
-            <div style="font-size:12px;color:var(--text-3)">Manage user access status or permanently delete the account.</div>
-          </div>
-          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <button id="pa-modal-btn-toggle-status" class="btn btn-sm btn-outline" onclick="togglePlatformUserStatus()">
-              Toggle Status
-            </button>
-            <button id="pa-modal-btn-delete" class="btn btn-sm btn-outline-danger" onclick="deletePlatformUser()" title="Permanently delete user">
-              <i class="fas fa-trash-alt"></i> Delete
-            </button>
-          </div>
-        </div>
       </div>
     </div>
-    <div class="modal-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+
+    <div style="display:flex;justify-content:flex-end;margin-top:12px">
       <button class="btn btn-outline" onclick="Modal.close('pa-user-modal')">Close</button>
     </div>
   </div>
@@ -3429,33 +3446,35 @@
      MODAL: PLATFORM ADMIN PROVISION USER
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-create-user-modal" class="modal-backdrop">
-  <div class="modal-box" style="max-width:540px">
+  <div class="modal" style="max-width:560px">
     <div class="modal-header">
-      <div class="modal-title"><i class="fas fa-user-plus" style="color:var(--primary);margin-right:8px"></i> Provision New User</div>
-      <button class="modal-close" onclick="Modal.close('pa-create-user-modal')">&times;</button>
+      <div class="modal-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-user-plus" style="color:var(--primary)"></i> Provision New User
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-create-user-modal')">✕</button>
     </div>
     <form onsubmit="event.preventDefault(); submitCreatePlatformUser();">
-      <div class="modal-body" style="padding:24px">
+      <div style="margin-bottom:20px">
         <p style="font-size:13px;color:var(--text-3);margin-bottom:18px">Create and provision a new platform account with immediate verified access.</p>
         
         <div class="form-group" style="margin-bottom:16px">
-          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Full Name <span style="color:var(--danger)">*</span></label>
+          <label class="form-label" style="font-weight:700">Full Name <span style="color:var(--danger)">*</span></label>
           <input type="text" id="pa-new-user-name" class="form-control" placeholder="e.g. Alex Morgan" required style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
         </div>
 
         <div class="form-group" style="margin-bottom:16px">
-          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Email Address <span style="color:var(--danger)">*</span></label>
+          <label class="form-label" style="font-weight:700">Email Address <span style="color:var(--danger)">*</span></label>
           <input type="email" id="pa-new-user-email" class="form-control" placeholder="alex@company.com" required style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
         </div>
 
         <div class="form-group" style="margin-bottom:16px">
-          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Initial Password <span style="color:var(--danger)">*</span></label>
+          <label class="form-label" style="font-weight:700">Initial Password <span style="color:var(--danger)">*</span></label>
           <input type="password" id="pa-new-user-pass" class="form-control" placeholder="Min. 8 characters" required minlength="8" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
           <div style="font-size:11px;color:var(--text-3);margin-top:4px">Temporary password to be shared with the provisioned user.</div>
         </div>
 
         <div class="form-group" style="margin-bottom:16px">
-          <label style="display:block;font-size:13px;font-weight:700;margin-bottom:6px;color:var(--text)">Platform Role <span style="color:var(--danger)">*</span></label>
+          <label class="form-label" style="font-weight:700">Platform Role <span style="color:var(--danger)">*</span></label>
           <select id="pa-new-user-role" class="form-control" style="width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:13.5px">
             <option value="candidate">Candidate (Job Seeker / Applicant)</option>
             <option value="hr">HR / Recruiter (Hiring Manager)</option>
@@ -3463,7 +3482,7 @@
           </select>
         </div>
 
-        <div style="display:flex;align-items:center;gap:10px;margin-top:20px;padding:12px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px">
+        <div style="display:flex;align-items:center;gap:12px;margin-top:20px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:10px">
           <input type="checkbox" id="pa-new-user-verified" checked style="width:16px;height:16px;cursor:pointer">
           <div>
             <label for="pa-new-user-verified" style="font-size:13px;font-weight:700;cursor:pointer;color:var(--text)">Mark Account Verified &amp; Active</label>
@@ -3471,7 +3490,7 @@
           </div>
         </div>
       </div>
-      <div class="modal-footer" style="padding:16px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px">
+      <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:16px;border-top:1px solid var(--border)">
         <button type="button" class="btn btn-outline" onclick="Modal.close('pa-create-user-modal')">Cancel</button>
         <button type="submit" id="pa-new-user-submit-btn" class="btn btn-primary"><i class="fas fa-user-plus"></i> Create User</button>
       </div>
@@ -3483,35 +3502,37 @@
      MODAL 2: PLATFORM ADMIN JOB DETAIL
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-job-modal" class="modal-backdrop">
-  <div class="modal-box" style="max-width:720px">
+  <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-job-title">Job Details (Internal)</div>
-      <button class="modal-close" onclick="Modal.close('pa-job-modal')">&times;</button>
+      <div class="modal-title" id="pa-modal-job-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-briefcase" style="color:var(--primary)"></i> Job Details (Internal)
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-job-modal')">✕</button>
     </div>
-    <div class="modal-body" style="padding:24px">
-      <table class="table" style="margin-bottom:20px">
-        <tr><td style="color:var(--text-3);font-weight:600;width:140px">Job ID</td><td id="pa-modal-job-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Company</td><td id="pa-modal-job-company">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Location</td><td id="pa-modal-job-location">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Employment Type</td><td id="pa-modal-job-type">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Salary Range</td><td id="pa-modal-job-salary">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Posting Status</td><td id="pa-modal-job-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Created Date</td><td id="pa-modal-job-created">--</td></tr>
+    <div style="margin-bottom:20px">
+      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Job ID</td><td id="pa-modal-job-id">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Company</td><td id="pa-modal-job-company">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Location</td><td id="pa-modal-job-location">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Employment Type</td><td id="pa-modal-job-type">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Salary Range</td><td id="pa-modal-job-salary">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Posting Status</td><td id="pa-modal-job-status">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Created Date</td><td id="pa-modal-job-created">--</td></tr>
       </table>
 
       <div style="margin-bottom:18px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Required Skills</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Required Skills</div>
         <div class="skills-cloud" id="pa-modal-job-skills">None listed</div>
       </div>
 
       <div style="margin-bottom:20px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Job Description</div>
-        <div id="pa-modal-job-desc" style="font-size:12px;color:var(--text-2);background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap">--</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Job Description</div>
+        <div id="pa-modal-job-desc" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap">--</div>
       </div>
 
       <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Applicants (<span id="pa-modal-job-app-count">0</span>)</div>
-        <div class="table-wrap" style="max-height:180px;overflow-y:auto">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Applicants (<span id="pa-modal-job-app-count">0</span>)</div>
+        <div class="table-wrap" style="max-height:180px;overflow-y:auto;border:1px solid var(--border);border-radius:10px">
           <table class="table">
             <thead>
               <tr><th>Candidate</th><th>Match</th><th>Status</th><th>Applied</th></tr>
@@ -3523,7 +3544,7 @@
         </div>
       </div>
     </div>
-    <div class="modal-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+    <div style="display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border)">
       <button class="btn btn-outline" onclick="Modal.close('pa-job-modal')">Close</button>
     </div>
   </div>
@@ -3533,32 +3554,34 @@
      MODAL 3: PLATFORM ADMIN APPLICATION DETAIL
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-app-modal" class="modal-backdrop">
-  <div class="modal-box" style="max-width:680px">
+  <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-app-title">Application Details</div>
-      <button class="modal-close" onclick="Modal.close('pa-app-modal')">&times;</button>
+      <div class="modal-title" id="pa-modal-app-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-file-signature" style="color:var(--primary)"></i> Application Details
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-app-modal')">✕</button>
     </div>
-    <div class="modal-body" style="padding:24px">
-      <table class="table" style="margin-bottom:20px">
-        <tr><td style="color:var(--text-3);font-weight:600;width:140px">Application ID</td><td id="pa-modal-app-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Candidate</td><td id="pa-modal-app-candidate">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Candidate Email</td><td id="pa-modal-app-email">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Candidate ATS</td><td id="pa-modal-app-cand-ats">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Job Title</td><td id="pa-modal-app-job">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Company</td><td id="pa-modal-app-company">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Match Score</td><td id="pa-modal-app-match">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Current Status</td><td id="pa-modal-app-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Applied At</td><td id="pa-modal-app-applied">--</td></tr>
+    <div style="margin-bottom:20px">
+      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Application ID</td><td id="pa-modal-app-id">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate</td><td id="pa-modal-app-candidate">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate Email</td><td id="pa-modal-app-email">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate ATS</td><td id="pa-modal-app-cand-ats">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Job Title</td><td id="pa-modal-app-job">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Company</td><td id="pa-modal-app-company">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Match Score</td><td id="pa-modal-app-match">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Current Status</td><td id="pa-modal-app-status">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Applied At</td><td id="pa-modal-app-applied">--</td></tr>
       </table>
 
       <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Status Audit Trail</div>
-        <div id="pa-modal-app-history" style="font-size:12px;color:var(--text-2);background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Status Audit Trail</div>
+        <div id="pa-modal-app-history" style="font-size:12.5px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border)">
           No status transitions recorded.
         </div>
       </div>
     </div>
-    <div class="modal-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:flex-end">
+    <div style="display:flex;justify-content:flex-end;padding-top:14px;border-top:1px solid var(--border)">
       <button class="btn btn-outline" onclick="Modal.close('pa-app-modal')">Close</button>
     </div>
   </div>
@@ -3568,34 +3591,36 @@
      MODAL 4: PLATFORM ADMIN RESUME DETAIL & PREVIEW
 ═══════════════════════════════════════════════════════════ -->
 <div id="pa-resume-modal" class="modal-backdrop">
-  <div class="modal-box" style="max-width:700px">
+  <div class="modal modal-lg">
     <div class="modal-header">
-      <div class="modal-title" id="pa-modal-resume-title">Resume Metadata &amp; Intelligence</div>
-      <button class="modal-close" onclick="Modal.close('pa-resume-modal')">&times;</button>
+      <div class="modal-title" id="pa-modal-resume-title" style="display:flex;align-items:center;gap:8px">
+        <i class="fas fa-file-pdf" style="color:var(--primary)"></i> Resume Metadata &amp; Intelligence
+      </div>
+      <button class="modal-close" onclick="Modal.close('pa-resume-modal')">✕</button>
     </div>
-    <div class="modal-body" style="padding:24px">
-      <table class="table" style="margin-bottom:20px">
-        <tr><td style="color:var(--text-3);font-weight:600;width:140px">Resume ID</td><td id="pa-modal-resume-id">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Candidate</td><td id="pa-modal-resume-candidate">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Original Filename</td><td id="pa-modal-resume-filename">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">File Size</td><td id="pa-modal-resume-size">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">ATS Score</td><td id="pa-modal-resume-ats">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Status</td><td id="pa-modal-resume-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">File on Disk</td><td id="pa-modal-resume-file-status">--</td></tr>
-        <tr><td style="color:var(--text-3);font-weight:600">Uploaded At</td><td id="pa-modal-resume-uploaded">--</td></tr>
+    <div style="margin-bottom:20px">
+      <table class="table" style="margin-bottom:20px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <tr><td style="color:var(--text-3);font-weight:600;width:150px;background:var(--bg-card)">Resume ID</td><td id="pa-modal-resume-id">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Candidate</td><td id="pa-modal-resume-candidate">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Original Filename</td><td id="pa-modal-resume-filename">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">File Size</td><td id="pa-modal-resume-size">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">ATS Score</td><td id="pa-modal-resume-ats">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Status</td><td id="pa-modal-resume-status">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">File on Disk</td><td id="pa-modal-resume-file-status">--</td></tr>
+        <tr><td style="color:var(--text-3);font-weight:600;background:var(--bg-card)">Uploaded At</td><td id="pa-modal-resume-uploaded">--</td></tr>
       </table>
 
       <div style="margin-bottom:18px">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Extracted Skills</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Extracted Skills</div>
         <div class="skills-cloud" id="pa-modal-resume-skills">None extracted</div>
       </div>
 
       <div>
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">Parsed Content Excerpt</div>
-        <div id="pa-modal-resume-preview" style="font-size:12px;color:var(--text-2);background:#f8fafc;padding:12px;border-radius:8px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap;font-family:monospace">--</div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">Parsed Content Excerpt</div>
+        <div id="pa-modal-resume-preview" style="font-size:12px;color:var(--text-2);background:var(--bg);padding:14px;border-radius:10px;border:1px solid var(--border);max-height:160px;overflow-y:auto;white-space:pre-wrap;font-family:monospace">--</div>
       </div>
     </div>
-    <div class="modal-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid var(--border);flex-wrap:wrap;gap:10px">
       <button id="pa-modal-resume-download-btn" class="btn btn-primary btn-sm">
         <i class="fas fa-download"></i> Download Resume
       </button>

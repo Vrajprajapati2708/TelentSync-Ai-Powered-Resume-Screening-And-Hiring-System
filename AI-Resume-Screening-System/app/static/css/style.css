@@ -210,8 +210,11 @@ body.dark-mode .top-rank-row { background: rgba(250,204,21,.1) !important; }
 .top-rank-row { background: #fffef0; }
 
 /* ── Dark Mode: Modal / Overlay ── */
-body.dark-mode .modal-box { background: var(--card); border-color: var(--border); }
+body.dark-mode .modal,
+body.dark-mode .modal-box { background: var(--card); border-color: var(--border); color: var(--text); }
+body.dark-mode .modal h3,
 body.dark-mode .modal-box h3 { color: var(--text); }
+body.dark-mode .modal p,
 body.dark-mode .modal-box p { color: var(--text-2); }
 body.dark-mode .modal-header { border-bottom-color: var(--border); }
 
@@ -526,32 +529,41 @@ select.form-control { cursor: pointer; }
    ============================================================ */
 .modal-backdrop {
   position: fixed; inset: 0;
-  background: rgba(4,20,43,.65);
-  backdrop-filter: blur(4px);
+  background: rgba(4,20,43,.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   z-index: 1000;
   display: none; align-items: flex-start; justify-content: center;
-  padding: 20px;
+  padding: 30px 20px;
   overflow-y: auto;
   animation: fadeIn .2s ease;
 }
 .modal-backdrop.show { display: flex; }
-.modal {
+.modal, .modal-box {
   background: var(--white);
+  color: var(--text);
   border-radius: var(--radius-xl);
-  padding: 36px;
+  padding: 32px;
   width: 100%;
-  max-width: 540px;
+  max-width: 580px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.22), 0 1px 3px rgba(0,0,0,0.1);
+  border: 1px solid var(--border);
   animation: slideUp .25s ease;
+  position: relative;
+  z-index: 1001;
+  margin: auto;
 }
-.modal-lg { max-width: 720px; }
+.modal-lg { max-width: 740px !important; }
 .modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 26px;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
-.modal-title { font-size: 20px; font-weight: 800; }
+.modal-title { font-size: 20px; font-weight: 800; font-family: 'Syne', sans-serif; color: var(--navy); display: flex; align-items: center; }
+body.dark-mode .modal-title { color: var(--text); }
 .modal-close {
   width: 36px; height: 36px;
   border-radius: 9px; border: 1.5px solid var(--border);
@@ -561,6 +573,7 @@ select.form-control { cursor: pointer; }
   transition: var(--transition);
 }
 .modal-close:hover { background: var(--bg-2); color: var(--text); }
+body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); border-color: var(--border); }
 
 @keyframes fadeIn  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(24px) } to { opacity: 1; transform: translateY(0) } }
