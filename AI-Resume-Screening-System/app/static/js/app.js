@@ -2582,9 +2582,9 @@ function saveProfile(portal) {
 
 
 function changePwd(portal) {
-  const cur  = document.getElementById(`${portal}-cur-pwd`).value;
-  const nw   = document.getElementById(`${portal}-new-pwd`).value;
-  const conf = document.getElementById(`${portal}-conf-pwd`).value;
+  const cur  = (document.getElementById(`${portal}-cur-pwd`) || document.getElementById('admin-cur-pwd') || document.getElementById('settings-cur-pwd'))?.value || '';
+  const nw   = (document.getElementById(`${portal}-new-pwd`) || document.getElementById('admin-new-pwd') || document.getElementById('settings-new-pwd'))?.value || '';
+  const conf = (document.getElementById(`${portal}-conf-pwd`) || document.getElementById('admin-conf-pwd') || document.getElementById('settings-conf-pwd'))?.value || '';
   if (!cur||!nw||!conf) { Toast.show('Please fill in all password fields.','warning'); return; }
   if (nw !== conf) { Toast.show('New passwords do not match!','error'); return; }
   if (nw.length < 10) { Toast.show('Password must be at least 10 characters.','warning'); return; }
@@ -2595,9 +2595,15 @@ function changePwd(portal) {
   }).then(r => r.json()).then(data => {
     if (data.success) {
       Toast.show('Password changed successfully! 🔒', 'success');
-      ['cur-pwd','new-pwd','conf-pwd'].forEach(s => { const el=document.getElementById(`${portal}-${s}`); if(el) el.value=''; });
-      const strEl = document.getElementById(`${portal}-pwd-strength`);
-      if (strEl) strEl.innerHTML = 'Password strength: Minimum 10 characters with numbers/symbols';
+      ['cur-pwd','new-pwd','conf-pwd'].forEach(s => {
+        const elAdmin = document.getElementById(`admin-${s}`); if(elAdmin) elAdmin.value='';
+        const elSet = document.getElementById(`settings-${s}`); if(elSet) elSet.value='';
+        const elCand = document.getElementById(`cand-${s}`); if(elCand) elCand.value='';
+      });
+      const strAdmin = document.getElementById('admin-pwd-strength');
+      if (strAdmin) strAdmin.innerHTML = 'Password strength: Minimum 10 characters with numbers/symbols';
+      const strSet = document.getElementById('settings-pwd-strength');
+      if (strSet) strSet.innerHTML = 'Password strength: Minimum 10 characters with numbers/symbols';
     } else {
       Toast.show(data.message || 'Failed to change password.', 'error');
     }
@@ -2640,19 +2646,58 @@ function checkPasswordStrength(pwd, targetElId) {
   }
 }
 
-function saveSettings() {
+function saveSettings(silent = false) {
+  const atsVal = document.getElementById('set-ats-threshold')?.value || '80';
   const settings = {
-    newAlerts: document.getElementById('set-new-alerts')?.checked,
-    emailShortlist: document.getElementById('set-email-shortlist')?.checked,
-    weeklyReport: document.getElementById('set-weekly-report')?.checked,
-    autoRank: document.getElementById('set-auto-rank')?.checked,
-    strictAts: document.getElementById('set-strict-ats')?.checked,
-    softSkills: document.getElementById('set-soft-skills')?.checked,
-    tfa: document.getElementById('set-2fa')?.checked,
-    darkMode: document.getElementById('set-dark-mode')?.checked
+    newAlerts: document.getElementById('set-new-alerts')?.checked ?? true,
+    emailShortlist: document.getElementById('set-email-shortlist')?.checked ?? true,
+    weeklyReport: document.getElementById('set-weekly-report')?.checked ?? true,
+    autoRank: document.getElementById('set-auto-rank')?.checked ?? true,
+    strictAts: document.getElementById('set-strict-ats')?.checked ?? false,
+    softSkills: document.getElementById('set-soft-skills')?.checked ?? true,
+    atsThreshold: parseInt(atsVal, 10),
+    defaultLocation: document.getElementById('set-default-loc')?.value || 'Bangalore, India',
+    defaultCurrency: document.getElementById('set-default-currency')?.value || 'INR',
+    tfa: document.getElementById('set-2fa')?.checked ?? false,
+    sessionTimeout: document.getElementById('set-session-timeout')?.value || '60',
+    darkMode: document.getElementById('set-dark-mode')?.checked ?? false,
+    compactDensity: document.getElementById('set-compact-density')?.checked ?? false
   };
   localStorage.setItem('hireai_settings', JSON.stringify(settings));
-  Toast.show('Settings saved to device.', 'success');
+  if (!silent) {
+    Toast.show('Settings saved successfully! ✓', 'success');
+  }
+}
+
+function testNotificationAlert() {
+  const testNotif = {
+    id: Date.now(),
+    title: 'Test Notification Alert',
+    message: 'This is a simulated real-time alert dispatched from System Settings.',
+    type: 'system',
+    time: 'Just now',
+    timestamp: new Date().toISOString(),
+    unread: true,
+    action: 'admin-dash'
+  };
+  if (!Array.isArray(DB.notifications)) DB.notifications = [];
+  DB.notifications.unshift(testNotif);
+  updateSidebarBadges();
+  if (typeof UI !== 'undefined' && UI.renderNotifications) {
+    UI.renderNotifications('admin', UI._adminNotifCategory || 'all');
+  }
+  Toast.show('🔔 Test notification sent! Check Notification Center.', 'info');
+}
+
+function toggleTableDensity(isCompact) {
+  if (isCompact) {
+    document.body.classList.add('compact-table-density');
+  } else {
+    document.body.classList.remove('compact-table-density');
+  }
+  const el = document.getElementById('set-compact-density');
+  if (el) el.checked = isCompact;
+  saveSettings(true);
 }
 
 function saveCandidateSettings(silent = false) {
@@ -2684,7 +2729,7 @@ function saveCandidateSettings(silent = false) {
 function switchSettingTab(tab, el) {
   document.querySelectorAll('#admin-settings .settings-nav-item').forEach(i => i.classList.remove('active'));
   if (el) el.classList.add('active');
-  document.querySelectorAll('.set-tab-pane').forEach(p => p.classList.add('hidden'));
+  document.querySelectorAll('#admin-settings .set-tab-pane').forEach(p => p.classList.add('hidden'));
   const target = document.getElementById('set-tab-' + tab);
   if (target) target.classList.remove('hidden');
 }
@@ -2728,7 +2773,7 @@ function toggleDarkMode(isDark) {
   const elCand = document.getElementById('cand-set-dark-mode');
   if (elCand) elCand.checked = isDark;
 
-  saveSettings();
+  saveSettings(true);
   saveCandidateSettings(true);
 }
 
@@ -2773,11 +2818,25 @@ function loadSettings() {
       if (parsed.autoRank !== undefined) { const el = document.getElementById('set-auto-rank'); if(el) el.checked = parsed.autoRank; }
       if (parsed.strictAts !== undefined) { const el = document.getElementById('set-strict-ats'); if(el) el.checked = parsed.strictAts; }
       if (parsed.softSkills !== undefined) { const el = document.getElementById('set-soft-skills'); if(el) el.checked = parsed.softSkills; }
+      if (parsed.atsThreshold !== undefined) {
+        const el = document.getElementById('set-ats-threshold');
+        if (el) el.value = parsed.atsThreshold;
+        const valSpan = document.getElementById('ats-threshold-val');
+        if (valSpan) valSpan.textContent = parsed.atsThreshold + '%';
+      }
+      if (parsed.defaultLocation) { const el = document.getElementById('set-default-loc'); if(el) el.value = parsed.defaultLocation; }
+      if (parsed.defaultCurrency) { const el = document.getElementById('set-default-currency'); if(el) el.value = parsed.defaultCurrency; }
+      if (parsed.sessionTimeout) { const el = document.getElementById('set-session-timeout'); if(el) el.value = parsed.sessionTimeout; }
       if (parsed.tfa !== undefined) { const el = document.getElementById('set-2fa'); if(el) el.checked = parsed.tfa; }
       if (parsed.darkMode !== undefined) { 
         const el = document.getElementById('set-dark-mode'); 
         if(el) el.checked = parsed.darkMode; 
         if(parsed.darkMode) document.body.classList.add('dark-mode'); 
+      }
+      if (parsed.compactDensity !== undefined) {
+        const el = document.getElementById('set-compact-density');
+        if (el) el.checked = parsed.compactDensity;
+        toggleTableDensity(parsed.compactDensity);
       }
     } catch(e){}
   }
@@ -5224,6 +5283,8 @@ window.changePwd = changePwd;
 window.togglePasswordVisibility = togglePasswordVisibility;
 window.checkPasswordStrength = checkPasswordStrength;
 window.saveSettings = saveSettings;
+window.testNotificationAlert = testNotificationAlert;
+window.toggleTableDensity = toggleTableDensity;
 window.markAllRead = markAllRead;
 window.filterAdminNotifs = filterAdminNotifs;
 window.markSingleNotificationRead = markSingleNotificationRead;

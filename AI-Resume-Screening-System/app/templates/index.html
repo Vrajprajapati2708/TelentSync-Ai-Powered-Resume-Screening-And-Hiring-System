@@ -2039,12 +2039,13 @@
 
         <!-- ── ADMIN: Settings ── -->
         <div id="admin-settings" data-portal="admin" class="hidden">
-          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:22px">System Settings</div>
+          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:20px">System Settings &amp; Configuration</div>
           <div class="settings-layout">
-            <div class="card" style="padding:16px; align-self: start;">
+            <div class="card" style="padding:14px; align-self: start;">
               <div class="settings-nav">
                 <div class="settings-nav-item active" onclick="switchSettingTab('notif', this)"><i class="fas fa-bell"></i>Notifications</div>
-                <div class="settings-nav-item" onclick="switchSettingTab('ai', this)"><i class="fas fa-robot"></i>AI Settings</div>
+                <div class="settings-nav-item" onclick="switchSettingTab('ai', this)"><i class="fas fa-robot"></i>AI Engine</div>
+                <div class="settings-nav-item" onclick="switchSettingTab('workflow', this)"><i class="fas fa-sitemap"></i>Hiring Workflow</div>
                 <div class="settings-nav-item" onclick="switchSettingTab('security', this)"><i class="fas fa-shield-alt"></i>Security</div>
                 <div class="settings-nav-item" onclick="switchSettingTab('appearance', this)"><i class="fas fa-palette"></i>Appearance</div>
               </div>
@@ -2052,22 +2053,26 @@
             <div class="card">
               <!-- Settings Tab: Notifications -->
               <div id="set-tab-notif" class="set-tab-pane">
-                <div class="card-header"><span class="card-title">Notification Preferences</span></div>
+                <div class="card-header"><span class="card-title"><i class="fas fa-bell" style="color:var(--primary);margin-right:8px"></i>Notification Preferences</span></div>
                 <div class="card-body">
-                  <div style="display:flex;flex-direction:column;gap:20px">
+                  <div style="display:flex;flex-direction:column;gap:18px">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">New Application Alerts</div><div style="font-size:13px;color:var(--text-3)">Get notified when new candidates apply</div></div>
+                      <div><div style="font-size:14px;font-weight:600">New Applicant Alerts</div><div style="font-size:13px;color:var(--text-3)">Get notified in real-time when new candidates submit resumes</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-new-alerts" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
                     <hr class="divider" style="margin:0">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Email Shortlist Notifications</div><div style="font-size:13px;color:var(--text-3)">Email candidates when shortlisted</div></div>
-                      <label class="toggle-switch"><input type="checkbox" id="set-email-shortlist" onchange="saveSettings()"><span class="toggle-slider"></span></label>
+                      <div><div style="font-size:14px;font-weight:600">High-Match Candidate Push</div><div style="font-size:13px;color:var(--text-3)">Instant alert when a candidate matches >= 85% for an active role</div></div>
+                      <label class="toggle-switch"><input type="checkbox" id="set-email-shortlist" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
                     <hr class="divider" style="margin:0">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Weekly Analytics Report</div><div style="font-size:13px;color:var(--text-3)">Receive weekly HR analytics email digest</div></div>
+                      <div><div style="font-size:14px;font-weight:600">Weekly Analytics Report</div><div style="font-size:13px;color:var(--text-3)">Receive weekly HR analytics and talent pool performance digest</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-weekly-report" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div>
+                      <button class="btn btn-outline btn-sm" onclick="testNotificationAlert()"><i class="fas fa-paper-plane"></i> Send Test Notification</button>
                     </div>
                   </div>
                 </div>
@@ -2075,54 +2080,130 @@
 
               <!-- Settings Tab: AI Settings -->
               <div id="set-tab-ai" class="set-tab-pane hidden">
-                <div class="card-header"><span class="card-title">AI Engine Settings</span></div>
+                <div class="card-header"><span class="card-title"><i class="fas fa-robot" style="color:var(--primary);margin-right:8px"></i>AI Engine &amp; Screening Configuration</span></div>
                 <div class="card-body">
-                  <div style="display:flex;flex-direction:column;gap:20px">
+                  <div style="display:flex;flex-direction:column;gap:18px">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Auto-rank on Upload</div><div style="font-size:13px;color:var(--text-3)">Auto-run AI ranking when new resumes arrive</div></div>
+                      <div><div style="font-size:14px;font-weight:600">Auto-rank on Upload</div><div style="font-size:13px;color:var(--text-3)">Automatically compute composite AI scores upon new resume intake</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-auto-rank" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
                     <hr class="divider" style="margin:0">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Strict ATS Parsing</div><div style="font-size:13px;color:var(--text-3)">Require exact keyword matches instead of semantic matches</div></div>
+                      <div><div style="font-size:14px;font-weight:600">Strict Keyword Match Guard</div><div style="font-size:13px;color:var(--text-3)">Require exact skill keywords alongside semantic cosine embeddings</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-strict-ats" onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
                     <hr class="divider" style="margin:0">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Extract Soft Skills</div><div style="font-size:13px;color:var(--text-3)">Attempt to extract leadership, communication, etc. from resume body</div></div>
+                      <div><div style="font-size:14px;font-weight:600">Extract Soft Skills &amp; Leadership</div><div style="font-size:13px;color:var(--text-3)">Extract communication, leadership, and collaboration traits</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-soft-skills" checked onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
+                    <hr class="divider" style="margin:0">
+                    <div>
+                      <div style="font-size:14px;font-weight:600;margin-bottom:4px">Auto-Shortlist Score Threshold: <span id="ats-threshold-val" style="color:var(--primary)">80%</span></div>
+                      <div style="font-size:13px;color:var(--text-3);margin-bottom:8px">Candidates meeting or exceeding this score will be recommended for fast-track screening</div>
+                      <input type="range" id="set-ats-threshold" min="50" max="95" value="80" class="form-control" style="padding:0;height:8px" oninput="document.getElementById('ats-threshold-val').textContent = this.value + '%'; saveSettings();">
+                    </div>
+                    <div style="background:var(--bg-2);padding:12px 14px;border-radius:8px;font-size:12px;color:var(--text-2);line-height:1.5">
+                      <strong style="color:var(--text-1)"><i class="fas fa-calculator" style="color:var(--primary);margin-right:4px"></i> Active AI Score Formula:</strong><br>
+                      <code>Composite Score = (ATS Score × 40%) + (Skill Match × 30%) + (Cosine Similarity × 30%)</code>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Settings Tab: Hiring Workflow -->
+              <div id="set-tab-workflow" class="set-tab-pane hidden">
+                <div class="card-header"><span class="card-title"><i class="fas fa-sitemap" style="color:var(--primary);margin-right:8px"></i>Hiring Workflow &amp; Organization Defaults</span></div>
+                <div class="card-body">
+                  <div style="display:flex;flex-direction:column;gap:18px">
+                    <div class="form-group">
+                      <label class="form-label">Default Office Location</label>
+                      <input id="set-default-loc" class="form-control" placeholder="e.g. Bangalore, India" value="Bangalore, India" onchange="saveSettings()">
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Default Salary Currency</label>
+                      <select id="set-default-currency" class="form-control" onchange="saveSettings()">
+                        <option value="INR" selected>INR (₹) - Indian Rupee</option>
+                        <option value="USD">USD ($) - US Dollar</option>
+                        <option value="EUR">EUR (€) - Euro</option>
+                        <option value="GBP">GBP (£) - British Pound</option>
+                      </select>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Screening Pipeline Stages</label>
+                      <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <span class="badge badge-primary" style="padding:6px 12px;font-size:12px">1. Application Intake</span>
+                        <span class="badge badge-primary" style="padding:6px 12px;font-size:12px">2. AI Screening</span>
+                        <span class="badge badge-primary" style="padding:6px 12px;font-size:12px">3. HR Review</span>
+                        <span class="badge badge-success" style="padding:6px 12px;font-size:12px">4. Shortlist / Offer</span>
+                      </div>
+                    </div>
+                    <button class="btn btn-primary btn-sm" onclick="saveSettings();Toast.show('Workflow defaults updated!','success')"><i class="fas fa-save"></i> Save Workflow Defaults</button>
                   </div>
                 </div>
               </div>
 
               <!-- Settings Tab: Security -->
               <div id="set-tab-security" class="set-tab-pane hidden">
-                <div class="card-header"><span class="card-title">Security & Passwords</span></div>
+                <div class="card-header"><span class="card-title"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:8px"></i>Security &amp; Session Controls</span></div>
                 <div class="card-body">
-                  <div style="display:flex;flex-direction:column;gap:20px; max-width: 400px;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                      <div><div style="font-size:14px;font-weight:600">Two-Factor Authentication</div><div style="font-size:13px;color:var(--text-3)">Require 2FA via authenticator app</div></div>
+                  <div style="display:flex;flex-direction:column;gap:18px">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div><div style="font-size:14px;font-weight:600">Two-Factor Authentication (2FA)</div><div style="font-size:13px;color:var(--text-3)">Enforce OTP confirmation for HR logins</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-2fa" onchange="saveSettings()"><span class="toggle-slider"></span></label>
                     </div>
                     <hr class="divider" style="margin:0">
-                    <div style="font-size:14px;font-weight:600;margin-top:10px;">Change Password</div>
-                    <div class="form-group"><label class="form-label">Current Password</label><input id="settings-cur-pwd" class="form-control" type="password" placeholder="••••••••"></div>
-                    <div class="form-group"><label class="form-label">New Password</label><input id="settings-new-pwd" class="form-control" type="password" placeholder="Min 10 characters"></div>
-                    <div class="form-group"><label class="form-label">Confirm New Password</label><input id="settings-conf-pwd" class="form-control" type="password" placeholder="Repeat"></div>
-                    <div><button class="btn btn-navy" onclick="changePwd('admin')"><i class="fas fa-key"></i> Update Password</button></div>
+                    <div class="form-group">
+                      <label class="form-label">Auto-Session Inactivity Timeout</label>
+                      <select id="set-session-timeout" class="form-control" style="max-width:240px" onchange="saveSettings()">
+                        <option value="30">30 Minutes</option>
+                        <option value="60" selected>1 Hour</option>
+                        <option value="240">4 Hours</option>
+                        <option value="never">Never (Stay signed in)</option>
+                      </select>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="font-size:14px;font-weight:600;color:var(--text-1)">Password Management</div>
+                    <div class="form-group">
+                      <label class="form-label">Current Password</label>
+                      <div style="position:relative;max-width:360px">
+                        <input id="settings-cur-pwd" class="form-control" type="password" placeholder="••••••••" style="padding-right:36px">
+                        <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('settings-cur-pwd', this)"></i>
+                      </div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">New Password</label>
+                      <div style="position:relative;max-width:360px">
+                        <input id="settings-new-pwd" class="form-control" type="password" placeholder="Min 10 characters" style="padding-right:36px" oninput="checkPasswordStrength(this.value, 'settings-pwd-strength')">
+                        <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('settings-new-pwd', this)"></i>
+                      </div>
+                      <div id="settings-pwd-strength" style="font-size:11px;margin-top:4px;color:var(--text-3)">Password strength: Minimum 10 characters with numbers/symbols</div>
+                    </div>
+                    <div class="form-group">
+                      <label class="form-label">Confirm New Password</label>
+                      <div style="position:relative;max-width:360px">
+                        <input id="settings-conf-pwd" class="form-control" type="password" placeholder="Repeat new password" style="padding-right:36px">
+                        <i class="fas fa-eye" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--text-3)" onclick="togglePasswordVisibility('settings-conf-pwd', this)"></i>
+                      </div>
+                    </div>
+                    <div><button class="btn btn-navy" onclick="changePwd('settings')"><i class="fas fa-key"></i> Update Password</button></div>
                   </div>
                 </div>
               </div>
 
               <!-- Settings Tab: Appearance -->
               <div id="set-tab-appearance" class="set-tab-pane hidden">
-                <div class="card-header"><span class="card-title">Appearance</span></div>
+                <div class="card-header"><span class="card-title"><i class="fas fa-palette" style="color:var(--primary);margin-right:8px"></i>Appearance &amp; Display</span></div>
                 <div class="card-body">
-                  <div style="display:flex;flex-direction:column;gap:20px">
+                  <div style="display:flex;flex-direction:column;gap:18px">
                     <div style="display:flex;justify-content:space-between;align-items:center">
-                      <div><div style="font-size:14px;font-weight:600">Dark Mode</div><div style="font-size:13px;color:var(--text-3)">Toggle night mode interface</div></div>
+                      <div><div style="font-size:14px;font-weight:600">Dark Mode Interface</div><div style="font-size:13px;color:var(--text-3)">Switch between dark modern theme and light high-clarity theme</div></div>
                       <label class="toggle-switch"><input type="checkbox" id="set-dark-mode" onchange="toggleDarkMode(this.checked)"><span class="toggle-slider"></span></label>
+                    </div>
+                    <hr class="divider" style="margin:0">
+                    <div style="display:flex;justify-content:space-between;align-items:center">
+                      <div><div style="font-size:14px;font-weight:600">Compact Table Density</div><div style="font-size:13px;color:var(--text-3)">Display more candidate and job rows with tighter padding</div></div>
+                      <label class="toggle-switch"><input type="checkbox" id="set-compact-density" onchange="toggleTableDensity(this.checked)"><span class="toggle-slider"></span></label>
                     </div>
                   </div>
                 </div>
