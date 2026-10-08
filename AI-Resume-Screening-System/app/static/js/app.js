@@ -1066,32 +1066,121 @@ const UI = {
     `).join('') || `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-3)">No candidates found</td></tr>`;
   },
 
-  renderRankingsTable(jobId) {
+  renderRankingsTable(jobFilter = 'All', searchQuery = '') {
     const tbody = document.getElementById('rankings-tbody');
     if (!tbody) return;
-    const data = [...DB.candidates].sort((a,b) => b.ats - a.ats);
-    tbody.innerHTML = data.map((c,i) => `
-      <tr ${i===0?'class="top-rank-row"':''}>
-        <td>${this.rankBadge(i+1)}</td>
-        <td>
-          <div style="display:flex;align-items:center;gap:10px">
-            <div class="avatar avatar-sm" style="background:${this.avatarColor(c.name)};color:#fff">${c.name.slice(0,2).toUpperCase()}</div>
-            <div class="fw-600">${c.name}</div>
-          </div>
-        </td>
-        <td>${c.job}</td>
-        <td><span class="badge ${this.atsBadge(c.ats)}">${c.ats}/100</span></td>
-        <td><strong>${c.match}%</strong></td>
-        <td>${c.exp}</td>
-        <td>${c.sim.toFixed(2)}</td>
-        <td><strong style="font-size:16px;font-family:'Syne',sans-serif">${Math.round((c.ats*0.4 + c.match*0.3 + c.sim*100*0.3))}</strong></td>
-        <td>
-          ${i===0?`<button class="btn btn-success btn-sm" onclick="updateCandidateStatus(${c.id},'Shortlisted');Toast.show('${c.name} shortlisted!','success')">✓ Hire</button>`
-          :i>=data.length-2?`<button class="btn btn-danger btn-sm" onclick="updateCandidateStatus(${c.id},'Rejected');Toast.show('${c.name} rejected.','info')">Reject</button>`
-          :`<button class="btn btn-warning btn-sm" onclick="updateCandidateStatus(${c.id},'Shortlisted');Toast.show('${c.name} shortlisted!','success')">Shortlist</button>`}
-        </td>
-      </tr>
-    `).join('');
+
+    // Populate job filter options dynamically if needed
+    const jobSelect = document.getElementById('rankings-filter-job');
+    if (jobSelect && jobSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
+      const distinctJobTitles = Array.from(new Set(DB.jobs.map(j => j.title).filter(Boolean)));
+      distinctJobTitles.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        jobSelect.appendChild(opt);
+      });
+    }
+
+    if (!Array.isArray(DB.candidates) || DB.candidates.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-inbox" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4"></i>No applicant candidates found</td></tr>`;
+      return;
+    }
+
+    // Filter by Job role
+    let filtered = [...DB.candidates];
+    if (jobFilter && jobFilter !== 'All') {
+      filtered = filtered.filter(c => (c.job || '').toLowerCase().trim() === jobFilter.toLowerCase().trim());
+    }
+
+    // Filter by Search Query
+    if (searchQuery && searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(c => 
+        (c.name || '').toLowerCase().includes(q) || 
+        (c.job || '').toLowerCase().includes(q) || 
+        (c.email || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Deduplicate candidate per job application
+    const seen = new Set();
+    filtered = filtered.filter(c => {
+      const key = `${c.user_id || c.id}_${c.job}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    // Calculate true Composite AI Score (ATS 40% + Skill Match 30% + Cosine Similarity 30%)
+    filtered.forEach(c => {
+      const ats = Number(c.ats) || 0;
+      const match = Number(c.match) || 0;
+      const simPercent = typeof c.sim === 'number' ? c.sim * 100 : match;
+      c.compositeAIScore = Math.round((ats * 0.4) + (match * 0.3) + (simPercent * 0.3));
+    });
+
+    // Sort strictly descending by Composite AI Score
+    filtered.sort((a, b) => b.compositeAIScore - a.compositeAIScore);
+
+    const subEl = document.getElementById('admin-rankings-subtitle');
+    if (subEl) {
+      subEl.textContent = jobFilter === 'All' 
+        ? `All Roles (${filtered.length} candidates) · Ranked by AI Composite Score` 
+        : `${jobFilter} (${filtered.length} candidates) · Ranked by AI Composite Score`;
+    }
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:32px;color:var(--text-3)"><i class="fas fa-search" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4"></i>No candidates match the selected filters.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map((c, i) => {
+      const topBadgeClass = i === 0 ? 'class="top-rank-row"' : '';
+      const isShortlisted = c.status === 'Shortlisted';
+      const isRejected = c.status === 'Rejected';
+
+      return `
+        <tr ${topBadgeClass}>
+          <td>${this.rankBadge(i + 1)}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="avatar avatar-sm" style="background:${this.avatarColor(c.name)};color:#fff">${(c.name || '??').slice(0, 2).toUpperCase()}</div>
+              <div>
+                <div class="fw-600" style="cursor:pointer;color:var(--primary)" onclick="viewCandidate(${c.id})">${c.name}</div>
+                <div style="font-size:11px;color:var(--text-3)">${c.email || ''}</div>
+              </div>
+            </div>
+          </td>
+          <td><span style="font-weight:600;color:var(--text-1)">${c.job}</span></td>
+          <td><span class="badge ${this.atsBadge(c.ats)}">${c.ats}/100</span></td>
+          <td><strong style="color:${c.match >= 80 ? '#16a34a' : c.match >= 60 ? '#d97706' : '#dc2626'}">${c.match}%</strong></td>
+          <td>${c.exp || '0 yrs'}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <strong style="font-size:15px;font-family:'Syne',sans-serif;color:${c.compositeAIScore >= 75 ? '#16a34a' : c.compositeAIScore >= 50 ? '#d97706' : '#dc2626'}">${c.compositeAIScore}</strong>
+              <div class="progress" style="width:36px;height:5px;background:var(--border)"><div class="progress-bar" style="width:${c.compositeAIScore}%;background:${c.compositeAIScore >= 75 ? '#16a34a' : c.compositeAIScore >= 50 ? '#d97706' : '#dc2626'}"></div></div>
+            </div>
+          </td>
+          <td>${this.statusBadge(c.status)}</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button class="btn btn-sm ${isShortlisted ? 'btn-success' : 'btn-outline'}" style="font-size:11px;padding:4px 8px" onclick="updateCandidateStatus(${c.id}, 'Shortlisted');UI.renderRankingsTable(document.getElementById('rankings-filter-job')?.value || 'All')">
+                ${isShortlisted ? '<i class="fas fa-check"></i> Shortlisted' : 'Shortlist'}
+              </button>
+              ${!isRejected ? `
+                <button class="btn btn-sm btn-outline-danger" style="font-size:11px;padding:4px 6px" title="Reject candidate" onclick="updateCandidateStatus(${c.id}, 'Rejected');UI.renderRankingsTable(document.getElementById('rankings-filter-job')?.value || 'All')">
+                  <i class="fas fa-times"></i>
+                </button>
+              ` : `
+                <span class="badge badge-danger" style="font-size:10px">Rejected</span>
+              `}
+              <button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 8px" onclick="viewCandidate(${c.id})">Profile</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join('');
   },
 
   renderNotifications(portal) {
@@ -2438,6 +2527,64 @@ function topbarSearch(val, portal) {
   if (!val.trim()) return;
   if (portal === 'admin') searchCandidates(val);
   Toast.show(`Searching for "${val}"...`,'info');
+}
+
+// ── AI Rankings Filter & Export Handlers ────────────────────────
+function filterRankingsByJob(jobTitle) {
+  const q = document.getElementById('rankings-search')?.value || '';
+  UI.renderRankingsTable(jobTitle, q);
+}
+
+function filterRankingsSearch(q) {
+  const jobTitle = document.getElementById('rankings-filter-job')?.value || 'All';
+  UI.renderRankingsTable(jobTitle, q);
+}
+
+function exportRankingsCSV() {
+  const jobTitle = document.getElementById('rankings-filter-job')?.value || 'All';
+  let list = [...(DB.candidates || [])];
+  if (jobTitle !== 'All') {
+    list = list.filter(c => (c.job || '').toLowerCase().trim() === jobTitle.toLowerCase().trim());
+  }
+
+  // Deduplicate
+  const seen = new Set();
+  list = list.filter(c => {
+    const key = `${c.user_id || c.id}_${c.job}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  list.forEach(c => {
+    const ats = Number(c.ats) || 0;
+    const match = Number(c.match) || 0;
+    const simPercent = typeof c.sim === 'number' ? c.sim * 100 : match;
+    c.compositeAIScore = Math.round((ats * 0.4) + (match * 0.3) + (simPercent * 0.3));
+  });
+
+  list.sort((a, b) => b.compositeAIScore - a.compositeAIScore);
+
+  let csv = 'Rank,Candidate Name,Email,Job Applied,ATS Score,Skill Match,Experience,AI Composite Score,Status\n';
+  list.forEach((c, idx) => {
+    const clean = (val) => {
+      let s = String(val || '').replace(/"/g, '""');
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+      return `"${s}"`;
+    };
+    csv += `${idx + 1},${clean(c.name)},${clean(c.email)},${clean(c.job)},${c.ats},${c.match}%,${clean(c.exp)},${c.compositeAIScore},${clean(c.status)}\n`;
+  });
+
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `talentsync_ai_rankings_${jobTitle.replace(/\s+/g,'_').toLowerCase()}_${Date.now()}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.show('AI Candidate Rankings exported to CSV! 📊', 'success');
 }
 
 // ── API Fetchers (World-Class Live Data) ────────────────────────────────
