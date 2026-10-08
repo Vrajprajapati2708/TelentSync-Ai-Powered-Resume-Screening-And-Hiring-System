@@ -8419,13 +8419,13 @@ function loadMLPipelineStatus() {
       if (data.version_info) {
         const v = data.version_info;
         if (v.python) {
-          setEl('ml-runtime-badge', `Python ${escapeHTML(v.python)}`);
-          setEl('ml-ver-python', `<i class="fab fa-python" style="color:#3b82f6;margin-right:4px"></i> Python ${escapeHTML(v.python)}`);
+          setEl('ml-runtime-badge', `Python ${v.python}`);
+          setEl('ml-val-python', v.python);
         }
-        if (v.spacy) setEl('ml-ver-spacy', `<i class="fas fa-brain" style="color:#7c3aed;margin-right:4px"></i> spaCy ${escapeHTML(v.spacy)}`);
-        if (v.scikit_learn) setEl('ml-ver-sklearn', `<i class="fas fa-cogs" style="color:#f59e0b;margin-right:4px"></i> scikit-learn ${escapeHTML(v.scikit_learn)}`);
-        if (v.numpy) setEl('ml-ver-numpy', `<i class="fas fa-cube" style="color:#06b6d4;margin-right:4px"></i> NumPy ${escapeHTML(v.numpy)}`);
-        if (v.joblib) setEl('ml-ver-joblib', `<i class="fas fa-archive" style="color:#10b981;margin-right:4px"></i> Joblib ${escapeHTML(v.joblib)}`);
+        if (v.spacy) setEl('ml-val-spacy', v.spacy);
+        if (v.scikit_learn) setEl('ml-val-sklearn', v.scikit_learn);
+        if (v.numpy) setEl('ml-val-numpy', v.numpy);
+        if (v.joblib) setEl('ml-val-joblib', v.joblib);
       }
 
       if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh Status'; }
