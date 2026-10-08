@@ -1724,7 +1724,7 @@
 
         <!-- ── ADMIN: Candidates ── -->
         <div id="admin-candidates" data-portal="admin" class="hidden">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:14px">
             <div class="tab-bar">
               <button class="tab-btn active" data-tabgroup="cand-filter" data-filter="All" onclick="switchTab(this,'cand-filter');document.getElementById('cluster-view-container').style.display='none';document.getElementById('candidates-table-card').style.display='';UI.renderCandidatesTable('All')"><i class="fas fa-users" style="font-size:12px"></i> All (<span id="tab-count-all">0</span>)</button>
               <button class="tab-btn" data-tabgroup="cand-filter" data-filter="Shortlisted" onclick="switchTab(this,'cand-filter');document.getElementById('cluster-view-container').style.display='none';document.getElementById('candidates-table-card').style.display='';UI.renderCandidatesTable('Shortlisted')"><i class="fas fa-check-circle" style="font-size:12px;color:#16a34a"></i> Shortlisted (<span id="tab-count-shortlisted">0</span>)</button>
@@ -1733,15 +1733,34 @@
               <button class="tab-btn" data-tabgroup="cand-filter" data-filter="Flagged" onclick="switchTab(this,'cand-filter');document.getElementById('cluster-view-container').style.display='none';document.getElementById('candidates-table-card').style.display='';UI.renderCandidatesTable('Flagged')" style="color:#dc2626"><i class="fas fa-shield-alt" style="font-size:12px"></i> Flagged (<span id="tab-count-outliers">0</span>)</button>
               <button class="tab-btn" data-tabgroup="cand-filter" data-filter="Cluster" onclick="switchTab(this,'cand-filter');document.getElementById('cluster-view-container').style.display='block';document.getElementById('candidates-table-card').style.display='none';renderClusterView()" style="color:#7c3aed"><i class="fas fa-project-diagram" style="font-size:12px"></i> View by Cluster</button>
             </div>
-            <div style="display:flex;gap:10px">
-              <button class="btn btn-outline btn-sm" onclick="exportCSV()"><i class="fas fa-download"></i> Export CSV</button>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <select id="candidates-filter-job" class="form-control form-control-sm" style="width:auto;min-width:160px;padding:6px 10px;font-size:12px" onchange="onCandidatesJobFilterChange(this.value)">
+                <option value="All">All Job Openings</option>
+              </select>
+              <div class="topbar-search" style="margin:0;width:200px">
+                <i class="fas fa-search"></i>
+                <input id="candidates-search-input" placeholder="Search applicant..." oninput="onCandidatesSearch(this.value)">
+              </div>
+              <button class="btn btn-outline btn-sm" onclick="exportCandidatesCSV()"><i class="fas fa-download"></i> Export CSV</button>
               <button class="btn btn-primary btn-sm" onclick="Modal.open('post-job-modal')"><i class="fas fa-plus"></i> Post Job</button>
             </div>
           </div>
           <div class="card" id="candidates-table-card">
             <div class="table-wrap">
               <table class="table">
-                <thead><tr><th>Rank</th><th>Candidate</th><th>Degree</th><th>Job Applied</th><th>Skills</th><th>ATS Score</th><th>Match %</th><th>Status</th><th>Actions</th></tr></thead>
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Candidate</th>
+                    <th>Education &amp; Exp</th>
+                    <th>Job Applied</th>
+                    <th>Extracted Skills</th>
+                    <th>ATS Score</th>
+                    <th>Match %</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
                 <tbody id="candidates-tbody"></tbody>
               </table>
             </div>

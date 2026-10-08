@@ -1019,51 +1019,122 @@ const UI = {
   },
 
 
-  renderCandidatesTable(filter='All') {
+  renderCandidatesTable(filter='All', jobFilter='All', searchQuery='') {
     const tbody = document.getElementById('candidates-tbody');
     if (!tbody) return;
-    let data = DB.candidates;
-    if (filter === 'Flagged')  data = data.filter(c => c.outlier_flag);
-    else if (filter !== 'All') data = data.filter(c => c.status === filter);
 
-    tbody.innerHTML = data.map((c,i) => `
+    // Track active candidate filter state
+    if (filter !== undefined && filter !== null) this._candStatusFilter = filter;
+    if (jobFilter !== undefined && jobFilter !== null) this._candJobFilter = jobFilter;
+    if (searchQuery !== undefined && searchQuery !== null) this._candSearchQuery = searchQuery;
+
+    const currentStatus = this._candStatusFilter || 'All';
+    const currentJob = this._candJobFilter || 'All';
+    const currentSearch = (this._candSearchQuery || '').toLowerCase().trim();
+
+    // Populate job filter options if available
+    const jobSelect = document.getElementById('candidates-filter-job');
+    if (jobSelect && jobSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
+      const distinctJobTitles = Array.from(new Set(DB.jobs.map(j => j.title).filter(Boolean)));
+      distinctJobTitles.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        jobSelect.appendChild(opt);
+      });
+    }
+
+    if (!Array.isArray(DB.candidates)) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-3)">No candidates found</td></tr>`;
+      return;
+    }
+
+    // Sync tab counts
+    const totalAll = DB.candidates.length;
+    const totalShortlisted = DB.candidates.filter(c => c.status === 'Shortlisted').length;
+    const totalReviewing = DB.candidates.filter(c => c.status === 'Reviewing' || c.status === 'Pending').length;
+    const totalRejected = DB.candidates.filter(c => c.status === 'Rejected').length;
+    const totalFlagged = DB.candidates.filter(c => c.outlier_flag).length;
+
+    setEl('tab-count-all', totalAll);
+    setEl('tab-count-shortlisted', totalShortlisted);
+    setEl('tab-count-reviewing', totalReviewing);
+    setEl('tab-count-rejected', totalRejected);
+    setEl('tab-count-outliers', totalFlagged);
+
+    let data = [...DB.candidates];
+
+    // Status filter
+    if (currentStatus === 'Flagged') {
+      data = data.filter(c => c.outlier_flag);
+    } else if (currentStatus === 'Reviewing') {
+      data = data.filter(c => c.status === 'Reviewing' || c.status === 'Pending');
+    } else if (currentStatus !== 'All') {
+      data = data.filter(c => c.status === currentStatus);
+    }
+
+    // Job filter
+    if (currentJob && currentJob !== 'All') {
+      data = data.filter(c => (c.job || '').toLowerCase().trim() === currentJob.toLowerCase().trim());
+    }
+
+    // Search filter
+    if (currentSearch) {
+      data = data.filter(c => 
+        (c.name || '').toLowerCase().includes(currentSearch) ||
+        (c.email || '').toLowerCase().includes(currentSearch) ||
+        (c.job || '').toLowerCase().includes(currentSearch) ||
+        (c.degree || '').toLowerCase().includes(currentSearch) ||
+        (Array.isArray(c.skills) && c.skills.some(s => s.toLowerCase().includes(currentSearch)))
+      );
+    }
+
+    if (data.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--text-3)"><i class="fas fa-search" style="font-size:24px;margin-bottom:8px;display:block;opacity:0.4"></i>No candidates match the selected filters.</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.map((c, i) => `
       <tr style="${c.outlier_flag ? 'background:rgba(220,38,38,0.04);border-left:3px solid #dc2626' : ''}">
-        <td>${this.rankBadge(i+1)}</td>
+        <td>${this.rankBadge(i + 1)}</td>
         <td>
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="avatar avatar-sm" style="background:${this.avatarColor(c.name)};color:#fff">${c.name.slice(0,2).toUpperCase()}</div>
+            <div class="avatar avatar-sm" style="background:${this.avatarColor(c.name)};color:#fff">${(c.name || '??').slice(0, 2).toUpperCase()}</div>
             <div>
-              <div class="fw-600">${c.name}</div>
-              <div class="text-xs text-muted">${c.email}</div>
-              ${c.outlier_flag ? `<span title="${c.outlier_reason}" style="display:inline-flex;align-items:center;gap:3px;margin-top:3px;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #fca5a5">⚠️ SUSPICIOUS</span>` : ''}
-              <span style="display:inline-block;margin-top:3px;background:#eff6ff;color:#2563eb;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600">${c.cluster_label}</span>
+              <div class="fw-600" style="cursor:pointer;color:var(--primary)" onclick="viewCandidate(${c.id})">${c.name}</div>
+              <div class="text-xs text-muted">${c.email || ''}</div>
+              ${c.outlier_flag ? `<span title="${c.outlier_reason || 'Anomaly Detected'}" style="display:inline-flex;align-items:center;gap:3px;margin-top:3px;background:#fee2e2;color:#dc2626;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid #fca5a5">⚠️ SUSPICIOUS</span>` : ''}
+              ${c.cluster_label ? `<span style="display:inline-block;margin-top:3px;background:#eff6ff;color:#2563eb;font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600">${c.cluster_label}</span>` : ''}
             </div>
           </div>
         </td>
-        <td><span class="text-sm">${c.degree}</span></td>
-        <td>${c.job}</td>
         <td>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;max-width:220px">
-            ${c.skills.slice(0, 4).map(s=>`<span class="badge badge-primary" style="font-size:11px">${s}</span>`).join('')}
-            ${c.skills.length > 4 ? `<span class="badge badge-gray" style="font-size:11px">+${c.skills.length - 4} more</span>` : ''}
+          <div style="font-size:12px;font-weight:600;color:var(--text-1)">${c.degree || 'N/A'}</div>
+          <div style="font-size:11px;color:var(--text-3)"><i class="fas fa-briefcase" style="font-size:10px"></i> ${c.exp || '0 yrs'}</div>
+        </td>
+        <td><span style="font-weight:600;color:var(--text-1)">${c.job || 'Unassigned'}</span></td>
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:wrap;max-width:200px">
+            ${Array.isArray(c.skills) ? c.skills.slice(0, 3).map(s => `<span class="badge badge-primary" style="font-size:10px;padding:2px 6px">${s}</span>`).join('') : ''}
+            ${Array.isArray(c.skills) && c.skills.length > 3 ? `<span class="badge badge-gray" style="font-size:10px;padding:2px 6px">+${c.skills.length - 3}</span>` : ''}
           </div>
         </td>
         <td><span class="badge ${this.atsBadge(c.ats)}">${c.ats}/100</span></td>
-        <td><strong style="color:${c.match>=80?'#16a34a':c.match>=60?'#d97706':'#dc2626'}">${c.match}%</strong></td>
+        <td><strong style="color:${c.match >= 80 ? '#16a34a' : c.match >= 60 ? '#d97706' : '#dc2626'}">${c.match}%</strong></td>
         <td>${this.statusBadge(c.status)}</td>
         <td>
-          <div style="display:flex;gap:6px">
-            <button class="btn btn-sm btn-primary" onclick="viewCandidate(${c.id})">View</button>
-            <select class="form-control" style="padding:5px 8px;font-size:12px;height:auto;width:auto" onchange="updateCandidateStatus(${c.id},this.value)">
-              <option ${c.status==='Reviewing'?'selected':''}>Reviewing</option>
-              <option ${c.status==='Shortlisted'?'selected':''}>Shortlisted</option>
-              <option ${c.status==='Pending'?'selected':''}>Pending</option>
-              <option ${c.status==='Rejected'?'selected':''}>Rejected</option>
+          <div style="display:flex;gap:6px;align-items:center">
+            <button class="btn btn-sm btn-primary" style="font-size:11px;padding:4px 8px" onclick="viewCandidate(${c.id})">Profile</button>
+            <select class="form-control" style="padding:4px 8px;font-size:11px;height:auto;width:auto" onchange="updateCandidateStatus(${c.id}, this.value)">
+              <option ${c.status === 'Reviewing' ? 'selected' : ''}>Reviewing</option>
+              <option ${c.status === 'Shortlisted' ? 'selected' : ''}>Shortlisted</option>
+              <option ${c.status === 'Pending' ? 'selected' : ''}>Pending</option>
+              <option ${c.status === 'Rejected' ? 'selected' : ''}>Rejected</option>
             </select>
           </div>
         </td>
       </tr>
-    `).join('') || `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-3)">No candidates found</td></tr>`;
+    `).join('');
   },
 
   renderRankingsTable(jobFilter = 'All', searchQuery = '') {
@@ -1561,29 +1632,142 @@ function viewJobRankings(jobId) {
   if (job) Toast.show(`Showing rankings for: ${job.title}`, 'info');
 }
 
-function exportCSV() {
-  const headers = ['Rank','Name','Email','Degree','Job','ATS','Match','Experience','Status'];
-  const rows = DB.candidates.sort((a,b)=>b.ats-a.ats).map((c,i)=>[i+1,c.name,c.email,c.degree,c.job,c.ats+'%',c.match+'%',c.exp,c.status]);
-  const csv = [headers,...rows].map(r=>r.join(',')).join('\n');
-  const blob = new Blob([csv], {type:'text/csv'});
+function onCandidatesJobFilterChange(job) {
+  UI.renderCandidatesTable(undefined, job, undefined);
+}
+
+function onCandidatesSearch(query) {
+  UI.renderCandidatesTable(undefined, undefined, query);
+}
+
+function exportCandidatesCSV() {
+  const currentStatus = UI._candStatusFilter || 'All';
+  const currentJob = UI._candJobFilter || 'All';
+  const currentSearch = (UI._candSearchQuery || '').toLowerCase().trim();
+
+  let data = [...DB.candidates];
+  if (currentStatus === 'Flagged') data = data.filter(c => c.outlier_flag);
+  else if (currentStatus === 'Reviewing') data = data.filter(c => c.status === 'Reviewing' || c.status === 'Pending');
+  else if (currentStatus !== 'All') data = data.filter(c => c.status === currentStatus);
+
+  if (currentJob && currentJob !== 'All') {
+    data = data.filter(c => (c.job || '').toLowerCase().trim() === currentJob.toLowerCase().trim());
+  }
+  if (currentSearch) {
+    data = data.filter(c => 
+      (c.name || '').toLowerCase().includes(currentSearch) ||
+      (c.email || '').toLowerCase().includes(currentSearch) ||
+      (c.job || '').toLowerCase().includes(currentSearch) ||
+      (c.degree || '').toLowerCase().includes(currentSearch)
+    );
+  }
+
+  const sanitizeCSV = (val) => {
+    let str = String(val == null ? '' : val);
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const headers = ['Rank', 'Candidate Name', 'Email', 'Job Applied', 'Degree', 'Experience', 'Extracted Skills', 'ATS Score', 'Match Score %', 'Status', 'Cluster', 'Outlier Flag'];
+  const rows = data.map((c, i) => [
+    sanitizeCSV(i + 1),
+    sanitizeCSV(c.name),
+    sanitizeCSV(c.email),
+    sanitizeCSV(c.job),
+    sanitizeCSV(c.degree),
+    sanitizeCSV(c.exp),
+    sanitizeCSV(Array.isArray(c.skills) ? c.skills.join('; ') : ''),
+    sanitizeCSV(c.ats + '/100'),
+    sanitizeCSV(c.match + '%'),
+    sanitizeCSV(c.status),
+    sanitizeCSV(c.cluster_label || ''),
+    sanitizeCSV(c.outlier_flag ? 'YES' : 'NO')
+  ]);
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href=url; a.download='candidates.csv'; a.click();
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TalentSync_Candidates_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  Toast.show('CSV exported successfully!','success');
+  Toast.show(`Exported ${data.length} candidate(s) to CSV!`, 'success');
+}
+
+function filterRankingsByJob(job) {
+  UI._rankingsJobFilter = job;
+  UI.renderRankingsTable(job, UI._rankingsSearchQuery || '');
+}
+
+function filterRankingsSearch(query) {
+  UI._rankingsSearchQuery = query;
+  UI.renderRankingsTable(UI._rankingsJobFilter || 'All', query);
+}
+
+function exportRankingsCSV() {
+  const jobFilter = UI._rankingsJobFilter || 'All';
+  const searchQuery = (UI._rankingsSearchQuery || '').toLowerCase().trim();
+
+  let filtered = [...DB.candidates];
+  if (jobFilter && jobFilter !== 'All') {
+    filtered = filtered.filter(c => (c.job || '').toLowerCase().trim() === jobFilter.toLowerCase().trim());
+  }
+  if (searchQuery) {
+    filtered = filtered.filter(c => 
+      (c.name || '').toLowerCase().includes(searchQuery) || 
+      (c.job || '').toLowerCase().includes(searchQuery) || 
+      (c.email || '').toLowerCase().includes(searchQuery)
+    );
+  }
+  filtered.forEach(c => {
+    const ats = Number(c.ats) || 0;
+    const match = Number(c.match) || 0;
+    const simPercent = typeof c.sim === 'number' ? c.sim * 100 : match;
+    c.compositeAIScore = Math.round((ats * 0.4) + (match * 0.3) + (simPercent * 0.3));
+  });
+  filtered.sort((a, b) => b.compositeAIScore - a.compositeAIScore);
+
+  const sanitizeCSV = (val) => {
+    let str = String(val == null ? '' : val);
+    if (/^[=+\-@\t\r]/.test(str)) str = "'" + str;
+    return `"${str.replace(/"/g, '""')}"`;
+  };
+
+  const headers = ['Rank', 'Candidate Name', 'Email', 'Job Applied', 'ATS Score', 'Skill Match %', 'Experience', 'AI Composite Score', 'Status'];
+  const rows = filtered.map((c, i) => [
+    sanitizeCSV(i + 1),
+    sanitizeCSV(c.name),
+    sanitizeCSV(c.email),
+    sanitizeCSV(c.job),
+    sanitizeCSV(c.ats + '/100'),
+    sanitizeCSV(c.match + '%'),
+    sanitizeCSV(c.exp),
+    sanitizeCSV(c.compositeAIScore),
+    sanitizeCSV(c.status)
+  ]);
+
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `TalentSync_AI_Rankings_${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  Toast.show(`Exported ${filtered.length} ranked candidate(s) to CSV!`, 'success');
+}
+
+function exportCSV() {
+  exportCandidatesCSV();
 }
 
 function searchCandidates(val) {
-  const q = val.toLowerCase();
-  const filtered = DB.candidates.filter(c => c.name.toLowerCase().includes(q) || c.job.toLowerCase().includes(q) || c.email.toLowerCase().includes(q));
-  const tbody = document.getElementById('candidates-tbody');
-  if (!tbody) return;
-  if (!q) { UI.renderCandidatesTable(); return; }
-  // Temporarily swap
-  const saved = DB.candidates;
-  const bak = DB.candidates;
-  DB.candidates = filtered;
-  UI.renderCandidatesTable();
-  DB.candidates = bak;
+  onCandidatesSearch(val);
 }
 
 function filterJobs(portal) {
@@ -4495,6 +4679,12 @@ window.postJob   = postJob;
 window.viewCandidate = viewCandidate;
 window.viewJobRankings = viewJobRankings;
 window.exportCSV = exportCSV;
+window.exportCandidatesCSV = exportCandidatesCSV;
+window.onCandidatesJobFilterChange = onCandidatesJobFilterChange;
+window.onCandidatesSearch = onCandidatesSearch;
+window.filterRankingsByJob = filterRankingsByJob;
+window.filterRankingsSearch = filterRankingsSearch;
+window.exportRankingsCSV = exportRankingsCSV;
 window.searchCandidates = searchCandidates;
 window.filterJobs = filterJobs;
 window.resetFilters = resetFilters;
