@@ -1647,26 +1647,42 @@
 
         <!-- ── ADMIN: Dashboard ── -->
         <div id="admin-dash" data-portal="admin">
+          <!-- Top Stats (Clickable to jump directly to sections) -->
           <div class="stats-grid">
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:pointer" onclick="Router.inner('admin','candidates');Sidebar.setActive(document.querySelector('#sb-admin [data-section=candidates]'))" title="Click to view all applicants">
               <div class="stat-top"><div class="stat-label">Total Applicants</div><div class="stat-icon" style="background:#eff6ff"><i class="fas fa-users" style="color:var(--primary)"></i></div></div>
-              <div class="stat-value" id="stat-total-applicants">--</div><div class="stat-change up">Live from DB</div>
+              <div class="stat-value" id="stat-total-applicants">--</div><div class="stat-change up"><i class="fas fa-arrow-right"></i> View Applicants</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:pointer" onclick="Router.inner('admin','talentpool');Sidebar.setActive(document.querySelector('#sb-admin [data-section=talentpool]'))" title="Click to open Global Talent Pool">
               <div class="stat-top"><div class="stat-label">Resumes Analyzed</div><div class="stat-icon" style="background:#f0fdf4"><i class="fas fa-robot" style="color:#16a34a"></i></div></div>
-              <div class="stat-value" id="stat-resumes-analyzed">--</div><div class="stat-change up">AI Parsed</div>
+              <div class="stat-value" id="stat-resumes-analyzed">--</div><div class="stat-change up"><i class="fas fa-arrow-right"></i> Talent Pool</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:pointer" onclick="Router.inner('admin','candidates');Sidebar.setActive(document.querySelector('#sb-admin [data-section=candidates]'));switchTab(document.querySelector('[data-filter=Shortlisted]'),'cand-filter');UI.renderCandidatesTable('Shortlisted')" title="Click to view shortlisted talent">
               <div class="stat-top"><div class="stat-label">Shortlisted</div><div class="stat-icon" style="background:#fef9c3"><i class="fas fa-check-circle" style="color:#a16207"></i></div></div>
-              <div class="stat-value" id="stat-shortlisted">--</div><div class="stat-change up">Top Talent</div>
+              <div class="stat-value" id="stat-shortlisted">--</div><div class="stat-change up"><i class="fas fa-check"></i> Filter Shortlisted</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:pointer" onclick="Router.inner('admin','jobs');Sidebar.setActive(document.querySelector('#sb-admin [data-section=jobs]'))" title="Click to manage job postings">
               <div class="stat-top"><div class="stat-label">Active Jobs</div><div class="stat-icon" style="background:#fff1f2"><i class="fas fa-briefcase" style="color:#e11d48"></i></div></div>
-              <div class="stat-value" id="stat-active-jobs">--</div><div class="stat-change flat">Live postings</div>
+              <div class="stat-value" id="stat-active-jobs">--</div><div class="stat-change flat"><i class="fas fa-arrow-right"></i> Manage Jobs</div>
             </div>
-            <div class="stat-card">
+            <div class="stat-card" style="cursor:pointer" onclick="Router.inner('admin','rankings');Sidebar.setActive(document.querySelector('#sb-admin [data-section=rankings]'))" title="Click to view AI rankings">
               <div class="stat-top"><div class="stat-label">Avg ATS Score</div><div class="stat-icon" style="background:#f5f3ff"><i class="fas fa-star" style="color:#7c3aed"></i></div></div>
-              <div class="stat-value" id="stat-avg-ats">--</div><div class="stat-change up">AI Scored</div>
+              <div class="stat-value" id="stat-avg-ats">--</div><div class="stat-change up"><i class="fas fa-trophy"></i> AI Rankings</div>
+            </div>
+          </div>
+
+          <!-- Quick Actions Bar -->
+          <div class="card mb-2" style="padding:14px 20px;background:var(--surface)">
+            <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+              <div style="font-size:14px;font-weight:700;color:var(--text-1);display:flex;align-items:center;gap:8px">
+                <i class="fas fa-bolt" style="color:var(--primary)"></i> Recruitment Shortcuts
+              </div>
+              <div style="display:flex;gap:10px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" onclick="Modal.open('post-job-modal')"><i class="fas fa-plus"></i> Post New Job</button>
+                <button class="btn btn-outline btn-sm" onclick="Router.inner('admin','rankings');Sidebar.setActive(document.querySelector('#sb-admin [data-section=rankings]'))"><i class="fas fa-trophy"></i> AI Rankings</button>
+                <button class="btn btn-outline btn-sm" onclick="Router.inner('admin','talentpool');Sidebar.setActive(document.querySelector('#sb-admin [data-section=talentpool]'))"><i class="fas fa-users"></i> Global Talent Pool</button>
+                <button class="btn btn-outline btn-sm" onclick="exportTalentPoolCSV()"><i class="fas fa-download"></i> Export Talent CSV</button>
+              </div>
             </div>
           </div>
 
@@ -1678,7 +1694,16 @@
               </div>
               <div class="table-wrap">
                 <table class="table">
-                  <thead><tr><th>Candidate</th><th>Applied For</th><th>ATS</th><th>Status</th><th>Action</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Candidate</th>
+                      <th>Applied For</th>
+                      <th>ATS</th>
+                      <th>Applied</th>
+                      <th>Status</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
                   <tbody id="admin-dash-recent-tbody">
                   </tbody>
                 </table>
@@ -1686,11 +1711,11 @@
             </div>
             <div style="display:flex;flex-direction:column;gap:20px">
               <div class="card">
-                <div class="card-header"><span class="card-title">Skills Distribution</span></div>
+                <div class="card-header"><span class="card-title">Skills Demand Distribution</span></div>
                 <div class="card-body"><canvas id="admin-skills-donut" height="220"></canvas></div>
               </div>
               <div class="card">
-                <div class="card-header"><span class="card-title">Applications Trend</span></div>
+                <div class="card-header"><span class="card-title">Application Volume &amp; Shortlists</span></div>
                 <div class="card-body"><canvas id="admin-app-trend" height="160"></canvas></div>
               </div>
             </div>

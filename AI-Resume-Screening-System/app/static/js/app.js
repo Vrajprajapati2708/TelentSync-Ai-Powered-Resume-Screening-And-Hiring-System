@@ -2931,19 +2931,38 @@ function fetchCandidatesFromServer() {
 
     updateSidebarBadges();
     
-    // Populate recent applications on HR Dashboard (top 5 by ID desc as proxy for recent)
+    // Populate recent applications on HR Dashboard (top 6 by ID desc as proxy for recent)
     const recentTbody = document.getElementById('admin-dash-recent-tbody');
-    if (recentTbody && DB.candidates) {
-      const recentCands = [...DB.candidates].sort((a,b) => b.id - a.id).slice(0, 5);
-      recentTbody.innerHTML = recentCands.map(c => `
-        <tr>
-          <td><div class="fw-600">${c.name}</div><div class="text-xs text-muted">${c.email}</div></td>
-          <td>${c.job}</td>
-          <td><span class="badge ${c.ats >= 80 ? 'badge-success' : (c.ats >= 50 ? 'badge-warning' : 'badge-danger')}">${c.ats}</span></td>
-          <td>${UI.statusBadge(c.status)}</td>
-          <td><button class="btn btn-sm btn-primary" onclick="viewCandidate(${c.id})">View</button></td>
-        </tr>
-      `).join('');
+    if (recentTbody) {
+      if (!DB.candidates || DB.candidates.length === 0) {
+        recentTbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--text-3)"><i class="fas fa-inbox" style="font-size:22px;opacity:0.4;display:block;margin-bottom:6px"></i>No applicant records yet</td></tr>`;
+      } else {
+        const recentCands = [...DB.candidates].sort((a,b) => b.id - a.id).slice(0, 6);
+        recentTbody.innerHTML = recentCands.map(c => `
+          <tr>
+            <td>
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="avatar avatar-sm" style="background:${UI.avatarColor(c.name)};color:#fff">${(c.name || '??').slice(0, 2).toUpperCase()}</div>
+                <div>
+                  <div class="fw-600" style="cursor:pointer;color:var(--primary)" onclick="viewCandidate(${c.id})">${c.name}</div>
+                  <div class="text-xs text-muted">${c.email || ''}</div>
+                </div>
+              </div>
+            </td>
+            <td><span style="font-weight:600">${c.job}</span></td>
+            <td><span class="badge ${UI.atsBadge(c.ats)}">${c.ats}/100</span></td>
+            <td><span class="text-xs text-muted">${c.created_at ? formatRelativeTime(c.created_at) : 'Recent'}</span></td>
+            <td>${UI.statusBadge(c.status)}</td>
+            <td>
+              <div style="display:flex;gap:4px">
+                <button class="btn btn-sm btn-outline" style="padding:3px 7px;font-size:11px" onclick="updateCandidateStatus(${c.id},'Shortlisted');fetchCandidatesFromServer();" title="Shortlist"><i class="fas fa-check" style="color:#16a34a"></i></button>
+                <button class="btn btn-sm btn-outline-danger" style="padding:3px 7px;font-size:11px" onclick="updateCandidateStatus(${c.id},'Rejected');fetchCandidatesFromServer();" title="Reject"><i class="fas fa-times"></i></button>
+                <button class="btn btn-sm btn-primary" style="padding:3px 7px;font-size:11px" onclick="viewCandidate(${c.id})">View</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+      }
     }
   });
 }
