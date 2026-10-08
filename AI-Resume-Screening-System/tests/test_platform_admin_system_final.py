@@ -34,7 +34,7 @@ class PlatformAdminSystemFinalTestCase(unittest.TestCase):
     def tearDown(self):
         self.app_context.pop()
 
-    def _create_user(self, name, role, is_verified=1, ats_score=0):
+    def _create_user(self, name: str, role: str, is_verified: int = 1, ats_score: int = 0):
         uid_suffix = uuid.uuid4().hex[:8]
         email = f"{name.lower().replace(' ', '')}_{uid_suffix}_{role}@test.com"
         with get_db() as conn:
@@ -43,7 +43,7 @@ class PlatformAdminSystemFinalTestCase(unittest.TestCase):
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 (name, email, generate_password_hash("password123"), role, is_verified, ats_score)
             )
-            user_id = cur.lastrowid
+            user_id = int(cur.lastrowid or 0)
             if hasattr(conn, "commit"):
                 conn.commit()
         return user_id, email

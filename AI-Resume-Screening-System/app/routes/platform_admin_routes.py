@@ -248,7 +248,7 @@ def resolve_outlier(user_id):
     POST /api/platform-admin/security/outliers/<user_id>/resolve
     Clears the outlier flag for a candidate profile with audit logging.
     """
-    admin_user_id = session.get('user_id')
+    admin_user_id = int(session.get('user_id') or 0)
     success, message, status_code = resolve_platform_outlier(user_id, admin_user_id)
     return jsonify({"success": success, "message": message}), status_code
 
