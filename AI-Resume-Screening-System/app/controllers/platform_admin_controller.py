@@ -1078,17 +1078,17 @@ def get_platform_applications(
         conditions.append("LOWER(a.status) = ?")
         params.append(status.strip().lower())
 
-    if job_id is not None and int(job_id) > 0:
+    if job_id is not None and job_id > 0:
         conditions.append("a.job_id = ?")
-        params.append(int(job_id))
+        params.append(job_id)
 
     if min_match is not None:
         conditions.append("a.match_score >= ?")
-        params.append(int(min_match))
+        params.append(min_match)
 
     if max_match is not None:
         conditions.append("a.match_score <= ?")
-        params.append(int(max_match))
+        params.append(max_match)
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
 
@@ -1780,12 +1780,12 @@ def get_platform_system_health() -> Dict[str, Any]:
 
     # 6. Job Matcher
     try:
-        from app.ml.matching.job_matcher import calculate_match_score
-        score = calculate_match_score(["Python"], ["Python", "Flask"])
+        from app.ml.recommendation.cosine_similarity import skill_overlap_score
+        score = skill_overlap_score(["Python"], ["Python", "Flask"])
         services["job_matcher"] = {
             "name": "Job Matching Engine",
             "status": "Healthy",
-            "details": "Matcher operational"
+            "details": f"Matcher operational (probe={round(score * 100)}%)"
         }
     except Exception as e:
         services["job_matcher"] = {
