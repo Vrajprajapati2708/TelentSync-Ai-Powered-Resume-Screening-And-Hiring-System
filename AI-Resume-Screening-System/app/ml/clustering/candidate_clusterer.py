@@ -11,6 +11,13 @@
 
 import re
 
+try:
+    from sklearn.feature_extraction.text import TfidfVectorizer
+    from sklearn.cluster import KMeans
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+
 # Human-readable cluster names (HR-friendly labels)
 # These are determined dynamically based on top keywords per cluster
 FALLBACK_LABELS = [
@@ -69,10 +76,14 @@ def cluster_candidates(candidates: list[dict], n_clusters: int = 5) -> list[dict
         return candidates
 
     # --- K-Means Clustering ---
-    try:
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.cluster import KMeans
+    if not _SKLEARN_AVAILABLE:
+        for candidate in candidates:
+            skills = candidate.get('skills') or ''
+            terms  = re.split(r'[,\s]+', skills.lower())
+            candidate['cluster_label'] = _get_dominant_label(terms)
+        return candidates
 
+    try:
         vectorizer  = TfidfVectorizer(max_features=200, stop_words='english')
         skill_matrix = vectorizer.fit_transform(skill_texts)
 

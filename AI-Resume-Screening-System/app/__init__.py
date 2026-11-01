@@ -125,11 +125,17 @@ def _init_db(db_file: str):
         if os.path.abspath(db_file) != os.path.abspath(ActiveConfig.DB_FILE) and os.path.exists(backup_path):
             import shutil
             shutil.copy2(backup_path, db_file)
-            return
 
     schema_path = os.path.join(os.path.dirname(__file__), 'database', 'schema.sql')
 
     with sqlite3.connect(db_file) as conn:
+        # Pre-flight migration for existing tables before executing schema.sql (ensures new indexes succeed)
+        tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
+        if 'applications' in tables:
+            cols_apps = [row[1] for row in conn.execute("PRAGMA table_info(applications)").fetchall()]
+            if 'resume_id' not in cols_apps:
+                conn.execute("ALTER TABLE applications ADD COLUMN resume_id INTEGER REFERENCES resumes(id)")
+
         # Create tables from schema file
         if os.path.exists(schema_path):
             with open(schema_path, 'r') as f:
@@ -146,6 +152,20 @@ def _init_db(db_file: str):
         if 'structured_json' not in cols_resumes:
             conn.execute("ALTER TABLE resumes ADD COLUMN structured_json TEXT DEFAULT ''")
 
+        cols_apps = [row[1] for row in conn.execute("PRAGMA table_info(applications)").fetchall()]
+        if 'resume_id' not in cols_apps:
+            conn.execute("ALTER TABLE applications ADD COLUMN resume_id INTEGER REFERENCES resumes(id)")
+            conn.execute("""
+                UPDATE applications
+                SET resume_id = (
+                    SELECT id FROM resumes
+                    WHERE resumes.user_id = applications.user_id
+                    ORDER BY id DESC
+                    LIMIT 1
+                )
+                WHERE resume_id IS NULL
+            """)
+
         cols_notifs = [row[1] for row in conn.execute("PRAGMA table_info(notifications)").fetchall()]
         if 'action_type' not in cols_notifs:
             conn.execute("ALTER TABLE notifications ADD COLUMN action_type TEXT DEFAULT 'none'")
@@ -155,6 +175,101 @@ def _init_db(db_file: str):
             conn.execute("ALTER TABLE notifications ADD COLUMN metadata TEXT DEFAULT '{}'")
         if 'updated_at' not in cols_notifs:
             conn.execute("ALTER TABLE notifications ADD COLUMN updated_at TEXT")
+
+        # Ensure resume_upload_logs table exists and is indexed
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS resume_upload_logs (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                file_hash   TEXT    DEFAULT '',
+                uploaded_at TEXT    DEFAULT (datetime('now')),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_resume_upload_logs_user_time ON resume_upload_logs(user_id, uploaded_at)")
+
+        # Step 6: Ensure candidate_skills table exists and is indexed
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS candidate_skills (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id      INTEGER NOT NULL,
+                skill        TEXT    NOT NULL,
+                source       TEXT    NOT NULL DEFAULT 'self_declared',
+                confidence   REAL    DEFAULT 0.2,
+                confirmed_at TEXT    DEFAULT (datetime('now')),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE(user_id, skill)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidate_skills_user ON candidate_skills(user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_candidate_skills_skill ON candidate_skills(skill)")
+
+        cols_cskills = [row[1] for row in conn.execute("PRAGMA table_info(candidate_skills)").fetchall()]
+        if 'evidence_sources' not in cols_cskills:
+            conn.execute("ALTER TABLE candidate_skills ADD COLUMN evidence_sources TEXT DEFAULT ''")
+
+        # Step 7: Ensure skill_velocity_anomalies table exists and is indexed
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS skill_velocity_anomalies (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id            INTEGER NOT NULL,
+                previous_resume_id INTEGER,
+                current_resume_id  INTEGER NOT NULL,
+                elapsed_days       REAL NOT NULL,
+                estimated_days     REAL NOT NULL,
+                new_skills         TEXT NOT NULL,
+                severity           TEXT NOT NULL DEFAULT 'high',
+                velocity_ratio     REAL NOT NULL,
+                anomaly_reason     TEXT NOT NULL,
+                status             TEXT NOT NULL DEFAULT 'flagged',
+                detected_at        TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY(previous_resume_id) REFERENCES resumes(id) ON DELETE SET NULL,
+                FOREIGN KEY(current_resume_id) REFERENCES resumes(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_user ON skill_velocity_anomalies(user_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_status ON skill_velocity_anomalies(status)")
+
+        # Step 8: Ensure quiz_questions and quiz_attempts tables exist
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_questions (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                skill          TEXT NOT NULL,
+                question       TEXT NOT NULL,
+                options        TEXT NOT NULL,
+                correct_option INTEGER NOT NULL,
+                difficulty     TEXT DEFAULT 'intermediate',
+                created_at     TEXT DEFAULT (datetime('now'))
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quiz_questions_skill ON quiz_questions(skill)")
+
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS quiz_attempts (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id         INTEGER NOT NULL,
+                skill           TEXT NOT NULL,
+                score           INTEGER NOT NULL,
+                total_questions INTEGER NOT NULL,
+                correct_answers INTEGER NOT NULL,
+                passed          INTEGER NOT NULL,
+                attempted_at    TEXT DEFAULT (datetime('now')),
+                FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_skill ON quiz_attempts(user_id, skill)")
+
+        # Auto-seed initial quiz question bank if table is empty
+        if conn.execute("SELECT COUNT(*) FROM quiz_questions").fetchone()[0] == 0:
+            try:
+                from app.database.migrations.quiz_gatekeeper_migration import INITIAL_QUESTIONS
+                conn.executemany(
+                    "INSERT INTO quiz_questions (skill, question, options, correct_option, difficulty) VALUES (?, ?, ?, ?, ?)",
+                    INITIAL_QUESTIONS
+                )
+            except Exception:
+                pass
 
         _seed_demo_data(conn)
         conn.commit()
@@ -172,6 +287,77 @@ def _create_tables_inline(conn):
             summary TEXT DEFAULT '', education TEXT DEFAULT '',
             created_at TEXT DEFAULT (datetime('now'))
         );
+        CREATE TABLE IF NOT EXISTS resumes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            original_name TEXT NOT NULL,
+            stored_filename TEXT UNIQUE NOT NULL,
+            file_path TEXT NOT NULL,
+            file_hash TEXT NOT NULL,
+            file_size_bytes INTEGER NOT NULL,
+            mime_type TEXT NOT NULL,
+            parsed_text TEXT DEFAULT '',
+            word_count INTEGER DEFAULT 0,
+            ats_score INTEGER DEFAULT 0,
+            extracted_skills TEXT DEFAULT '',
+            structured_json TEXT DEFAULT '',
+            status TEXT DEFAULT 'processed',
+            version INTEGER DEFAULT 1,
+            uploaded_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS resume_upload_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            file_hash TEXT DEFAULT '',
+            uploaded_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS candidate_skills (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            skill TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT 'self_declared',
+            confidence REAL DEFAULT 0.2,
+            confirmed_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            UNIQUE(user_id, skill)
+        );
+        CREATE TABLE IF NOT EXISTS skill_velocity_anomalies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            previous_resume_id INTEGER,
+            current_resume_id INTEGER NOT NULL,
+            elapsed_days REAL NOT NULL,
+            estimated_days REAL NOT NULL,
+            new_skills TEXT NOT NULL,
+            severity TEXT NOT NULL DEFAULT 'high',
+            velocity_ratio REAL NOT NULL,
+            anomaly_reason TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'flagged',
+            detected_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
+        CREATE TABLE IF NOT EXISTS quiz_questions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            skill TEXT NOT NULL,
+            question TEXT NOT NULL,
+            options TEXT NOT NULL,
+            correct_option INTEGER NOT NULL,
+            difficulty TEXT DEFAULT 'intermediate',
+            created_at TEXT DEFAULT (datetime('now'))
+        );
+        CREATE TABLE IF NOT EXISTS quiz_attempts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            skill TEXT NOT NULL,
+            score INTEGER NOT NULL,
+            total_questions INTEGER NOT NULL,
+            correct_answers INTEGER NOT NULL,
+            passed INTEGER NOT NULL,
+            attempted_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
         CREATE TABLE IF NOT EXISTS jobs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT, company TEXT, location TEXT, type TEXT, salary TEXT,
@@ -180,11 +366,12 @@ def _create_tables_inline(conn):
         );
         CREATE TABLE IF NOT EXISTS applications (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER, job_id INTEGER,
+            user_id INTEGER, job_id INTEGER, resume_id INTEGER,
             match_score INTEGER DEFAULT 0, status TEXT DEFAULT 'Reviewing',
             applied_at TEXT,
             FOREIGN KEY(user_id) REFERENCES users(id),
             FOREIGN KEY(job_id)  REFERENCES jobs(id),
+            FOREIGN KEY(resume_id) REFERENCES resumes(id),
             UNIQUE(user_id, job_id)
         );
         CREATE TABLE IF NOT EXISTS notifications (

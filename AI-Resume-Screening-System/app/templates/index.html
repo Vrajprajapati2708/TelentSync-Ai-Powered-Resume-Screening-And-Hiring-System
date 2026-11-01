@@ -7,7 +7,8 @@
 <title>TalentSync — Smart Resume Screening & Job Matching</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 <link rel="stylesheet" href="static/css/style.css">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'><rect width='40' height='40' rx='10' fill='%231260cc'/><text x='20' y='27' text-anchor='middle' font-size='20'>🤖</text></svg>">
@@ -740,7 +741,7 @@
           <!-- New User Welcome Banner (shown only for new users with no resume) -->
           <div id="new-user-banner" style="background:linear-gradient(135deg,#1260cc,#7c3aed);border-radius:16px;padding:28px 32px;color:#fff;margin-bottom:22px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
             <div>
-              <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px">Welcome to TalentSync, <span id="cand-welcome-name">there</span>! <i class="fa-solid fa-wand-magic-sparkles" style="color: #f59e0b; margin-left: 5px;"></i></div>
+              <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;margin-bottom:6px">Welcome to TalentSync, <span id="cand-welcome-name">there</span>! <i class="fa-solid fa-wand-magic-sparkles" style="color: #f59e0b; margin-left: 5px;"></i></div>
               <div style="font-size:14px;opacity:.85;max-width:480px">Your profile is set up and ready. Upload your resume to get your AI-powered ATS score, skill analysis, and personalized job matches.</div>
             </div>
             <button class="btn btn-teal" style="white-space:nowrap" onclick="Router.inner('cand','upload');Sidebar.setActive(document.querySelector('#sb-cand [data-section=upload]'))">
@@ -819,7 +820,7 @@
                   <div style="position:relative;width:110px;height:110px;flex-shrink:0">
                     <canvas id="cand-ats-mini"></canvas>
                     <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center">
-                      <div style="font-family:'Syne',sans-serif;font-size:22px;font-weight:800;color:var(--primary)" id="cand-ats-mini-num">--</div>
+                      <div style="font-family:'Plus Jakarta Sans',sans-serif;font-size:22px;font-weight:800;color:var(--primary)" id="cand-ats-mini-num">--</div>
                       <div style="font-size:11px;color:var(--text-3)">/100</div>
                     </div>
                   </div>
@@ -919,6 +920,58 @@
                     <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">Technical Skills</div>
                     <div class="skills-cloud" id="profile-skills-tech">
                       <!-- Dynamically populated -->
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- Anti-Gaming Steps 5, 6, 7, 8: Evidence-Weighted Skills, Blind Confirmation & Assessment Gateway -->
+              <div class="card" id="card-cand-provenance" style="margin-top:20px">
+                <div class="card-header" style="display:flex;align-items:center;justify-content:space-between">
+                  <span class="card-title"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px"></i>Verified Skill Evidence & Blind Confirmation</span>
+                  <span class="badge badge-teal"><i class="fas fa-balance-scale"></i> Anti-Gaming Protection</span>
+                </div>
+                <div class="card-body">
+                  <!-- Velocity Anomaly Notice Banner (Shown dynamically when flagged) -->
+                  <div id="velocity-anomaly-banner" style="display:none;background:rgba(217,119,6,0.12);border:1px solid rgba(217,119,6,0.3);border-radius:12px;padding:14px 18px;margin-bottom:18px">
+                    <div style="display:flex;align-items:flex-start;gap:12px">
+                      <div style="font-size:20px;color:#d97706;line-height:1"><i class="fas fa-exclamation-triangle"></i></div>
+                      <div style="flex:1">
+                        <div style="font-weight:700;font-size:14px;color:#d97706;margin-bottom:4px">Skill Acquisition Verification Required</div>
+                        <div style="font-size:12.5px;color:var(--text-2);margin-bottom:10px" id="velocity-disputed-text">
+                          Recent resume updates introduced complex skills in an accelerated timeframe. Take a quick technical quiz to elevate these skills to verified status (1.0 weight) and clear this flag.
+                        </div>
+                        <div id="velocity-quiz-buttons" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Evidence Tiers Legend -->
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;padding:12px;background:var(--bg-2);border-radius:10px;border:1px solid var(--border)">
+                    <div style="font-size:11.5px"><span class="badge badge-success" style="font-size:10px">1.0</span> <strong>Experience</strong></div>
+                    <div style="font-size:11.5px"><span class="badge badge-info" style="font-size:10px">0.7</span> <strong>Project</strong></div>
+                    <div style="font-size:11.5px"><span class="badge badge-warning" style="font-size:10px">0.2</span> <strong>Self-Declared</strong></div>
+                    <div style="font-size:11.5px"><span class="badge badge-primary" style="font-size:10px">1.0</span> <strong>Quiz-Verified</strong></div>
+                  </div>
+
+                  <!-- Candidate Verified Skills Cloud with Provenance Badges -->
+                  <div style="margin-bottom:16px">
+                    <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:8px">Your Profile Skills & Verification Tiers</div>
+                    <div class="skills-cloud" id="candidate-provenance-skills-cloud" style="display:flex;flex-wrap:wrap;gap:8px">
+                      <span class="text-muted text-sm">Loading verified skill evidence...</span>
+                    </div>
+                  </div>
+
+                  <!-- Step 6 Blind Skill Declaration Form -->
+                  <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:16px">
+                    <div style="font-size:13px;font-weight:700;margin-bottom:6px">Blind Skill Declaration</div>
+                    <p class="text-muted text-sm" style="margin-bottom:12px">
+                      Declare skills you possess before viewing target job gaps. Self-declared skills receive baseline 0.2 weight until verified via technical assessment or verified work evidence.
+                    </p>
+                    <div style="display:flex;gap:10px;max-width:540px">
+                      <input id="blind-skill-input" class="form-control" placeholder="Enter skill name (e.g. Docker, Kubernetes, Python)" onkeydown="if(event.key==='Enter')declareBlindSkill()">
+                      <button class="btn btn-primary" onclick="declareBlindSkill()" style="white-space:nowrap">
+                        <i class="fas fa-plus"></i> Declare Skill
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -1029,7 +1082,7 @@
         <div id="cand-jobs" data-portal="cand" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:22px;flex-wrap:wrap;gap:14px">
             <div>
-              <div style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif">Live Jobs Network</div>
+              <div style="font-size:24px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">Live Jobs Network</div>
               <div style="font-size:13px;color:var(--text-3)">AI-ranked live matches from Adzuna and TalentSync Internal Jobs</div>
               <div id="cand-jobs-personalization-info" style="font-size:12px;color:var(--primary);font-weight:600;margin-top:5px;display:none;"></div>
             </div>
@@ -1286,7 +1339,7 @@
           <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:20px;">
             <div>
               <div style="display:flex;align-items:center;gap:12px;">
-                <h2 style="font-size:24px;font-weight:800;font-family:'Syne',sans-serif;margin:0;color:var(--text-1);">Notifications</h2>
+                <h2 style="font-size:24px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin:0;color:var(--text-1);">Notifications</h2>
                 <span id="cand-notif-unread-badge" class="badge badge-primary" style="font-size:12px;padding:3px 10px;border-radius:20px;font-weight:700;">0 Unread</span>
               </div>
               <p style="color:var(--text-3);font-size:13px;margin:4px 0 0 0;">Stay updated on your job applications, profile views, ATS scores, and recruiter messages.</p>
@@ -1333,7 +1386,7 @@
 
         <!-- ── CAND: Settings ── -->
         <div id="cand-settings" data-portal="cand" class="hidden">
-          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:22px">Candidate Settings</div>
+          <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:22px">Candidate Settings</div>
           <div class="settings-layout">
             <div class="card" style="padding:16px; align-self: start;">
               <div class="settings-nav">
@@ -1468,7 +1521,7 @@
                       </div>
                     </div>
                     <hr class="divider" style="margin:0">
-                    <div style="font-size:15px;font-weight:700;font-family:'Syne',sans-serif">Change Password</div>
+                    <div style="font-size:15px;font-weight:700;font-family:'Plus Jakarta Sans',sans-serif">Change Password</div>
                     <div class="form-group">
                       <label class="form-label">Current Password</label>
                       <input id="cand-cur-pwd" class="form-control" type="password" placeholder="••••••••">
@@ -1773,7 +1826,7 @@
         <div id="admin-talentpool" data-portal="admin" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Global Talent Pool</div>
+              <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">Global Talent Pool</div>
               <div style="font-size:13px;color:var(--text-3)">All registered candidates across TalentSync (<span id="talentpool-total-count">0</span> candidates) · Discover talent independently of job applications.</div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -1815,7 +1868,7 @@
           </div>
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">AI Candidate Rankings</div>
+              <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">AI Candidate Rankings</div>
               <div style="font-size:13px;color:var(--text-3)" id="admin-rankings-subtitle">All Roles · Ranked by Composite AI Score</div>
             </div>
             <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -1852,7 +1905,7 @@
         <div id="admin-jobs" data-portal="admin" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Job Postings Management</div>
+              <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">Job Postings Management</div>
               <div style="font-size:13px;color:var(--text-3)" id="admin-jobs-header-count">Loading job postings...</div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -1886,7 +1939,7 @@
         <div id="admin-analytics" data-portal="admin" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Hiring Intelligence &amp; Analytics</div>
+              <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">Hiring Intelligence &amp; Analytics</div>
               <div style="font-size:13px;color:var(--text-3)">Comprehensive hiring pipeline performance, skill demand trends, and AI scoring metrics.</div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -2016,7 +2069,7 @@
         <div id="admin-notif" data-portal="admin" class="hidden">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px">
             <div>
-              <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif">Notification &amp; Activity Center</div>
+              <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif">Notification &amp; Activity Center</div>
               <div style="font-size:13px;color:var(--text-3)">Real-time applicant alerts, job pipeline updates, and system events.</div>
             </div>
             <div style="display:flex;gap:8px;align-items:center">
@@ -2039,7 +2092,7 @@
 
         <!-- ── ADMIN: Settings ── -->
         <div id="admin-settings" data-portal="admin" class="hidden">
-          <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;margin-bottom:20px">System Settings &amp; Configuration</div>
+          <div style="font-size:20px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:20px">System Settings &amp; Configuration</div>
           <div class="settings-layout">
             <div class="card" style="padding:14px; align-self: start;">
               <div class="settings-nav">
@@ -2313,7 +2366,7 @@
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:24px;padding:20px;background:var(--bg);border-radius:14px">
       <div class="avatar avatar-lg" style="background:var(--primary);color:#fff" id="modal-cand-avatar">PN</div>
       <div>
-        <div style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif" id="modal-cand-name">Preethi Nair</div>
+        <div style="font-size:20px;font-weight:800;font-family:'Inter',sans-serif" id="modal-cand-name">Preethi Nair</div>
         <div style="color:var(--text-2);font-size:13px" id="modal-cand-degree">MCA · BITS Pilani</div>
         <div style="margin-top:8px" id="modal-cand-status"></div>
       </div>
@@ -2321,15 +2374,15 @@
     <div class="form-row-3" style="margin-bottom:20px">
       <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:6px">ATS Score</div>
-        <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="modal-cand-ats">91/100</div>
+        <div style="font-size:22px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--primary)" id="modal-cand-ats">91/100</div>
       </div>
       <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:6px">Job Match</div>
-        <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--teal-d)" id="modal-cand-match">95%</div>
+        <div style="font-size:22px;font-weight:800;font-family:'Inter',sans-serif;color:var(--teal-d)" id="modal-cand-match">95%</div>
       </div>
       <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:6px">Experience</div>
-        <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif" id="modal-cand-exp">2 yrs</div>
+        <div style="font-size:22px;font-weight:800;font-family:'Inter',sans-serif" id="modal-cand-exp">2 yrs</div>
       </div>
     </div>
     <table class="table" style="margin-bottom:20px">
@@ -2344,12 +2397,87 @@
       <div style="font-size:13px;font-weight:700;margin-bottom:10px">Extracted Skills</div>
       <div class="skills-cloud" id="modal-cand-skills"></div>
     </div>
+    <!-- Anti-Gaming Provenance & Verification Audit for HR -->
+    <div id="modal-cand-anti-gaming" style="margin-bottom:20px;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700"><i class="fas fa-shield-alt" style="color:var(--primary);margin-right:6px"></i>Skill Provenance & Anti-Gaming Audit</div>
+        <span class="badge badge-teal" id="modal-cand-outlier-tag">Verified Profile</span>
+      </div>
+      <div id="modal-cand-provenance-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+      <div id="modal-cand-velocity-alert" style="display:none;padding:10px 14px;border-radius:8px;background:rgba(217,119,6,.15);border:1px solid rgba(217,119,6,.3);color:#d97706;font-size:12px;margin-top:8px"></div>
+      <div id="modal-cand-quiz-history" style="font-size:12px;color:var(--text-2);margin-top:8px"></div>
+    </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
       <a id="modal-btn-download" class="btn btn-navy" style="display:none" target="_blank"><i class="fas fa-download"></i> Download Resume</a>
       <a id="modal-btn-preview" class="btn btn-outline" style="display:none" target="_blank"><i class="fas fa-eye"></i> Preview Resume</a>
       <button id="modal-btn-shortlist" class="btn btn-success"><i class="fas fa-check"></i> Shortlist</button>
       <button id="modal-btn-reject" class="btn btn-danger"><i class="fas fa-times"></i> Reject</button>
       <button class="btn btn-outline" onclick="Modal.close('view-cand-modal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════
+     STEP 8 — TECHNICAL QUIZ GATEKEEPER MODAL
+═══════════════════════════════════════════════════════════ -->
+<div class="modal-backdrop" id="quiz-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <div class="modal-title" id="quiz-modal-title">
+        <i class="fas fa-graduation-cap" style="color:var(--primary);margin-right:8px"></i>Technical Skill Assessment
+      </div>
+      <button class="modal-close" onclick="Modal.close('quiz-modal')">✕</button>
+    </div>
+    <div id="quiz-modal-body" style="padding:16px 0">
+      <!-- Loading State -->
+      <div id="quiz-loading-state" style="text-align:center;padding:40px">
+        <i class="fas fa-circle-notch fa-spin fa-2x" style="color:var(--primary);margin-bottom:12px"></i>
+        <div style="font-weight:600;color:var(--text-2)">Loading assessment questions from server...</div>
+      </div>
+
+      <!-- Quiz Questions Container -->
+      <div id="quiz-content-container" style="display:none">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:var(--bg);border-radius:12px;border:1px solid var(--border);margin-bottom:20px">
+          <div>
+            <span style="font-size:12px;color:var(--text-3);text-transform:uppercase;font-weight:700">Skill Being Tested:</span>
+            <strong id="quiz-active-skill" style="font-size:16px;color:var(--primary);margin-left:6px">Docker</strong>
+          </div>
+          <div>
+            <span class="badge badge-teal" id="quiz-active-difficulty">Intermediate</span>
+            <span class="badge badge-gray" id="quiz-pass-threshold" style="margin-left:6px">Passing: 70%</span>
+          </div>
+        </div>
+
+        <!-- Smart Assessment Lock (SAL) Security Banner -->
+        <div id="sal-security-banner" style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:10px;margin-bottom:16px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text)">
+            <i class="fas fa-shield-halved" style="color:#6366f1;font-size:15px"></i>
+            <span><strong>Smart Assessment Lock Active:</strong> Window switching and copying questions is strictly monitored.</span>
+          </div>
+          <span id="sal-strike-badge" class="badge badge-success" style="font-weight:700;font-size:11px;padding:4px 10px;background:rgba(22,163,74,0.15);color:#16a34a">
+            Strikes: 0 / 3
+          </span>
+        </div>
+
+        <form id="quiz-form" onsubmit="event.preventDefault();submitCurrentQuiz()">
+          <div id="quiz-questions-list" style="display:flex;flex-direction:column;gap:18px;user-select:none;-webkit-user-select:none"></div>
+          <div style="margin-top:24px;display:flex;gap:12px;align-items:center;justify-content:flex-end">
+            <button type="button" class="btn btn-outline" onclick="Modal.close('quiz-modal')">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="btn-submit-quiz">
+              <i class="fas fa-paper-plane"></i> Submit Assessment
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Quiz Result Container -->
+      <div id="quiz-result-container" style="display:none;text-align:center;padding:24px">
+        <div id="quiz-result-icon" style="font-size:48px;margin-bottom:12px">🎉</div>
+        <div id="quiz-result-title" style="font-size:22px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;margin-bottom:6px">Assessment Passed!</div>
+        <div id="quiz-result-score-badge" style="display:inline-block;padding:8px 16px;border-radius:20px;font-size:16px;font-weight:700;margin-bottom:12px">Score: 85%</div>
+        <p id="quiz-result-message" style="color:var(--text-2);max-width:440px;margin:0 auto 20px"></p>
+        <button class="btn btn-primary" onclick="Modal.close('quiz-modal');fetchCandidateProvenanceSkills();">Close &amp; Refresh Profile</button>
+      </div>
     </div>
   </div>
 </div>
@@ -2441,7 +2569,7 @@
           <!-- Overview Header & Action Bar -->
           <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;flex-wrap:wrap;gap:14px">
             <div>
-              <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)">Platform Operations &amp; Intelligence</div>
+              <div style="font-size:22px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text)">Platform Operations &amp; Intelligence</div>
               <div style="font-size:13px;color:var(--text-3)">Global governance, subsystem metrics, recruitment funnel health, and real-time activity stream.</div>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
@@ -3307,7 +3435,7 @@
           <!-- Pipeline Header -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px">
             <div>
-              <div style="font-size:22px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">AI/ML Pipeline &amp; Intelligence Architecture</div>
+              <div style="font-size:22px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);letter-spacing:-0.01em">AI/ML Pipeline &amp; Intelligence Architecture</div>
               <div style="font-size:13px;color:var(--text-2);margin-top:2px">Real-time orchestration monitor, model telemetry, live inference playground, and lifecycle retraining governance.</div>
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
@@ -3648,19 +3776,19 @@
             <div class="card-body">
               <div class="stats-grid" style="margin-bottom:18px">
                 <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
-                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="ml-dataset-resumes">--</div>
+                  <div style="font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--primary)" id="ml-dataset-resumes">--</div>
                   <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Synthetic Resumes</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
-                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#7c3aed" id="ml-dataset-jobs">--</div>
+                  <div style="font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#7c3aed" id="ml-dataset-jobs">--</div>
                   <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Job Descriptions in Corpus</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
-                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#d97706" id="ml-dataset-ner">--</div>
+                  <div style="font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#d97706" id="ml-dataset-ner">--</div>
                   <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">NER Training Annotations</div>
                 </div>
                 <div style="text-align:center;padding:16px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
-                  <div style="font-size:26px;font-weight:800;font-family:'Syne',sans-serif;color:#10b981" id="ml-live-jobs">--</div>
+                  <div style="font-size:26px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:#10b981" id="ml-live-jobs">--</div>
                   <div style="font-size:12px;font-weight:600;color:var(--text-3);margin-top:4px">Live Active Jobs in DB</div>
                 </div>
               </div>
@@ -3704,7 +3832,7 @@
     <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
       <div id="pa-modal-avatar" class="avatar avatar-lg" style="background:var(--primary);color:#fff;font-size:20px;font-weight:800;flex-shrink:0">--</div>
       <div style="flex:1;min-width:0">
-        <div id="pa-modal-name" style="font-size:20px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div id="pa-modal-name" style="font-size:20px;font-weight:800;font-family:'Inter',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
         <div id="pa-modal-email" style="font-size:13px;color:var(--text-2);margin-top:2px">--</div>
         <div style="display:flex;gap:8px;margin-top:8px;align-items:center;flex-wrap:wrap">
           <span id="pa-modal-role-badge" class="badge">--</span>
@@ -3717,11 +3845,11 @@
     <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Account ID</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-id">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text)" id="pa-modal-id">--</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">ATS Score</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-ats">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--primary)" id="pa-modal-ats">--</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Activity Records</div>
@@ -3867,7 +3995,7 @@
         <i class="fas fa-building"></i>
       </div>
       <div style="flex:1;min-width:0">
-        <div id="pa-modal-job-title" style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div id="pa-modal-job-title" style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap">
           <span id="pa-modal-job-company" style="font-size:13px;font-weight:700;color:var(--text-2)">--</span>
           <span style="color:var(--text-3)">•</span>
@@ -3881,11 +4009,11 @@
     <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Job ID</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-job-id">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text)" id="pa-modal-job-id">--</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Total Applicants</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-job-app-count">0</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--primary)" id="pa-modal-job-app-count">0</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Compensation</div>
@@ -3974,7 +4102,7 @@
     <div style="display:flex;align-items:center;gap:18px;margin-bottom:20px;padding:18px 20px;background:var(--bg);border-radius:14px;border:1px solid var(--border)">
       <div id="pa-modal-app-avatar" class="avatar avatar-lg" style="background:var(--primary);color:#fff;font-size:18px;font-weight:800;flex-shrink:0">--</div>
       <div style="flex:1;min-width:0">
-        <div id="pa-modal-app-candidate" style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
+        <div id="pa-modal-app-candidate" style="font-size:18px;font-weight:800;font-family:'Inter',sans-serif;color:var(--text);letter-spacing:-0.01em">--</div>
         <div id="pa-modal-app-email" style="font-size:13px;color:var(--text-2);margin-top:2px">--</div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
           <span class="badge badge-gray" id="pa-modal-app-job-badge">Job #--</span>
@@ -3987,15 +4115,15 @@
     <div class="form-row-3" style="margin-bottom:20px;display:grid;grid-template-columns:repeat(3,1fr);gap:12px">
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Application ID</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--text)" id="pa-modal-app-id">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--text)" id="pa-modal-app-id">--</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Match Score</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--primary)" id="pa-modal-app-match">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Inter',sans-serif;color:var(--primary)" id="pa-modal-app-match">--</div>
       </div>
       <div style="text-align:center;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border)">
         <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--text-3);margin-bottom:4px">Candidate ATS</div>
-        <div style="font-size:18px;font-weight:800;font-family:'Syne',sans-serif;color:var(--teal-d)" id="pa-modal-app-cand-ats">--</div>
+        <div style="font-size:18px;font-weight:800;font-family:'Plus Jakarta Sans',sans-serif;color:var(--teal-d)" id="pa-modal-app-cand-ats">--</div>
       </div>
     </div>
 
@@ -4268,7 +4396,7 @@
   <section class="about-hero" style="padding: 160px 20px 80px; text-align: center; max-width: 900px; margin: 0 auto; position: relative;">
     <div class="hero-glow hero-glow-1"></div>
     <div class="section-eyebrow" style="margin-bottom: 20px; color: var(--primary);">The TalentSync Story</div>
-    <h1 style="font-size: 56px; font-family: 'Syne', sans-serif; font-weight: 800; line-height: 1.1; margin-bottom: 30px; letter-spacing: -0.02em; color: var(--navy);">We believe hiring should be <span class="grad">fair, fast, and human.</span></h1>
+    <h1 style="font-size: 56px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; line-height: 1.1; margin-bottom: 30px; letter-spacing: -0.02em; color: var(--navy);">We believe hiring should be <span class="grad">fair, fast, and human.</span></h1>
     <p style="font-size: 20px; color: var(--text-2); line-height: 1.6; max-width: 700px; margin: 0 auto;">
       Manual resume screening is broken. It's biased, time-consuming, and leaves great talent undiscovered. TalentSync was built to fix this by empowering HR teams with transparent AI.
     </p>
@@ -4278,7 +4406,7 @@
   <section style="padding: 80px 20px; background: var(--white); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
     <div style="max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 60px; align-items: center;">
       <div>
-        <h2 style="font-size: 36px; margin-bottom: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy);">Our Mission</h2>
+        <h2 style="font-size: 36px; margin-bottom: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy);">Our Mission</h2>
         <p style="color: var(--text-2); font-size: 16px; line-height: 1.7; margin-bottom: 16px;">
           We are on a mission to democratize the recruitment process. By leveraging Natural Language Processing and Machine Learning, we remove human fatigue and unconscious bias from the initial screening phase.
         </p>
@@ -4292,7 +4420,7 @@
          
          <div style="position: relative; z-index: 1;">
            <div style="font-family: monospace; color: var(--primary); margin-bottom: 16px; font-size: 13px; font-weight: 600;">> analyzing_candidate.py</div>
-           <div style="font-size: 24px; font-weight: 700; margin-bottom: 24px; font-family: 'Syne', sans-serif; color: var(--navy);">Bias-Free Evaluation Engine</div>
+           <div style="font-size: 24px; font-weight: 700; margin-bottom: 24px; font-family: 'Plus Jakarta Sans', sans-serif; color: var(--navy);">Bias-Free Evaluation Engine</div>
            <div style="display: flex; gap: 12px; flex-wrap: wrap;">
              <span class="badge" style="background: var(--strip-1); color: var(--navy); border: 1px solid var(--border);">Skill Extraction</span>
              <span class="badge" style="background: var(--strip-1); color: var(--navy); border: 1px solid var(--border);">TF-IDF Matching</span>
@@ -4306,7 +4434,7 @@
   <!-- Core Values / Bento Grid -->
   <section style="padding: 100px 20px; max-width: 1100px; margin: 0 auto;">
     <div style="text-align: center; margin-bottom: 60px;">
-      <h2 style="font-size: 36px; margin-bottom: 16px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy);">Our Core Principles</h2>
+      <h2 style="font-size: 36px; margin-bottom: 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy);">Our Core Principles</h2>
       <p style="color: var(--text-2); max-width: 600px; margin: 0 auto;">The values that drive our algorithm and shape our company culture.</p>
     </div>
     
@@ -4342,15 +4470,15 @@
     <div style="max-width: 1100px; margin: 0 auto; text-align: center;">
       <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 60px; color: var(--text-2);">
         <div style="max-width: 200px;">
-          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Syne', sans-serif;">80<span style="color:var(--primary); font-size: 40px;">+</span></div>
+          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Inter', sans-serif;">80<span style="color:var(--primary); font-size: 40px;">+</span></div>
           <div style="font-size: 15px; line-height: 1.5;">Technical skills identified natively by our custom taxonomy.</div>
         </div>
         <div style="max-width: 200px;">
-          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Syne', sans-serif;">40<span style="color:var(--primary); font-size: 40px;">%</span></div>
+          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Inter', sans-serif;">40<span style="color:var(--primary); font-size: 40px;">%</span></div>
           <div style="font-size: 15px; line-height: 1.5;">Weight given to pure skill match, the highest factor in ranking.</div>
         </div>
         <div style="max-width: 200px;">
-          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Syne', sans-serif;">10<span style="color:var(--primary); font-size: 40px;">x</span></div>
+          <div style="font-size: 56px; color: var(--navy); font-weight: 800; margin-bottom: 10px; font-family: 'Inter', sans-serif;">10<span style="color:var(--primary); font-size: 40px;">x</span></div>
           <div style="font-size: 15px; line-height: 1.5;">Faster hiring cycles by automating the manual screening phase.</div>
         </div>
       </div>
@@ -4361,7 +4489,7 @@
   <section style="padding: 0 20px 100px; max-width: 860px; margin: 0 auto; text-align: center;">
     <div style="background: var(--navy); border: 1px solid var(--navy-2); border-radius: 32px; padding: 70px 40px; position: relative; overflow: hidden; color: var(--white); box-shadow: var(--shadow-lg);">
       <i class="fas fa-quote-left" style="font-size: 60px; color: rgba(255,255,255,0.05); position: absolute; top: -10px; left: 30px;"></i>
-      <h3 style="font-size: 32px; margin-bottom: 24px; font-weight: 600; font-family: 'Syne', sans-serif;">"Technology should empower human connection, not replace it."</h3>
+      <h3 style="font-size: 32px; margin-bottom: 24px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif;">"Technology should empower human connection, not replace it."</h3>
       <p style="color: rgba(255,255,255,0.8); margin-bottom: 40px; font-size: 18px; line-height: 1.6; max-width: 600px; margin-left: auto; margin-right: auto;">By automating the mundane task of keyword matching, we give recruiters their time back to actually talk to candidates, understand their stories, and build world-class teams.</p>
       
       <!-- Interactive element: A glowing "Experience it" button that tracks mouse -->
@@ -4455,7 +4583,7 @@
   <section style="padding: 160px 20px 40px; max-width: 1200px; margin: 0 auto; border-bottom: 1px solid var(--border);">
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 40px;">
       <div style="max-width: 600px;">
-        <h1 style="font-size: 52px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 16px; letter-spacing: -0.02em;">Engineering Blog</h1>
+        <h1 style="font-size: 52px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 16px; letter-spacing: -0.02em;">Engineering Blog</h1>
         <p style="font-size: 20px; color: var(--text-2); line-height: 1.5;">Insights, architecture, and thoughts from the team building the future of automated hiring.</p>
       </div>
       <div style="display: flex; gap: 12px; margin-bottom: 8px; flex-wrap: wrap;">
@@ -4473,7 +4601,7 @@
       <div style="background: var(--navy); position: relative; overflow: hidden; min-height: 320px; display: flex; align-items: center; justify-content: center;">
         <div style="position: absolute; width: 150%; height: 150%; background: radial-gradient(circle at center, var(--primary) 0%, transparent 60%); opacity: 0.15; top: -25%; left: -25%;"></div>
         <div style="position: absolute; width: 100%; height: 100%; background: repeating-linear-gradient(45deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 2px, transparent 2px, transparent 10px);"></div>
-        <div style="font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--white); z-index: 1; text-align: center; padding: 40px; line-height: 1.2;">
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 32px; font-weight: 800; color: var(--white); z-index: 1; text-align: center; padding: 40px; line-height: 1.2;">
           TF-IDF + Cosine<br><span style="color: var(--teal);">Similarity Model</span>
         </div>
       </div>
@@ -4484,7 +4612,7 @@
           <span style="color: var(--border-2);">•</span>
           <span style="font-size: 14px; color: var(--text-3); font-weight: 500;">May 10, 2026</span>
         </div>
-        <h2 style="font-size: 32px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 16px; line-height: 1.2;">Inside Our Recommendation Engine: Matching Resumes to Jobs</h2>
+        <h2 style="font-size: 32px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 16px; line-height: 1.2;">Inside Our Recommendation Engine: Matching Resumes to Jobs</h2>
         <p style="font-size: 16px; color: var(--text-2); line-height: 1.6; margin-bottom: 24px;">
           A deep technical dive into the mathematics behind TalentSync. We explain how we vectorize unstructured resume data and calculate a 70% skill overlap paired with a 30% cosine similarity score to identify the perfect candidate fit.
         </p>
@@ -4496,7 +4624,7 @@
     </article>
 
     <!-- Grid of Recent Posts -->
-    <h3 style="font-size: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">Recent Articles</h3>
+    <h3 style="font-size: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 30px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">Recent Articles</h3>
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 32px;">
       
@@ -4513,7 +4641,7 @@
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
             <span style="font-size: 12px; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em;">NLP Pipeline</span>
           </div>
-          <h3 style="font-size: 22px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Why We Built Our Parser with spaCy and NLTK</h3>
+          <h3 style="font-size: 22px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Why We Built Our Parser with spaCy and NLTK</h3>
           <p style="font-size: 15px; color: var(--text-2); line-height: 1.6; margin-bottom: 24px;">
             Discover how we process raw PDF unstructured text accurately. From custom Named Entity Recognition (NER) to robust tokenization, here's our text cleaning architecture.
           </p>
@@ -4527,7 +4655,7 @@
       <article style="display: flex; flex-direction: column; background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; transition: transform 0.2s, box-shadow 0.2s; cursor: pointer; box-shadow: var(--shadow-sm);" onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='var(--shadow)'" onmouseout="this.style.transform='none'; this.style.boxShadow='var(--shadow-sm)'">
         <div style="height: 200px; background: #e0e7ff; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
            <div style="position: absolute; width: 100%; height: 100%; background-image: radial-gradient(#a5b4fc 2px, transparent 2px); background-size: 20px 20px; opacity: 0.4;"></div>
-           <div style="font-family: 'Syne', sans-serif; font-size: 48px; font-weight: 800; color: #3730a3; z-index: 1;">
+           <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 48px; font-weight: 800; color: #3730a3; z-index: 1;">
              95/100
            </div>
         </div>
@@ -4535,7 +4663,7 @@
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
             <span style="font-size: 12px; font-weight: 700; color: #4338ca; text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
           </div>
-          <h3 style="font-size: 22px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Demystifying the ATS Score Algorithm</h3>
+          <h3 style="font-size: 22px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Demystifying the ATS Score Algorithm</h3>
           <p style="font-size: 15px; color: var(--text-2); line-height: 1.6; margin-bottom: 24px;">
             We break down the 5 core factors of our ATS checker: Skills, Contact Info, Education, Experience, and Length—and how applicants can optimize for them.
           </p>
@@ -4550,7 +4678,7 @@
         <div style="height: 200px; background: #fffbeb; position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center;">
           <div style="position: absolute; bottom: -30px; left: -30px; width: 150px; height: 150px; background: #fde68a; border-radius: 20px; transform: rotate(45deg); opacity: 0.5;"></div>
           <div style="position: absolute; top: -30px; right: -30px; width: 100px; height: 100px; background: #fcd34d; border-radius: 20px; transform: rotate(15deg); opacity: 0.5;"></div>
-          <div style="font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800; color: #92400e; z-index: 1; text-align: center; line-height: 1.1;">
+          <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 800; color: #92400e; z-index: 1; text-align: center; line-height: 1.1;">
             Scaling<br>SQLite
           </div>
         </div>
@@ -4558,7 +4686,7 @@
           <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
             <span style="font-size: 12px; font-weight: 700; color: #d97706; text-transform: uppercase; letter-spacing: 0.05em;">Infrastructure</span>
           </div>
-          <h3 style="font-size: 22px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Why We Started with SQLite (And What's Next)</h3>
+          <h3 style="font-size: 22px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px; line-height: 1.3;">Why We Started with SQLite (And What's Next)</h3>
           <p style="font-size: 15px; color: var(--text-2); line-height: 1.6; margin-bottom: 24px;">
             Our initial prototype leverages SQLite for rapid development and zero-config deployment. Here is our architectural roadmap to upgrading to MySQL for production.
           </p>
@@ -4633,7 +4761,7 @@
   <!-- Careers Hero (Ultra-Premium Typography) -->
   <section style="padding: 160px 20px 100px; text-align: center; max-width: 1000px; margin: 0 auto;">
     <div style="display: inline-block; padding: 6px 16px; border-radius: 20px; background: rgba(78, 157, 140, 0.1); border: 1px solid rgba(78, 157, 140, 0.2); color: var(--primary); font-size: 13px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 24px;">Join the team</div>
-    <h1 style="font-size: 72px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.05; letter-spacing: -0.03em;">Help us build a <span style="position: relative; z-index: 1;">fairer future<span style="position: absolute; bottom: 8px; left: 0; width: 100%; height: 16px; background: var(--strip-1); z-index: -1; transform: rotate(-1deg);"></span></span> for hiring.</h1>
+    <h1 style="font-size: 72px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.05; letter-spacing: -0.03em;">Help us build a <span style="position: relative; z-index: 1;">fairer future<span style="position: absolute; bottom: 8px; left: 0; width: 100%; height: 16px; background: var(--strip-1); z-index: -1; transform: rotate(-1deg);"></span></span> for hiring.</h1>
     <p style="font-size: 22px; color: var(--text-2); line-height: 1.6; max-width: 600px; margin: 0 auto;">
       We are a small, elite team of engineers and researchers replacing biased recruitment with transparent AI.
     </p>
@@ -4644,39 +4772,39 @@
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px;">
       <div style="background: var(--navy); border-radius: var(--radius-xl); overflow: hidden; position: relative; padding: 60px 40px; display: flex; align-items: flex-end; grid-column: 1 / -1; min-height: 300px;">
         <div style="position: absolute; top: -100px; right: -100px; width: 300px; height: 300px; background: var(--primary); filter: blur(120px); opacity: 0.4;"></div>
-        <div style="color: var(--white); font-family: 'Syne', sans-serif; font-size: 40px; font-weight: 700; max-width: 600px; line-height: 1.2;">"The best work of your career, with the smartest people you've ever met."</div>
+        <div style="color: var(--white); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 40px; font-weight: 700; max-width: 600px; line-height: 1.2;">"The best work of your career, with the smartest people you've ever met."</div>
       </div>
       <div style="background: var(--strip-1); border-radius: var(--radius-xl); overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; height: 200px;">
          <div style="font-family: monospace; color: var(--primary); font-size: 24px; font-weight: 700; letter-spacing: -0.05em;">{"team": "remote"}</div>
       </div>
       <div style="background: #e2f5e8; border-radius: var(--radius-xl); overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; height: 200px;">
-         <div style="font-family: 'Syne', sans-serif; color: var(--navy); font-size: 48px; font-weight: 800;">100% Async</div>
+         <div style="font-family: 'Plus Jakarta Sans', sans-serif; color: var(--navy); font-size: 48px; font-weight: 800;">100% Async</div>
       </div>
     </div>
   </section>
 
   <!-- Core Operating Principles (No icons, pure typography) -->
   <section style="padding: 0 20px 120px; max-width: 1000px; margin: 0 auto;">
-    <h2 style="font-size: 40px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 60px; letter-spacing: -0.02em;">Operating Principles</h2>
+    <h2 style="font-size: 40px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 60px; letter-spacing: -0.02em;">Operating Principles</h2>
     <div style="display: flex; flex-direction: column; gap: 40px;">
       <div style="display: grid; grid-template-columns: 80px 1fr; gap: 24px; border-top: 1px solid var(--border); padding-top: 40px;">
-        <div style="font-family: 'Syne', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">01</div>
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">01</div>
         <div>
-          <h3 style="font-size: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Radical Truth & Transparency</h3>
+          <h3 style="font-size: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Radical Truth & Transparency</h3>
           <p style="font-size: 18px; color: var(--text-2); line-height: 1.6; max-width: 700px;">We believe in open source, open data, and open communication. Our algorithms are explainable by design, and our internal culture mirrors that transparency.</p>
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 80px 1fr; gap: 24px; border-top: 1px solid var(--border); padding-top: 40px;">
-        <div style="font-family: 'Syne', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">02</div>
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">02</div>
         <div>
-          <h3 style="font-size: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Engineering Excellence</h3>
+          <h3 style="font-size: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Engineering Excellence</h3>
           <p style="font-size: 18px; color: var(--text-2); line-height: 1.6; max-width: 700px;">We sweat the details. From O(1) parsing optimizations in our NLP pipeline to crafting flawless CSS interfaces, we take immense pride in our craft.</p>
         </div>
       </div>
       <div style="display: grid; grid-template-columns: 80px 1fr; gap: 24px; border-top: 1px solid var(--border); padding-top: 40px;">
-        <div style="font-family: 'Syne', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">03</div>
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; color: var(--primary); font-weight: 700;">03</div>
         <div>
-          <h3 style="font-size: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Impact Over Output</h3>
+          <h3 style="font-size: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 12px;">Impact Over Output</h3>
           <p style="font-size: 18px; color: var(--text-2); line-height: 1.6; max-width: 700px;">We don't track hours, we track impact. We are a fully asynchronous, globally distributed team that trusts you to manage your own time.</p>
         </div>
       </div>
@@ -4686,7 +4814,7 @@
   <!-- Open Roles List (Minimalist List Layout) -->
   <section style="padding: 0 20px 100px; max-width: 1000px; margin: 0 auto;">
     <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 40px;">
-      <h2 style="font-size: 40px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); letter-spacing: -0.02em;">Open Roles</h2>
+      <h2 style="font-size: 40px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); letter-spacing: -0.02em;">Open Roles</h2>
       <div style="font-size: 15px; color: var(--text-2); font-weight: 500;">3 Positions</div>
     </div>
     
@@ -4808,7 +4936,7 @@
   <!-- Hero -->
   <section style="padding: 160px 20px 80px; max-width: 900px; margin: 0 auto; text-align: center;">
     <div class="section-eyebrow" style="margin-bottom: 20px; color: var(--primary);">Press & Media</div>
-    <h1 style="font-size: 56px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.02em;">Brand Assets & <span class="grad">Resources</span></h1>
+    <h1 style="font-size: 56px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.02em;">Brand Assets & <span class="grad">Resources</span></h1>
     <p style="font-size: 20px; color: var(--text-2); line-height: 1.6; max-width: 700px; margin: 0 auto;">
       Everything you need to cover TalentSync. Download our official brand assets, read our company boilerplate, and explore our design guidelines.
     </p>
@@ -4818,7 +4946,7 @@
     
     <!-- Company Boilerplate (Real Info) -->
     <div style="background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 50px; margin-bottom: 60px; box-shadow: var(--shadow-sm);">
-      <h2 style="font-size: 28px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Company Boilerplate</h2>
+      <h2 style="font-size: 28px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Company Boilerplate</h2>
       <p style="font-size: 16px; color: var(--text-2); line-height: 1.7; margin-bottom: 24px; max-width: 800px;">
         TalentSync is an AI-powered resume screening platform designed to eliminate human fatigue and unconscious bias from the hiring process. Built on advanced Natural Language Processing (NLP) frameworks like spaCy and NLTK, TalentSync evaluates candidates based strictly on a mathematical skill-overlap and cosine similarity scoring engine. By focusing on merit over metrics, TalentSync helps HR teams identify the best talent faster, fairer, and more efficiently.
       </p>
@@ -4828,7 +4956,7 @@
     </div>
 
     <!-- Brand Colors (The Fun Interactive Element!) -->
-    <h2 style="font-size: 28px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Brand Color Palette</h2>
+    <h2 style="font-size: 28px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Brand Color Palette</h2>
     <p style="font-size: 16px; color: var(--text-2); margin-bottom: 32px;">Our signature "4-Strip Mint Palette". Click any swatch to instantly copy its HEX code.</p>
     
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 60px;" id="swatch-container">
@@ -4863,12 +4991,12 @@
     </div>
 
     <!-- Official Logos -->
-    <h2 style="font-size: 28px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Logo Downloads</h2>
+    <h2 style="font-size: 28px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 24px;">Logo Downloads</h2>
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
       
       <!-- Logo Dark -->
       <div style="background: var(--navy); border-radius: var(--radius-lg); padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-        <div style="font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 700; color: var(--white); margin-bottom: 30px;">
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 32px; font-weight: 700; color: var(--white); margin-bottom: 30px;">
           🤖 Talent<span style="color: var(--primary);">Sync</span>
         </div>
         <a href="#" style="color: var(--white); text-decoration: none; font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.1); padding: 8px 16px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'"><i class="fas fa-download"></i> Download SVG</a>
@@ -4876,7 +5004,7 @@
 
       <!-- Logo Light -->
       <div style="background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative;">
-        <div style="font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 30px;">
+        <div style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 32px; font-weight: 700; color: var(--navy); margin-bottom: 30px;">
           🤖 Talent<span style="color: var(--primary);">Sync</span>
         </div>
         <a href="#" style="color: var(--navy); text-decoration: none; font-size: 14px; font-weight: 600; background: var(--strip-1); border: 1px solid var(--border); padding: 8px 16px; border-radius: 6px; transition: background 0.2s;" onmouseover="this.style.background='var(--strip-2)'" onmouseout="this.style.background='var(--strip-1)'"><i class="fas fa-download"></i> Download SVG</a>
@@ -4986,7 +5114,7 @@
       <!-- Left Column: Info & Routing -->
       <div>
         <div class="section-eyebrow" style="margin-bottom: 20px; color: var(--primary);">Get in touch</div>
-        <h1 style="font-size: 56px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.02em;">Let's talk about <span class="grad">hiring.</span></h1>
+        <h1 style="font-size: 56px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px; line-height: 1.1; letter-spacing: -0.02em;">Let's talk about <span class="grad">hiring.</span></h1>
         <p style="font-size: 18px; color: var(--text-2); line-height: 1.6; margin-bottom: 40px;">
           Whether you're looking to scale your engineering team, integrate our open-source parsing engine, or just want to say hi—we'd love to hear from you.
         </p>
@@ -5020,7 +5148,7 @@
 
       <!-- Right Column: Contact Form (The Fun Element: Floating Labels & Validation UI) -->
       <div style="background: var(--white); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 40px; box-shadow: var(--shadow-sm);">
-        <h2 style="font-size: 24px; font-family: 'Syne', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 30px;">Send us a message</h2>
+        <h2 style="font-size: 24px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; color: var(--navy); margin-bottom: 30px;">Send us a message</h2>
         
         <form onsubmit="event.preventDefault(); document.getElementById('contact-success').style.display='block'; this.style.display='none';">
           
@@ -5131,7 +5259,7 @@
 
   <section style="padding: 120px 20px 80px; text-align: center; max-width: 900px; margin: 0 auto;">
     <div class="section-eyebrow" style="margin-bottom: 20px; color: var(--primary);">Legal Hub</div>
-    <h1 style="font-size: 56px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px;">Trust Center</h1>
+    <h1 style="font-size: 56px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px;">Trust Center</h1>
     <p style="font-size: 18px; color: var(--text-2);">Transparent policies on how we handle your data.</p>
   </section>
 
@@ -5281,7 +5409,7 @@
 
   <section style="padding: 120px 20px 80px; text-align: center; max-width: 900px; margin: 0 auto;">
     <div class="section-eyebrow" style="margin-bottom: 20px; color: var(--primary);">Product Hub</div>
-    <h1 style="font-size: 56px; font-family: 'Syne', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px;">Changelog & <span class="grad">Roadmap</span></h1>
+    <h1 style="font-size: 56px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; color: var(--navy); margin-bottom: 24px;">Changelog & <span class="grad">Roadmap</span></h1>
     <p style="font-size: 18px; color: var(--text-2);">Track our recent updates and see where our engineering team is heading next.</p>
   </section>
 

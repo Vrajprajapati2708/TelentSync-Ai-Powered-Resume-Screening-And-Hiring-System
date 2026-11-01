@@ -87,6 +87,81 @@ CREATE TABLE IF NOT EXISTS resumes (
 CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(user_id);
 CREATE INDEX IF NOT EXISTS idx_resumes_hash ON resumes(file_hash);
 
+-- Anti-Gaming: Log all resume upload events for 24-hour rate-limiting
+CREATE TABLE IF NOT EXISTS resume_upload_logs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id     INTEGER NOT NULL,
+    file_hash   TEXT    DEFAULT '',
+    uploaded_at TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_resume_upload_logs_user_time ON resume_upload_logs(user_id, uploaded_at);
+
+-- Anti-Gaming Step 6: Blind Skill Confirmation (Candidate confirmed skills with evidence weight & provenance)
+CREATE TABLE IF NOT EXISTS candidate_skills (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id      INTEGER NOT NULL,
+    skill        TEXT    NOT NULL,
+    source       TEXT    NOT NULL DEFAULT 'self_declared', -- 'resume_extracted' | 'self_declared' | 'quiz_verified'
+    confidence   REAL    DEFAULT 0.2,                      -- 1.0 (experience/quiz), 0.7 (project), 0.2 (self_declared/list)
+    confirmed_at TEXT    DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE(user_id, skill)
+);
+
+CREATE INDEX IF NOT EXISTS idx_candidate_skills_user ON candidate_skills(user_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_skills_skill ON candidate_skills(skill);
+
+-- Anti-Gaming Step 7: Learning Timeline Engine & Velocity Anomaly Detection
+CREATE TABLE IF NOT EXISTS skill_velocity_anomalies (
+    id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id            INTEGER NOT NULL,
+    previous_resume_id INTEGER,
+    current_resume_id  INTEGER NOT NULL,
+    elapsed_days       REAL NOT NULL,
+    estimated_days     REAL NOT NULL,
+    new_skills         TEXT NOT NULL,
+    severity           TEXT NOT NULL DEFAULT 'high', -- 'high' | 'medium' | 'low'
+    velocity_ratio     REAL NOT NULL,
+    anomaly_reason     TEXT NOT NULL,
+    status             TEXT NOT NULL DEFAULT 'flagged', -- 'flagged' | 'cleared' | 'verified'
+    detected_at        TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY(previous_resume_id) REFERENCES resumes(id) ON DELETE SET NULL,
+    FOREIGN KEY(current_resume_id) REFERENCES resumes(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_user ON skill_velocity_anomalies(user_id);
+CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_status ON skill_velocity_anomalies(status);
+
+-- Anti-Gaming Step 8: Technical Quiz Gatekeeper for Disputed / Sudden Skills
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    skill          TEXT NOT NULL,
+    question       TEXT NOT NULL,
+    options        TEXT NOT NULL, -- JSON array of options
+    correct_option INTEGER NOT NULL,
+    difficulty     TEXT DEFAULT 'intermediate',
+    created_at     TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_questions_skill ON quiz_questions(skill);
+
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id         INTEGER NOT NULL,
+    skill           TEXT NOT NULL,
+    score           INTEGER NOT NULL,
+    total_questions INTEGER NOT NULL,
+    correct_answers INTEGER NOT NULL,
+    passed          INTEGER NOT NULL, -- 1 if >= 70%, 0 otherwise
+    attempted_at    TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_skill ON quiz_attempts(user_id, skill);
+
 
 CREATE TABLE IF NOT EXISTS jobs (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -105,13 +180,17 @@ CREATE TABLE IF NOT EXISTS applications (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id     INTEGER NOT NULL,
     job_id      INTEGER NOT NULL,
+    resume_id   INTEGER,
     match_score INTEGER DEFAULT 0,
     status      TEXT    DEFAULT 'Reviewing',  -- Reviewing|Shortlisted|Pending|Rejected
     applied_at  TEXT    DEFAULT (datetime('now')),
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(job_id)  REFERENCES jobs(id)  ON DELETE CASCADE,
+    FOREIGN KEY(resume_id) REFERENCES resumes(id) ON DELETE SET NULL,
     UNIQUE(user_id, job_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_applications_resume ON applications(resume_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id            INTEGER PRIMARY KEY AUTOINCREMENT,

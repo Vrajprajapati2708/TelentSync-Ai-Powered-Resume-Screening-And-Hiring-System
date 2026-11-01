@@ -10,7 +10,7 @@ from app.database.connection import get_db
 from app.ml.recommendation.recommend_jobs import recommend_jobs
 from app.utils.security import login_required
 from app import limiter
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import threading
 
@@ -33,6 +33,8 @@ def invalidate_user_ranked_cache(uid: Optional[int]) -> None:
 
 
 @resume_bp.route('/upload_resume', methods=['POST'])
+@resume_bp.route('/resume/upload', methods=['POST'])
+@resume_bp.route('/resumes/upload', methods=['POST'])
 @login_required
 @limiter.limit("5 per minute")
 def upload_resume():
@@ -47,7 +49,7 @@ def upload_resume():
     result = process_resume_upload(file, user_id)
     if result.get('success'):
         invalidate_user_ranked_cache(user_id)
-    status = 200 if result.get('success') else 400
+    status = result.get('status_code') or (200 if result.get('success') else 400)
     return jsonify(result), status
 
 
@@ -102,7 +104,7 @@ def get_my_resumes():
     with get_db() as conn:
         rows = conn.execute(
             """SELECT id, original_name, stored_filename, file_size_bytes, mime_type, ats_score, extracted_skills, structured_json, status, version, uploaded_at 
-               FROM resumes WHERE user_id=? ORDER BY id DESC""",
+               FROM resumes WHERE user_id=? AND status != 'archived' ORDER BY id DESC""",
             (user_id,)
         ).fetchall()
 
@@ -393,23 +395,96 @@ def apply_job():
         return jsonify({'success': False, 'message': 'Invalid job ID for internal job'}), 400
 
     with get_db() as conn:
-        job = conn.execute("SELECT id, title, company FROM jobs WHERE id=?", (internal_job_id,)).fetchone()
+        job = conn.execute("SELECT id, title, company, skills, description FROM jobs WHERE id=?", (internal_job_id,)).fetchone()
         if not job:
             return jsonify({'success': False, 'message': 'Job not found'}), 404
 
-        exists = conn.execute(
-            "SELECT id FROM applications WHERE user_id=? AND job_id=?",
+        # ── STEP 3: Check Existing Application & 30-Day Cooldown ──
+        existing_app = conn.execute(
+            "SELECT id, applied_at, status, resume_id FROM applications WHERE user_id=? AND job_id=? ORDER BY id DESC LIMIT 1",
             (user_id, internal_job_id)
         ).fetchone()
-        if exists:
-            return jsonify({'success': False, 'message': 'Already applied!'})
 
-        match_score = int(data.get('match_score', 0))
+        if existing_app:
+            applied_str = existing_app['applied_at']
+            app_date = None
+            if applied_str:
+                for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%d'):
+                    try:
+                        app_date = datetime.strptime(str(applied_str).strip()[:19], fmt)
+                        break
+                    except Exception:
+                        pass
+
+            now = datetime.now()
+            is_within_cooldown = True
+            days_left = 30
+            if app_date:
+                delta = now - app_date
+                if delta.total_seconds() >= 30 * 86400:
+                    is_within_cooldown = False
+                else:
+                    days_left = max(1, 30 - delta.days)
+
+            if is_within_cooldown:
+                return jsonify({
+                    'success': False,
+                    'cooldown_active': True,
+                    'days_remaining': days_left,
+                    'message': f'Already applied! You have already applied to this position within the last 30 days. Re-application cooldown is active ({days_left} days remaining).'
+                }), 200
+
+        # ── STEP 1 & 3: Authoritative Match Scoring & Snapshot Lock ──
+        # Ignore any client-sent match_score to prevent tampering.
+        # Compute match score directly from stored resume and job requirements.
+        resume_row = conn.execute(
+            "SELECT id, parsed_text, extracted_skills FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1",
+            (user_id,)
+        ).fetchone()
+
+        active_resume_id = resume_row['id'] if resume_row else None
+
+        cand_skills = []
+        cand_text = None
+        if resume_row:
+            cand_text = resume_row['parsed_text'] or None
+            cand_skills = [s.strip() for s in (resume_row['extracted_skills'] or '').split(',') if s.strip()]
+
+        if not cand_skills:
+            user_row = conn.execute("SELECT skills FROM users WHERE id=?", (user_id,)).fetchone()
+            if user_row and user_row['skills']:
+                cand_skills = [s.strip() for s in user_row['skills'].split(',') if s.strip()]
+
+        job_dict = dict(job)
+        job_skills_list = [s.strip() for s in (job_dict.get('skills') or '').split(',') if s.strip()]
+
+        if (cand_skills or cand_text) and (job_skills_list or job_dict.get('description')):
+            recs = recommend_jobs(
+                cand_skills,
+                [job_dict],
+                top_n=1,
+                candidate_resume_text=cand_text
+            )
+            match_score = recs[0].get('match_percentage', 0) if recs else 0
+        else:
+            match_score = 0
+
         cur_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-        conn.execute(
-            "INSERT INTO applications (user_id, job_id, match_score, applied_at) VALUES (?, ?, ?, ?)",
-            (user_id, internal_job_id, match_score, cur_time)
-        )
+        if existing_app:
+            # Re-application after 30-day cooldown: update snapshot resume_id, score, status, and timestamp
+            conn.execute(
+                """UPDATE applications 
+                   SET resume_id=?, match_score=?, status='Reviewing', applied_at=?
+                   WHERE id=?""",
+                (active_resume_id, match_score, cur_time, existing_app['id'])
+            )
+        else:
+            conn.execute(
+                """INSERT INTO applications (user_id, job_id, resume_id, match_score, applied_at)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (user_id, internal_job_id, active_resume_id, match_score, cur_time)
+            )
+
         job_title = job['title'] if 'title' in job.keys() else 'Job'
         job_company = job['company'] if 'company' in job.keys() else ''
         company_str = f" at {job_company}" if job_company else ""
@@ -431,5 +506,6 @@ def apply_job():
         'success': True,
         'type': 'internal',
         'status': 'submitted',
-        'message': 'Application submitted successfully'
+        'reapplied': bool(existing_app),
+        'message': 'Application re-submitted successfully after cooldown period' if existing_app else 'Application submitted successfully'
     }), 200

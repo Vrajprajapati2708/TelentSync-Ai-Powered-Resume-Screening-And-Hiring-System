@@ -7,13 +7,16 @@ import os
 import uuid
 import hashlib
 import json
+import threading
 from typing import Optional, Dict, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timedelta
 from werkzeug.utils import secure_filename
+
+_upload_lock = threading.Lock()
 from app.ml.parsers.resume_parser import parse_resume
 from app.ml.resume_intelligence.resume_json_builder import build_resume_intelligence
 from app.ml.ats.ats_checker import compute_ats_score
-from app.database.connection import get_db
+from app.database.connection import get_db, is_postgres
 from app.utils.validators import validate_file_extension, validate_file_bytes
 from app.utils.logger import get_logger
 from app.config.settings import ActiveConfig
@@ -74,6 +77,97 @@ def check_duplicate_resume(user_id: int, file_hash: str) -> dict | None:
             return dict(record)
 
     return None
+
+
+def check_upload_rate_limit(user_id: int, max_uploads: int = 3, window_hours: int = 24, conn: Any = None) -> Tuple[bool, int, Optional[int]]:
+    """
+    Enforce anti-gaming rate limit: Maximum 3 resume uploads per user in a 24-hour period.
+    Tracks all upload events in resume_upload_logs (immune to resume deletion gaming).
+    Supports multi-process concurrency by running under an active database lock when `conn` is supplied.
+    Returns (allowed, current_count, hours_until_reset).
+    """
+    if not user_id:
+        return True, 0, None
+
+    def _execute_query(c):
+        # Check if resume_upload_logs table exists
+        is_pg = is_postgres()
+        if is_pg:
+            table_check = c.execute(
+                "SELECT tablename FROM pg_tables WHERE schemaname='public' AND tablename='resume_upload_logs'"
+            ).fetchone()
+        else:
+            table_check = c.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='resume_upload_logs'"
+            ).fetchone()
+
+        rows = []
+        if table_check:
+            rows = c.execute(
+                "SELECT id, uploaded_at FROM resume_upload_logs WHERE user_id=? ORDER BY id ASC",
+                (user_id,)
+            ).fetchall()
+
+        # If no log entries yet, check active resumes table (covers legacy / freshly seeded data)
+        if not rows:
+            rows = c.execute(
+                "SELECT id, uploaded_at FROM resumes WHERE user_id=? ORDER BY id ASC",
+                (user_id,)
+            ).fetchall()
+
+        ref_row = c.execute("SELECT datetime('now') as now_utc" if not is_pg else "SELECT CURRENT_TIMESTAMP as now_utc").fetchone()
+        sql_now_str = ref_row['now_utc'] if ref_row else None
+        now_utc = datetime.strptime(str(sql_now_str)[:19], '%Y-%m-%d %H:%M:%S') if sql_now_str else datetime.utcnow()
+        now_local = datetime.now()
+        return rows, now_utc, now_local
+
+    try:
+        if conn is not None:
+            rows, now_utc, now_local = _execute_query(conn)
+        else:
+            with get_db() as c:
+                rows, now_utc, now_local = _execute_query(c)
+    except Exception as e:
+        logger.warning(f"Could not query upload logs for user {user_id}: {e}")
+        return True, 0, None
+
+    cutoff_seconds = window_hours * 3600
+    recent_uploads = []
+
+    for r in rows:
+        ts_str = r['uploaded_at']
+        if not ts_str:
+            continue
+        r_dt = None
+        for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d'):
+            try:
+                r_dt = datetime.strptime(str(ts_str).strip()[:19], fmt)
+                break
+            except Exception:
+                pass
+        if not r_dt:
+            continue
+
+        diff_utc = (now_utc - r_dt).total_seconds()
+        diff_local = (now_local - r_dt).total_seconds()
+
+        # If by either valid clock reference (UTC or local) the upload is >= window_hours old, it has expired
+        if diff_utc > cutoff_seconds or diff_local > cutoff_seconds:
+            continue
+
+        # If by either clock reference the upload was within the active window
+        if (0 <= diff_utc <= cutoff_seconds) or (0 <= diff_local <= cutoff_seconds) or (-300 <= diff_utc <= cutoff_seconds):
+            recent_uploads.append((r['id'], max(diff_utc, diff_local)))
+
+    count = len(recent_uploads)
+    if count >= max_uploads:
+        earliest_diff = min(u[1] for u in recent_uploads)
+        seconds_left = max(1, int(cutoff_seconds - earliest_diff))
+        hours_left = max(1, int((seconds_left + 3599) // 3600))
+        return False, count, hours_left
+
+    return True, count, None
+
 
 
 
@@ -161,6 +255,20 @@ def process_resume_upload(file, user_id: int | None = None) -> dict:
                 }
             }
 
+        # Step 2b: Anti-Gaming 24-Hour Re-Upload Rate Limiting (P0 Anti-Gaming Rule)
+        allowed, count, hours_left = check_upload_rate_limit(user_id, max_uploads=3, window_hours=24)
+        if not allowed:
+            logger.warning(f"Upload rate limit reached for user_id={user_id}: {count}/3 uploads in last 24h")
+            return {
+                'success': False,
+                'rate_limited': True,
+                'status_code': 429,
+                'uploads_in_24h': count,
+                'max_allowed': 3,
+                'hours_until_reset': hours_left,
+                'message': f"Upload limit reached: Maximum 3 resume uploads allowed per 24-hour period. Please try again in {hours_left} hours."
+            }
+
     # Step 3: Resume Intelligence Orchestration (RI-08)
     intel = build_resume_intelligence(file_stream, raw_filename)
     meta = intel.get('metadata', {})
@@ -205,67 +313,134 @@ def process_resume_upload(file, user_id: int | None = None) -> dict:
 
     # Step 6: Transactional DB Insertion & Profile Sync
     resume_id = None
+    velocity_anomaly_data = None
     if user_id:
-        try:
-            with get_db() as conn:
-                # 6a. Insert into resumes metadata table (including structured_json)
-                cur = conn.execute(
-                    """INSERT INTO resumes 
-                       (user_id, original_name, stored_filename, file_path, file_hash, file_size_bytes, mime_type, parsed_text, word_count, ats_score, extracted_skills, structured_json, status, version)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processed', 1)""",
-                    (
-                        user_id,
-                        save_res['original_name'],
-                        save_res['stored_filename'],
-                        save_res['file_path'],
-                        file_hash,
-                        save_res['file_size_bytes'],
-                        save_res['mime_type'],
-                        raw_text,
-                        word_count,
-                        ats_score,
-                        skills_str,
-                        structured_json_str
+        with _upload_lock:
+            try:
+                with get_db() as conn:
+                    # Database-level atomic quota enforcement across multiple processes/workers:
+                    if is_postgres():
+                        conn.execute("SELECT id FROM users WHERE id=? FOR UPDATE", (user_id,))
+                    else:
+                        try:
+                            conn.execute("BEGIN IMMEDIATE")
+                        except Exception:
+                            pass
+
+                    # Atomic re-check under database lock
+                    allowed, count, hours_left = check_upload_rate_limit(user_id, max_uploads=3, window_hours=24, conn=conn)
+                    if not allowed:
+                        logger.warning(f"Upload rate limit reached during locked insertion for user_id={user_id}: {count}/3 uploads in last 24h")
+                        if os.path.exists(save_res['file_path']):
+                            try:
+                                os.remove(save_res['file_path'])
+                            except Exception:
+                                pass
+                        return {
+                            'success': False,
+                            'rate_limited': True,
+                            'status_code': 429,
+                            'uploads_in_24h': count,
+                            'max_allowed': 3,
+                            'hours_until_reset': hours_left,
+                            'message': f"Upload limit reached: Maximum 3 resume uploads allowed per 24-hour period. Please try again in {hours_left} hours."
+                        }
+
+                    # 6a. Check latest existing resume for versioning & velocity diffing (ignoring archived)
+                    latest_res = conn.execute(
+                        "SELECT id, version, extracted_skills, uploaded_at FROM resumes WHERE user_id=? AND status != 'archived' ORDER BY id DESC LIMIT 1",
+                        (user_id,)
+                    ).fetchone()
+                    prev_version = latest_res['version'] if latest_res and latest_res['version'] else 0
+                    new_version = prev_version + 1
+                    prev_resume_id = latest_res['id'] if latest_res else None
+
+                    # 6b. Insert into resumes metadata table (including structured_json)
+                    cur = conn.execute(
+                        """INSERT INTO resumes 
+                           (user_id, original_name, stored_filename, file_path, file_hash, file_size_bytes, mime_type, parsed_text, word_count, ats_score, extracted_skills, structured_json, status, version)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'processed', ?)""",
+                        (
+                            user_id,
+                            save_res['original_name'],
+                            save_res['stored_filename'],
+                            save_res['file_path'],
+                            file_hash,
+                            save_res['file_size_bytes'],
+                            save_res['mime_type'],
+                            raw_text,
+                            word_count,
+                            ats_score,
+                            skills_str,
+                            structured_json_str,
+                            new_version
+                        )
                     )
-                )
-                resume_id = cur.lastrowid
+                    resume_id = cur.lastrowid
 
-                # 6b. Update user candidate profile
-                conn.execute(
-                    "UPDATE users SET skills=?, ats_score=? WHERE id=?",
-                    (skills_str, ats_score, user_id)
-                )
-
-                # 6c. Insert event notification
-                cur_time = datetime.now().strftime('%Y-%m-%d %H:%M')
-                conn.execute(
-                    """INSERT INTO notifications 
-                       (user_id, title, message, type, action_type, action_target, metadata, created_at)
-                       VALUES (?, ?, ?, 'system', 'view_ats', '#cand-ats', ?, ?)""",
-                    (
-                        user_id,
-                        'Resume Processed & Scored ✨',
-                        f"Your resume was analyzed with an ATS Score of {ats_score}/100 and {len(skills_list)} extracted skills.",
-                        json.dumps({'resume_id': resume_id, 'ats_score': ats_score, 'skills_count': len(skills_list)}),
-                        cur_time
+                    # 6c. Log upload event for anti-gaming rate-limiting (immune to resume deletion)
+                    conn.execute(
+                        """INSERT INTO resume_upload_logs (user_id, file_hash, uploaded_at)
+                           VALUES (?, ?, datetime('now'))""",
+                        (user_id, file_hash)
                     )
-                )
-                conn.commit()
 
-            logger.info(f"Resume uploaded & inserted: resume_id={resume_id}, user_id={user_id}, score={ats_score}")
-        except Exception as db_err:
-            logger.error(f"DB transaction failed, removing disk file {save_res['file_path']}: {db_err}")
-            if os.path.exists(save_res['file_path']):
+                    # 6d. Update user candidate profile
+                    conn.execute(
+                        "UPDATE users SET skills=?, ats_score=? WHERE id=?",
+                        (skills_str, ats_score, user_id)
+                    )
+
+                    # 6e. Insert event notification
+                    cur_time = datetime.now().strftime('%Y-%m-%d %H:%M')
+                    conn.execute(
+                        """INSERT INTO notifications 
+                           (user_id, title, message, type, action_type, action_target, metadata, created_at)
+                           VALUES (?, ?, ?, 'system', 'view_ats', '#cand-ats', ?, ?)""",
+                        (
+                            user_id,
+                            'Resume Processed & Scored ✨',
+                            f"Your resume was analyzed with an ATS Score of {ats_score}/100 and {len(skills_list)} extracted skills.",
+                            json.dumps({'resume_id': resume_id, 'ats_score': ats_score, 'skills_count': len(skills_list), 'version': new_version}),
+                            cur_time
+                        )
+                    )
+                    conn.commit()
+
+                # 6f. Step 7: Learning Timeline Engine & Velocity Anomaly Detection (runs before updating candidate_skills)
                 try:
-                    os.remove(save_res['file_path'])
-                except Exception:
-                    pass
-            return {'success': False, 'message': 'Database operation failed.'}
+                    from app.services.velocity_service import check_and_record_velocity_anomaly
+                    velocity_anomaly_data = check_and_record_velocity_anomaly(
+                        user_id=user_id,
+                        current_resume_id=resume_id,
+                        current_skills=skills_list,
+                        previous_resume_id=prev_resume_id
+                    )
+                except Exception as v_err:
+                    logger.warning(f"Could not check velocity anomaly: {v_err}")
+
+                # 6g. Step 6: Sync extracted skills into candidate_skills with evidence tiers
+                try:
+                    from app.services.candidate_skills_service import sync_resume_extracted_skills
+                    sync_resume_extracted_skills(user_id, skills_list, structured_json_str)
+                except Exception as s_err:
+                    logger.warning(f"Could not sync extracted skills into candidate_skills: {s_err}")
+
+                logger.info(f"Resume uploaded & inserted: resume_id={resume_id}, user_id={user_id}, version={new_version}, score={ats_score}")
+            except Exception as db_err:
+                logger.error(f"DB transaction failed, removing disk file {save_res['file_path']}: {db_err}")
+                if os.path.exists(save_res['file_path']):
+                    try:
+                        os.remove(save_res['file_path'])
+                    except Exception:
+                        pass
+                return {'success': False, 'message': 'Database operation failed.'}
 
     return {
         'success': True,
         'message': 'Resume parsed, scored, and saved successfully.',
         'resume_id': resume_id,
+        'velocity_anomaly': velocity_anomaly_data,
         'data': {
             'skills':           skills_list,
             'ats_score':        ats_score,
@@ -379,12 +554,25 @@ def delete_resume_by_id(
 
     # Transactional Database Deletion & Candidate Profile Sync
     try:
+        is_archived = False
         with get_db() as conn:
-            conn.execute("DELETE FROM resumes WHERE id=?", (resume_id,))
+            # Check if this resume snapshot is locked to any historical job applications
+            apps_count = conn.execute(
+                "SELECT COUNT(*) FROM applications WHERE resume_id=?",
+                (resume_id,)
+            ).fetchone()[0]
 
-            # Recalculate profile state from remaining resumes for this user
+            if apps_count > 0:
+                # Retain snapshot for historical HR review: soft-delete by setting status='archived'
+                conn.execute("UPDATE resumes SET status='archived' WHERE id=?", (resume_id,))
+                is_archived = True
+                logger.info(f"Resume {resume_id} has {apps_count} historical job applications. Archived rather than purged.")
+            else:
+                conn.execute("DELETE FROM resumes WHERE id=?", (resume_id,))
+
+            # Recalculate profile state from remaining active resumes for this user
             remaining = conn.execute(
-                "SELECT ats_score, extracted_skills FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1",
+                "SELECT ats_score, extracted_skills FROM resumes WHERE user_id=? AND status != 'archived' ORDER BY id DESC LIMIT 1",
                 (owner_id,)
             ).fetchone()
 
@@ -406,7 +594,8 @@ def delete_resume_by_id(
                 (
                     owner_id,
                     'Resume Deleted 🗑️',
-                    f"Resume '{resume['original_name']}' was successfully deleted.",
+                    f"Resume '{resume['original_name']}' was removed from your active profile." if is_archived
+                    else f"Resume '{resume['original_name']}' was successfully deleted.",
                     datetime.now().strftime('%Y-%m-%d %H:%M')
                 )
             )
@@ -420,15 +609,16 @@ def delete_resume_by_id(
             'status_code': 500
         }
 
-    # Physical File Deletion (after DB commit)
-    if os.path.exists(target_path):
-        try:
-            os.remove(target_path)
-            logger.info(f"Physical resume file removed: {target_path}")
-        except Exception as file_err:
-            logger.warning(f"Could not remove physical resume file {target_path}: {file_err}")
+    # Physical File Deletion (after DB commit) ONLY if not preserved for historical applications
+    if not is_archived:
+        if os.path.exists(target_path):
+            try:
+                os.remove(target_path)
+                logger.info(f"Physical resume file removed: {target_path}")
+            except Exception as file_err:
+                logger.warning(f"Could not remove physical resume file {target_path}: {file_err}")
     else:
-        logger.info(f"Physical resume file was already absent on disk: {target_path}")
+        logger.info(f"Physical file preserved for historical application snapshot: {target_path}")
 
     # Invalidate user ranked cache
     try:
@@ -437,11 +627,12 @@ def delete_resume_by_id(
     except Exception:
         pass
 
-    logger.info(f"Resume {resume_id} deleted successfully by user {current_user_id} ({current_user_role})")
+    logger.info(f"Resume {resume_id} processed for deletion by user {current_user_id} ({current_user_role}), archived={is_archived}")
     return {
         'success': True,
         'message': 'Resume deleted successfully.',
         'deleted_id': resume_id,
+        'archived': is_archived,
         'status_code': 200
     }
 

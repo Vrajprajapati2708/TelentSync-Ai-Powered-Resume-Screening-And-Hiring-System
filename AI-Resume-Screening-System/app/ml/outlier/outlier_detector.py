@@ -13,6 +13,12 @@
 
 import numpy as np
 
+try:
+    from sklearn.ensemble import IsolationForest
+    _SKLEARN_AVAILABLE = True
+except ImportError:
+    _SKLEARN_AVAILABLE = False
+
 def detect_outliers(candidates: list[dict]) -> list[dict]:
     """
     Takes a list of candidate dicts (must have 'ats_score' key).
@@ -33,9 +39,8 @@ def detect_outliers(candidates: list[dict]) -> list[dict]:
     is_outlier_ml = [False] * len(scores)
 
     # --- Method 1: IsolationForest (only on candidates who actually have uploaded resumes) ---
-    if len(valid_indices) >= 20:
+    if _SKLEARN_AVAILABLE and len(valid_indices) >= 20:
         try:
-            from sklearn.ensemble import IsolationForest
             valid_scores = np.array([scores[i] for i in valid_indices]).reshape(-1, 1)
             model = IsolationForest(contamination=0.02, random_state=42)
             preds = model.fit_predict(valid_scores)
@@ -65,7 +70,7 @@ def detect_outliers(candidates: list[dict]) -> list[dict]:
             candidate['outlier_reason'] = '⚠️ Suspicious: Extremely high score (>98) - possible keyword stuffing'
         elif db_outlier:
             candidate['outlier_flag'] = True
-            candidate['outlier_reason'] = '⚠️ Flagged outlier in candidate profile'
+            candidate['outlier_reason'] = '⚠️ Learning velocity anomaly / candidate profile outlier'
         elif is_outlier_ml[i] and (score < 12 or score > 96):
             candidate['outlier_flag'] = True
             candidate['outlier_reason'] = '⚠️ Statistical anomaly detected by AI model'

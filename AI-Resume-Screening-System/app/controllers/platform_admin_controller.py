@@ -1183,12 +1183,17 @@ def get_platform_applications(
         total_count = conn.execute(count_query, tuple(params)).fetchone()[0]
 
         data_query = f"""
-            SELECT a.id, a.user_id, a.job_id, a.match_score, a.status, a.applied_at,
+            SELECT a.id, a.user_id, a.job_id, a.resume_id, a.match_score, a.status, a.applied_at,
                    u.name as candidate_name, u.email as candidate_email,
-                   j.title as job_title, j.company as job_company
+                   j.title as job_title, j.company as job_company,
+                   r.original_name as resume_name
             FROM applications a
             LEFT JOIN users u ON a.user_id = u.id
             LEFT JOIN jobs j ON a.job_id = j.id
+            LEFT JOIN resumes r ON r.id = COALESCE(
+                a.resume_id,
+                (SELECT id FROM resumes WHERE user_id = u.id ORDER BY id DESC LIMIT 1)
+            )
             {where_clause}
             ORDER BY a.id DESC
             LIMIT ? OFFSET ?
@@ -1202,6 +1207,8 @@ def get_platform_applications(
             "id": r["id"],
             "user_id": r["user_id"],
             "job_id": r["job_id"],
+            "resume_id": r["resume_id"],
+            "resume_name": r["resume_name"] or "",
             "candidate_name": r["candidate_name"] or "Unknown",
             "candidate_email": r["candidate_email"] or "",
             "job_title": r["job_title"] or "Deleted Job",
@@ -1327,14 +1334,19 @@ def get_platform_application_detail(app_id: int) -> Optional[Dict[str, Any]]:
     """
     with get_db() as conn:
         row = conn.execute(
-            """SELECT a.id, a.user_id, a.job_id, a.match_score, a.status, a.applied_at,
+            """SELECT a.id, a.user_id, a.job_id, a.resume_id, a.match_score, a.status, a.applied_at,
                       u.name as candidate_name, u.email as candidate_email, u.phone as candidate_phone,
                       u.location as candidate_location, u.skills as candidate_skills, u.ats_score,
                       j.title as job_title, j.company as job_company, j.location as job_location,
-                      j.type as job_type, j.salary as job_salary
+                      j.type as job_type, j.salary as job_salary,
+                      r.original_name as resume_name
                FROM applications a
                LEFT JOIN users u ON a.user_id = u.id
                LEFT JOIN jobs j ON a.job_id = j.id
+               LEFT JOIN resumes r ON r.id = COALESCE(
+                   a.resume_id,
+                   (SELECT id FROM resumes WHERE user_id = u.id ORDER BY id DESC LIMIT 1)
+               )
                WHERE a.id = ?""",
             (app_id,)
         ).fetchone()
@@ -1364,6 +1376,8 @@ def get_platform_application_detail(app_id: int) -> Optional[Dict[str, Any]]:
         "id": row["id"],
         "user_id": row["user_id"],
         "job_id": row["job_id"],
+        "resume_id": row["resume_id"],
+        "resume_name": row["resume_name"] or "",
         "match_score": row["match_score"] or 0,
         "status": row["status"] or "Pending",
         "applied_at": row["applied_at"] or "",

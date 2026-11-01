@@ -17,8 +17,8 @@
   --c-field: rgba(0, 0, 0, .28);
   --c-shadow: 0 30px 70px rgba(0, 0, 0, .45);
   --c-teal-ink: #04122b;
-  --f-display: 'Syne', sans-serif;
-  --f-body: 'DM Sans', system-ui, sans-serif;
+  --f-display: 'Plus Jakarta Sans', sans-serif;
+  --f-body: 'Inter', system-ui, sans-serif;
   --r-sm: 12px; --r-md: 18px; --r-lg: 26px;
 }
 

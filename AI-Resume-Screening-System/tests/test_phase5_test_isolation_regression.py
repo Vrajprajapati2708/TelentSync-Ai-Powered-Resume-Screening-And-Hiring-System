@@ -74,7 +74,8 @@ class TestPhase5TestIsolationRegression(unittest.TestCase):
             unique_filename = f"iso_test_{int(time.time() * 1000)}.docx"
             fs = FileStorage(stream=buf, filename=unique_filename, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
-            result = process_resume_upload(fs, user_id=999999)
+            iso_user_id = int(time.time() * 1000) % 900000 + 100000
+            result = process_resume_upload(fs, user_id=iso_user_id)
             self.assertTrue(result.get("success"), f"Upload failed: {result.get('message')}")
 
             with get_db() as conn:

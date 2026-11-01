@@ -336,7 +336,18 @@ class JobsSearchService:
 
         try:
             with get_db() as conn:
-                # 1. Check resumes table
+                # 1. Step 6: Check candidate_skills table (incorporates blind confirmed skills)
+                try:
+                    cs_rows = conn.execute(
+                        "SELECT skill FROM candidate_skills WHERE user_id=? ORDER BY confidence DESC, skill ASC",
+                        (user_id,)
+                    ).fetchall()
+                    if cs_rows:
+                        skills = [r['skill'] for r in cs_rows]
+                except Exception:
+                    pass
+
+                # 2. Check resumes table
                 r_row = conn.execute(
                     "SELECT extracted_skills, structured_json FROM resumes WHERE user_id=? ORDER BY id DESC LIMIT 1",
                     (user_id,)
@@ -344,9 +355,10 @@ class JobsSearchService:
                 
                 if r_row:
                     has_resume = True
-                    raw_skills = r_row['extracted_skills'] or ''
-                    if raw_skills:
-                        skills = [s.strip() for s in raw_skills.split(',') if s.strip()]
+                    if not skills:
+                        raw_skills = r_row['extracted_skills'] or ''
+                        if raw_skills:
+                            skills = [s.strip() for s in raw_skills.split(',') if s.strip()]
                     
                     if r_row['structured_json']:
                         import json
@@ -360,7 +372,7 @@ class JobsSearchService:
                         except Exception:
                             pass
 
-                # 2. Check users profile
+                # 3. Check users profile
                 u_row = conn.execute("SELECT skills, location FROM users WHERE id=?", (user_id,)).fetchone()
                 if u_row:
                     if not skills and u_row['skills']:
@@ -462,10 +474,18 @@ class JobsSearchService:
         end_idx = start_idx + per_page
         paged_jobs = ranked_jobs[start_idx:end_idx]
 
+        from flask import session
+        is_hr_caller = False
+        try:
+            is_hr_caller = session.get('role') in ('hr', 'admin')
+        except Exception:
+            pass
+
         # 8. Clean up response structures
         final_jobs = []
         for r in paged_jobs:
-            final_jobs.append({
+            m_score = int(r.get('match_percentage', 50))
+            job_obj = {
                 'id': str(r.get('id', '')),
                 'title': r.get('title', ''),
                 'company': r.get('company', ''),
@@ -484,9 +504,15 @@ class JobsSearchService:
                 'is_external': bool(r.get('is_external', False) or r.get('source') == 'adzuna'),
                 'external_apply_url': r.get('external_apply_url') or (r.get('apply_url') if (r.get('is_external') or r.get('source') == 'adzuna') else None),
                 'apply_url': r.get('apply_url', ''),
-                'match_score': int(r.get('match_percentage', 50)),
-                'matched_skills': r.get('matching_skills', [])
-            })
+                'match_score': m_score,
+            }
+            if is_hr_caller:
+                job_obj['matched_skills'] = r.get('matching_skills', [])
+            else:
+                # Step 2: Candidate view — coarse match band, no exact keyword leaks
+                job_obj['matched_skills'] = []
+                job_obj['match_band'] = 'Strong Match' if m_score >= 75 else ('Good Match' if m_score >= 50 else 'Potential Match')
+            final_jobs.append(job_obj)
 
         return {
             'success': True,

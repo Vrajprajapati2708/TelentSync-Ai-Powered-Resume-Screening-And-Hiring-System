@@ -119,7 +119,9 @@ class TestPhase3JobsTalentPoolRegression(unittest.TestCase):
         with get_db() as conn:
             app_row = conn.execute("SELECT * FROM applications WHERE user_id=? AND job_id=?", (cand_id, job_id)).fetchone()
             self.assertIsNotNone(app_row)
-            self.assertEqual(app_row["match_score"], 88)
+            # Under Step 1 Server-Side Scoring, client-sent match_score (88) is ignored.
+            # Since candidate has not uploaded a resume, server-calculated match_score is 0.
+            self.assertEqual(app_row["match_score"], 0)
 
     def test_gap07_internal_job_duplicate_application_prevented(self):
         """Applying twice to the same internal job returns already applied message."""

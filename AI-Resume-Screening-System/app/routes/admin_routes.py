@@ -12,13 +12,15 @@ from flask import Blueprint, request, jsonify, Response
 from app.database.connection import get_db
 from app.utils.security import login_required, role_required
 from app.utils.validators import validate_status, sanitize_text
+from app.ml.outlier.outlier_detector import detect_outliers
+from app.ml.clustering.candidate_clusterer import cluster_candidates
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
 
 @admin_bp.route('/stats')
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def admin_stats():
     """GET /api/admin/stats — Dashboard KPIs and chart data. HR only."""
     with get_db() as conn:
@@ -136,28 +138,24 @@ def admin_stats():
 
 @admin_bp.route('/candidates')
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def get_candidates():
-    """GET /api/admin/candidates — All applicants with outlier flags, cluster labels, and real Resume Intelligence. HR only."""
-    import json
-    from app.ml.outlier.outlier_detector import detect_outliers
-    from app.ml.clustering.candidate_clusterer import cluster_candidates
-
+    """GET /api/admin/candidates — All applicants with outlier flags, cluster labels, and real Resume Intelligence. HR and Admin."""
     with get_db() as conn:
         rows = conn.execute('''
             SELECT a.id as app_id, u.id as user_id, u.name, u.email, u.phone, u.location,
                    u.linkedin, u.github, u.summary, u.education as user_education, u.skills, u.ats_score,
+                   u.is_outlier,
                    j.title as job, a.match_score, a.status, a.applied_at,
                    r.id as resume_id, r.original_name as resume_name, r.mime_type as resume_mime,
                    r.structured_json
             FROM applications a
             JOIN users u ON a.user_id = u.id
             JOIN jobs j  ON a.job_id  = j.id
-            LEFT JOIN (
-                SELECT id, user_id, original_name, mime_type, structured_json,
-                       ROW_NUMBER() OVER (PARTITION BY user_id ORDER BY id DESC) as rn
-                FROM resumes
-            ) r ON r.user_id = u.id AND r.rn = 1
+            LEFT JOIN resumes r ON r.id = COALESCE(
+                a.resume_id,
+                (SELECT id FROM resumes WHERE user_id = u.id ORDER BY id DESC LIMIT 1)
+            )
             ORDER BY a.match_score DESC
         ''').fetchall()
 
@@ -237,6 +235,7 @@ def query_talent_pool(
                 u.education as user_education,
                 u.skills,
                 u.ats_score,
+                u.is_outlier,
                 u.created_at,
                 r.id as resume_id,
                 r.original_name as resume_name,
@@ -494,7 +493,7 @@ def export_talent_pool_csv():
 
 @admin_bp.route('/clusters')
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def get_clusters():
     """GET /api/admin/clusters — Candidates grouped by skill cluster. HR only."""
     from app.ml.outlier.outlier_detector import detect_outliers
@@ -525,7 +524,7 @@ def get_clusters():
 
 @admin_bp.route('/outliers')
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def get_outliers():
     """GET /api/admin/outliers — Only flagged/suspicious candidates. HR only."""
     from app.ml.outlier.outlier_detector import detect_outliers
@@ -549,7 +548,7 @@ def get_outliers():
 
 @admin_bp.route('/update_status', methods=['POST'])
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def update_status():
     """POST /api/admin/update_status  →  { app_id, status }. HR only."""
     data   = request.get_json(silent=True) or {}
@@ -613,9 +612,9 @@ def update_status():
 
 @admin_bp.route('/delete_job/<int:job_id>', methods=['DELETE'])
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def delete_job(job_id):
-    """DELETE /api/admin/delete_job/<job_id>. HR only."""
+    """DELETE /api/admin/delete_job/<job_id>. HR and Admin."""
     with get_db() as conn:
         conn.execute("DELETE FROM jobs WHERE id=?", (job_id,))
         conn.commit()
@@ -625,9 +624,9 @@ def delete_job(job_id):
 # ── Jobs CRUD ─────────────────────────────────────────────
 @admin_bp.route('/jobs', methods=['GET', 'POST'])
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def jobs_api():
-    """GET/POST /api/admin/jobs. HR only."""
+    """GET/POST /api/admin/jobs. HR and Admin."""
     if request.method == 'GET':
         with get_db() as conn:
             jobs = conn.execute('SELECT * FROM jobs ORDER BY id DESC').fetchall()
@@ -655,7 +654,7 @@ def jobs_api():
 
 @admin_bp.route('/jobs/<int:job_id>', methods=['PUT', 'GET'])
 @login_required
-@role_required('hr')
+@role_required('hr', 'admin')
 def job_detail(job_id):
     """GET/PUT /api/admin/jobs/<job_id>. HR only."""
     if request.method == 'GET':
@@ -711,3 +710,210 @@ def adzuna_health():
         "error_type": diag["error_type"],
         "error_message": diag["error_message"]
     })
+
+
+@admin_bp.route('/candidate/<int:user_id>/skills', methods=['GET'])
+@login_required
+@role_required('hr', 'admin')
+def admin_candidate_skills(user_id: int):
+    """
+    GET /api/admin/candidate/<user_id>/skills
+    HR inspection endpoint: returns full skill provenance and evidence weights
+    distinguishing experience narrative (1.0), project (0.7), and blind self-declared (0.2).
+    """
+    from app.services.candidate_skills_service import get_candidate_skills
+    skills = get_candidate_skills(user_id)
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'skills': skills,
+        'total_count': len(skills)
+    }), 200
+
+
+@admin_bp.route('/candidate/<int:user_id>/velocity', methods=['GET'])
+@login_required
+@role_required('hr', 'admin')
+def admin_candidate_velocity(user_id: int):
+    """
+    GET /api/admin/candidate/<user_id>/velocity
+    HR inspection endpoint: returns full skill acquisition velocity anomaly logs,
+    elapsed timelines, and flags across resume versions.
+    """
+    from app.services.velocity_service import get_user_velocity_anomalies
+    anomalies = get_user_velocity_anomalies(user_id)
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'has_anomaly': bool(anomalies),
+        'anomaly_count': len(anomalies),
+        'anomalies': anomalies
+    }), 200
+
+
+@admin_bp.route('/candidate/<int:user_id>/quizzes', methods=['GET'])
+@login_required
+@role_required('hr', 'admin')
+def admin_candidate_quizzes(user_id: int):
+    """
+    GET /api/admin/candidate/<user_id>/quizzes
+    HR inspection endpoint: returns full quiz attempts, scores, verification status,
+    and timestamps for candidate technical assessments.
+    """
+    from app.services.quiz_service import get_user_quiz_history
+    history = get_user_quiz_history(user_id)
+    verified = [h['skill'] for h in history if h.get('passed')]
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'quiz_attempts': history,
+        'total_attempts': len(history),
+        'verified_skills': list(set(verified))
+    }), 200
+
+
+@admin_bp.route('/candidate/<int:user_id>/resumes', methods=['GET'])
+@login_required
+@role_required('hr', 'admin')
+def admin_candidate_resumes(user_id: int):
+    """
+    GET /api/admin/candidate/<user_id>/resumes
+    HR inspection endpoint: returns full resume version history for candidate,
+    including version number, upload date, ATS score, extracted skills, and archival status.
+    """
+    with get_db() as conn:
+        rows = conn.execute(
+            """SELECT id, version, original_name, stored_filename, file_size_bytes, 
+                      mime_type, ats_score, extracted_skills, status, uploaded_at 
+               FROM resumes 
+               WHERE user_id=? 
+               ORDER BY version ASC, id ASC""",
+            (user_id,)
+        ).fetchall()
+
+    resumes = []
+    for r in rows:
+        d = dict(r)
+        skills_str = d.get('extracted_skills') or ''
+        d['skills_list'] = [s.strip() for s in skills_str.split(',') if s.strip()]
+        resumes.append(d)
+
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'total_resumes': len(resumes),
+        'resumes': resumes
+    }), 200
+
+
+@admin_bp.route('/candidate/<int:user_id>/resume_diff', methods=['GET'])
+@login_required
+@role_required('hr', 'admin')
+def admin_candidate_resume_diff(user_id: int):
+    """
+    GET /api/admin/candidate/<user_id>/resume_diff?v1=<id>&v2=<id>
+    HR inspection endpoint: compares two resume versions side-by-side,
+    calculates added, retained, and removed skills, elapsed days,
+    required learning days, and whether an anomaly was recorded.
+    """
+    from app.ml.velocity.learning_timeline_engine import diff_resume_skillsets, compute_required_learning_time
+    from app.services.velocity_service import get_user_velocity_anomalies
+
+    v1_id = request.args.get('v1', type=int)
+    v2_id = request.args.get('v2', type=int)
+
+    with get_db() as conn:
+        if v1_id and v2_id:
+            r1 = conn.execute("SELECT * FROM resumes WHERE id=? AND user_id=?", (v1_id, user_id)).fetchone()
+            r2 = conn.execute("SELECT * FROM resumes WHERE id=? AND user_id=?", (v2_id, user_id)).fetchone()
+        else:
+            latest = conn.execute(
+                "SELECT * FROM resumes WHERE user_id=? ORDER BY version DESC, id DESC LIMIT 2",
+                (user_id,)
+            ).fetchall()
+            if len(latest) < 2:
+                single = dict(latest[0]) if latest else None
+                return jsonify({
+                    'success': True,
+                    'user_id': user_id,
+                    'has_diff': False,
+                    'message': 'At least two resume versions are required to compute a diff.',
+                    'latest_resume': single
+                }), 200
+            r2, r1 = latest[0], latest[1]
+
+    if not r1 or not r2:
+        return jsonify({'success': False, 'message': 'Specified resume versions not found for this candidate.'}), 404
+
+    s1_raw = r1['extracted_skills'] or ''
+    s2_raw = r2['extracted_skills'] or ''
+    s1_list = [s.strip() for s in s1_raw.split(',') if s.strip()]
+    s2_list = [s.strip() for s in s2_raw.split(',') if s.strip()]
+
+    added, retained, removed = diff_resume_skillsets(s1_list, s2_list)
+
+    # Elapsed days
+    elapsed_days = 1.0
+    t1 = r1['uploaded_at']
+    t2 = r2['uploaded_at']
+    if t1 and t2:
+        try:
+            for fmt in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%dT%H:%M:%S', '%Y-%m-%d %H:%M'):
+                try:
+                    dt1 = datetime.strptime(str(t1).split('.')[0], fmt)
+                    dt2 = datetime.strptime(str(t2).split('.')[0], fmt)
+                    elapsed_days = max(abs((dt2 - dt1).total_seconds()) / 86400.0, 0.001)
+                    break
+                except ValueError:
+                    continue
+        except Exception:
+            pass
+
+    required_days = compute_required_learning_time(added)
+    velocity_ratio = round(elapsed_days / max(required_days, 0.01), 4)
+
+    # Check matching anomaly in database
+    anomalies = get_user_velocity_anomalies(user_id)
+    matching_anomaly = next((a for a in anomalies if a.get('current_resume_id') == r2['id']), None)
+
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'has_diff': True,
+        'version_1': {
+            'id': r1['id'],
+            'version': r1['version'],
+            'original_name': r1['original_name'],
+            'uploaded_at': r1['uploaded_at'],
+            'ats_score': r1['ats_score'],
+            'skills': s1_list
+        },
+        'version_2': {
+            'id': r2['id'],
+            'version': r2['version'],
+            'original_name': r2['original_name'],
+            'uploaded_at': r2['uploaded_at'],
+            'ats_score': r2['ats_score'],
+            'skills': s2_list
+        },
+        'diff': {
+            'added_skills': added,
+            'retained_skills': retained,
+            'removed_skills': removed,
+            'added_count': len(added),
+            'retained_count': len(retained),
+            'removed_count': len(removed)
+        },
+        'timeline': {
+            'elapsed_days': round(elapsed_days, 2),
+            'required_learning_days': required_days,
+            'velocity_ratio': velocity_ratio
+        },
+        'anomaly': {
+            'is_flagged': bool(matching_anomaly and matching_anomaly.get('status') == 'flagged'),
+            'anomaly_details': matching_anomaly
+        }
+    }), 200
+
+
+

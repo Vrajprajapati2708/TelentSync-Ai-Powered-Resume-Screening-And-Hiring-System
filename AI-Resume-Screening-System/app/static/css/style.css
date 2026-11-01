@@ -1,6 +1,6 @@
 /* ============================================================
    TalentSync — World-Class Design System
-   Font: Syne + DM Sans
+   Font: Plus Jakarta Sans + Inter
    Theme: 4-Strip Mint Palette
    Strip 1 (lightest): #d4edda  — pale mint
    Strip 2:            #80c4a4  — sage green
@@ -8,7 +8,7 @@
    Strip 4 (base):     #f5fdf7  — near-white cream
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
 /* ── CSS Variables ── */
 :root {
@@ -288,16 +288,38 @@ body.dark-mode [style*="color:var(--text-2)"]    { color: var(--text-2) !importa
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; font-size: 15px; }
 body {
-  font-family: 'DM Sans', sans-serif;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: -0.01em;
   background: var(--bg);
   color: var(--text);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
 }
-h1,h2,h3,h4,h5,h6 { font-family: 'Syne', sans-serif; line-height: 1.15; }
+h1, h2, h3, h4, h5, h6,
+.topbar-title,
+.modal-title {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+}
 a { text-decoration: none; color: inherit; }
 img { max-width: 100%; }
-input, select, textarea, button { font-family: 'DM Sans', sans-serif; }
+button,
+input,
+select,
+textarea {
+  font-family: 'Inter', sans-serif;
+}
+
+.stat-value,
+.score-ring-num,
+.candidate-name,
+.cand-name {
+  font-family: 'Inter', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
 
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -461,7 +483,7 @@ select.form-control { cursor: pointer; }
 .avatar {
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-weight: 800; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif;
   flex-shrink: 0;
 }
 .avatar-sm  { width: 32px; height: 32px; font-size: 12px; }
@@ -562,7 +584,7 @@ select.form-control { cursor: pointer; }
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
-.modal-title { font-size: 20px; font-weight: 800; font-family: 'Syne', sans-serif; color: var(--navy); display: flex; align-items: center; }
+.modal-title { font-size: 20px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.025em; color: var(--navy); display: flex; align-items: center; }
 body.dark-mode .modal-title { color: var(--text); }
 .modal-close {
   width: 36px; height: 36px;
@@ -635,11 +657,11 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
   box-shadow: 0 4px 14px rgba(128,196,164,.28);
 }
 .logo-name {
-  font-family: 'Arial Black', 'Syne', sans-serif;
+  font-family: 'Plus Jakarta Sans', sans-serif;
   font-size: 26px;
-  font-weight: 900;
+  font-weight: 800;
   color: var(--text);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.03em;
   display: flex; align-items: center;
 }
 .logo-name span { color: var(--primary); margin-left: 2px; }
@@ -874,7 +896,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
   max-width: 500px;
   animation: slideUp .7s ease .4s both;
 }
-.hero-stat .num { font-family: 'Syne', sans-serif; font-size: 32px; font-weight: 800; color: var(--primary); }
+.hero-stat .num { font-family: 'Inter', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: -0.02em; color: var(--primary); }
 .hero-stat .lbl { font-size: 13px; color: var(--text-3); margin-top: 2px; font-weight: 600; }
 
 /* Section Headers */
@@ -986,7 +1008,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
   border: 3px solid var(--primary);
   color: var(--primary);
   display: flex; align-items: center; justify-content: center;
-  font-family: 'Syne', sans-serif; font-size: 24px; font-weight: 800;
+  font-family: 'Plus Jakarta Sans', sans-serif; font-size: 24px; font-weight: 700;
   z-index: 2;
   flex-shrink: 0;
   box-shadow: 4px 4px 0px rgba(0,0,0,0.1);
@@ -1405,7 +1427,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
 }
 .hamburger-btn span { display: block; width: 22px; height: 2px; background: var(--text-2); border-radius: 2px; transition: var(--transition); }
 
-.topbar-title { font-size: 19px; font-weight: 800; font-family: 'Syne', sans-serif; }
+.topbar-title { font-size: 19px; font-weight: 700; font-family: 'Plus Jakarta Sans', sans-serif; letter-spacing: -0.025em; }
 .topbar-breadcrumb { font-size: 12px; color: var(--text-3); margin-top: 1px; }
 .topbar-breadcrumb span { color: var(--primary); font-weight: 600; }
 
@@ -1467,7 +1489,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
 .stat-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
 .stat-label { font-size: 13px; font-weight: 600; color: var(--text-2); }
 .stat-icon { width: 42px; height: 42px; border-radius: 0; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-.stat-value { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; color: var(--text); line-height: 1; }
+.stat-value { font-family: 'Inter', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: var(--text); line-height: 1; }
 .stat-change { font-size: 12px; font-weight: 600; margin-top: 6px; display: flex; align-items: center; gap: 4px; }
 .stat-change.up   { color: #16a34a; }
 .stat-change.down { color: var(--rose); }
@@ -1485,7 +1507,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
    ============================================================ */
 .score-ring-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
 .score-ring-inner { position: absolute; text-align: center; }
-.score-ring-num { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; line-height: 1; }
+.score-ring-num { font-family: 'Inter', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
 .score-ring-label { font-size: 11px; color: var(--text-3); margin-top: 2px; }
 
 /* ============================================================
@@ -1552,7 +1574,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
 .job-card.featured { border-top: 3px solid var(--teal); }
 .job-card-badge { position: absolute; top: 16px; right: 16px; }
 .company-row { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
-.company-logo { width: 52px; height: 52px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; font-family: 'Syne', sans-serif; flex-shrink: 0; overflow: hidden; background: #f8fafc; border: 1px solid var(--border); }
+.company-logo { width: 52px; height: 52px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; font-family: 'Plus Jakarta Sans', sans-serif; flex-shrink: 0; overflow: hidden; background: #f8fafc; border: 1px solid var(--border); }
 .company-logo img { width: 44px; height: 44px; object-fit: contain; border-radius: 6px; display: block; }
 .job-title { font-size: 17px; font-weight: 700; margin-bottom: 3px; }
 .company-name { font-size: 13px; color: var(--text-2); }
@@ -1572,7 +1594,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
   width: 30px; height: 30px;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 800; font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700; font-family: 'Inter', sans-serif;
 }
 .rank-gold   { background: linear-gradient(135deg,#f4c430,#e6a817); color: #fff; box-shadow: 0 2px 8px rgba(244,196,48,.4); }
 .rank-silver { background: linear-gradient(135deg,#94a3b8,#64748b); color: #fff; }
@@ -1614,7 +1636,7 @@ body.dark-mode .modal-close { background: var(--bg-2); color: var(--text); borde
 .ats-ring-wrap { position: relative; flex-shrink: 0; }
 svg.score-svg { transform: rotate(-90deg); }
 .ats-ring-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); text-align: center; }
-.ats-ring-center .big-num { font-family: 'Syne', sans-serif; font-size: 36px; font-weight: 800; color: #fff; line-height: 1; }
+.ats-ring-center .big-num { font-family: 'Inter', sans-serif; font-size: 36px; font-weight: 700; letter-spacing: -0.02em; color: #fff; line-height: 1; }
 .ats-ring-center .big-lbl { font-size: 12px; color: rgba(255,255,255,.6); }
 .ats-info h3 { font-size: 26px; font-weight: 800; margin-bottom: 10px; }
 .ats-info p { color: rgba(255,255,255,.75); font-size: 15px; margin-bottom: 20px; }

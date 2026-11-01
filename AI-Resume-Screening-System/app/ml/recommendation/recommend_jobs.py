@@ -38,7 +38,8 @@ SKILL_WEIGHT    = 0.60   # Direct skill overlap
 def recommend_jobs(candidate_skills: list[str],
                    jobs: list[dict],
                    top_n: int = 10,
-                   candidate_resume_text: str | None = None) -> list[dict]:
+                   candidate_resume_text: str | None = None,
+                   for_hr: bool = False) -> list[dict]:
     """
     Recommend the top N jobs for a candidate using two-stage matching.
 
@@ -56,14 +57,11 @@ def recommend_jobs(candidate_skills: list[str],
         jobs:                  List of job dicts (from DB) with 'skills', 'description'.
         top_n:                 Maximum number of recommendations to return.
         candidate_resume_text: Full resume text (preferred over skills alone).
+        for_hr:                If True, include exact matched_skills and missing_skills (HR view).
+                               If False (candidate-facing), return coarse bands and counts only.
 
     Returns:
-        List of job dicts with extra keys:
-            - 'match_percentage' (int 0–100)
-            - 'matched_skills'   (list[str])
-            - 'missing_skills'   (list[str])
-            - 'semantic_score'   (float 0–1)
-            - 'skill_score'      (float 0–1)
+        List of job dicts enriched with match attributes.
     """
     if not jobs:
         return []
@@ -126,15 +124,31 @@ def recommend_jobs(candidate_skills: list[str],
         enriched['score']            = round(final_score, 4)
         enriched['hybrid_score']     = round(final_score, 4)
         enriched['tfidf_score']      = round(semantic, 4)
-        enriched['matched_skills']   = matched
-        enriched['missing_skills']   = missing
         enriched['semantic_score']   = round(semantic, 4)
         enriched['skill_score']      = round(overlap,  4)
+
+        if for_hr:
+            # HR view: Provide exact matched and missing skills lists
+            enriched['matched_skills'] = matched
+            enriched['missing_skills'] = missing
+        else:
+            # Candidate view: Hide the answer sheet! Coarse match band and counts only
+            if match_pct >= 75:
+                enriched['match_band'] = 'High Match'
+            elif match_pct >= 45:
+                enriched['match_band'] = 'Moderate Match'
+            else:
+                enriched['match_band'] = 'Potential Match'
+            enriched['matched_skills_count'] = len(matched)
+            enriched['missing_skills_count'] = len(missing)
+            enriched['matched_skills']       = []
+            enriched['missing_skills']       = []
+
         results.append(enriched)
 
     results.sort(key=lambda x: x['match_percentage'], reverse=True)
     logger.info(
         f"recommend_jobs: {len(results)} matches from {len(jobs)} jobs "
-        f"(sklearn={vectorizer.is_sklearn})."
+        f"(sklearn={vectorizer.is_sklearn}, for_hr={for_hr})."
     )
     return results[:top_n]

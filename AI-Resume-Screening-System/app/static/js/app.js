@@ -291,6 +291,15 @@ const Router = {
     const el = document.getElementById('page-' + page);
     if (el) { el.classList.add('active'); window.scrollTo(0,0); }
     this.current = page;
+    if (page === 'admin') {
+      fetchAdminStats();
+      if (!DB.candidates || DB.candidates.length === 0) {
+        fetchCandidatesFromServer();
+      }
+      if (!DB.jobs || DB.jobs.length === 0) {
+        fetchJobsFromServer();
+      }
+    }
     // Clear login fields when navigating to login page (prevent stale autofill)
     if (page === 'login') {
       const emailEl = document.getElementById('login-email');
@@ -370,6 +379,29 @@ const Router = {
     if (portal === 'cand' && section === 'notif' && typeof CandidateNotifCenter !== 'undefined') {
       CandidateNotifCenter.fetchNotifications();
     }
+    if (portal === 'cand' && (section === 'analysis' || section === 'dash')) {
+      if (typeof fetchCandidateProvenanceSkills === 'function') {
+        fetchCandidateProvenanceSkills();
+      }
+    }
+    if (portal === 'admin') {
+      fetchAdminStats();
+      if (!DB.candidates || DB.candidates.length === 0) {
+        fetchCandidatesFromServer();
+      }
+      if (section === 'jobs') {
+        fetchJobsFromServer();
+      }
+      if (section === 'talentpool') {
+        fetchTalentPool();
+      }
+      if (section === 'candidates' && typeof UI.renderCandidatesTable === 'function') {
+        UI.renderCandidatesTable();
+      }
+      if (section === 'rankings' && typeof UI.renderRankingsTable === 'function') {
+        UI.renderRankingsTable();
+      }
+    }
   }
 };
 
@@ -404,6 +436,9 @@ const Auth = {
         fetchNotificationsFromServer(user.id);
         if (user.role === 'admin') {
             fetchPlatformAdminAnalytics();
+            fetchCandidatesFromServer();
+            fetchAdminStats();
+            fetchTalentPool();
         } else if (user.role === 'hr') {
             fetchCandidatesFromServer();
             fetchAdminStats();
@@ -452,6 +487,9 @@ const Auth = {
         fetchNotificationsFromServer(user.id);
         if (user.role === 'admin') {
             fetchPlatformAdminAnalytics();
+            fetchCandidatesFromServer();
+            fetchAdminStats();
+            fetchTalentPool();
         } else if (user.role === 'hr') {
             fetchCandidatesFromServer();
             fetchAdminStats();
@@ -619,7 +657,7 @@ const Auth = {
 
   setupPortal(user) {
     const avatar = user.avatar || user.name.slice(0,2).toUpperCase();
-    const isHR   = user.role === 'hr';
+    const isHR   = user.role === 'hr' || user.role === 'admin';
 
     // --- Sidebar + topbar names/avatars ---
     document.querySelectorAll('.cand-name').forEach(el => el.textContent = user.name);
@@ -757,7 +795,10 @@ const Auth = {
 
           // ── Restore the page from URL hash on refresh ──
           const hash = window.location.hash.replace('#', '');
-          const portalPage = user.role === 'admin' ? 'platform-admin' : (user.role === 'hr' ? 'admin' : 'cand');
+          let portalPage = user.role === 'admin' ? 'platform-admin' : (user.role === 'hr' ? 'admin' : 'cand');
+          if (user.role === 'admin' && (hash === 'admin' || hash.startsWith('admin-'))) {
+            portalPage = 'admin';
+          }
 
           if (hash === 'cand-pipeline') {
             // Block candidate-facing pipeline hash and redirect to candidate dashboard
@@ -784,6 +825,9 @@ const Auth = {
           fetchNotificationsFromServer(user.id);
           if (user.role === 'admin') {
               fetchPlatformAdminAnalytics();
+              fetchCandidatesFromServer();
+              fetchAdminStats();
+              fetchTalentPool();
           } else if (user.role === 'hr') {
               fetchCandidatesFromServer();
               fetchAdminStats();
@@ -882,8 +926,8 @@ const Sidebar = {
 // ── Modal ─────────────────────────────────────────────────────
 const Modal = {
   open(id) { document.getElementById(id).classList.add('show'); },
-  close(id) { document.getElementById(id).classList.remove('show'); },
-  closeAll() { document.querySelectorAll('.modal-backdrop.show').forEach(m => m.classList.remove('show')); }
+  close(id) { if (id === 'quiz-modal' && typeof cleanupAssessmentAntiCheat === 'function') cleanupAssessmentAntiCheat(); document.getElementById(id).classList.remove('show'); },
+  closeAll() { if (typeof cleanupAssessmentAntiCheat === 'function') cleanupAssessmentAntiCheat(); document.querySelectorAll('.modal-backdrop.show').forEach(m => m.classList.remove('show')); }
 };
 
 // ── Tabs ──────────────────────────────────────────────────────
@@ -1724,6 +1768,88 @@ function viewCandidate(id) {
     };
   }
   
+  // Anti-Gaming Provenance & Velocity Audit
+  const candUserId = c.user_id || c.id;
+  const provListEl = document.getElementById('modal-cand-provenance-list');
+  const velAlertEl = document.getElementById('modal-cand-velocity-alert');
+  const quizHistEl = document.getElementById('modal-cand-quiz-history');
+  const tagEl      = document.getElementById('modal-cand-outlier-tag');
+
+  if (provListEl) provListEl.innerHTML = '<span class="text-muted text-sm"><i class="fas fa-circle-notch fa-spin"></i> Loading audit data...</span>';
+  if (velAlertEl) velAlertEl.style.display = 'none';
+  if (quizHistEl) quizHistEl.innerHTML = '';
+  if (tagEl) {
+    tagEl.textContent = 'Verified Profile';
+    tagEl.className = 'badge badge-teal';
+  }
+
+  if (candUserId) {
+    // 1. Fetch skills provenance
+    fetch(`/api/admin/candidate/${candUserId}/skills`)
+      .then(r => r.json())
+      .then(data => {
+        if (!provListEl) return;
+        if (data.success && Array.isArray(data.skills) && data.skills.length > 0) {
+          provListEl.innerHTML = data.skills.map(s => {
+            const w = Number(s.evidence_weight) || 0.2;
+            let badgeClass = 'badge-warning';
+            let label = 'Self 0.2';
+            if (w >= 1.0) {
+              badgeClass = s.source === 'quiz' ? 'badge-primary' : 'badge-success';
+              label = s.source === 'quiz' ? 'Quiz 1.0' : 'Exp 1.0';
+            } else if (w >= 0.7) {
+              badgeClass = 'badge-info';
+              label = 'Project 0.7';
+            }
+            return `<span class="skill-tag" style="display:inline-flex;align-items:center;gap:6px">
+              ${escapeHTML(s.skill_name)}
+              <span class="badge ${badgeClass}" style="font-size:9px;padding:2px 5px">${label}</span>
+            </span>`;
+          }).join('');
+        } else {
+          provListEl.innerHTML = '<span class="text-muted text-sm">No structured provenance recorded.</span>';
+        }
+      })
+      .catch(() => {
+        if (provListEl) provListEl.innerHTML = '<span class="text-muted text-sm">Error loading provenance.</span>';
+      });
+
+    // 2. Fetch velocity anomalies
+    fetch(`/api/admin/candidate/${candUserId}/velocity`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.has_anomaly && Array.isArray(data.anomalies) && data.anomalies.length > 0) {
+          if (tagEl) {
+            tagEl.textContent = 'Velocity Anomaly Flagged';
+            tagEl.className = 'badge badge-danger';
+          }
+          if (velAlertEl) {
+            velAlertEl.style.display = 'block';
+            velAlertEl.innerHTML = `<i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>
+              <strong>Rapid Skill Acquisition Flagged:</strong> ${escapeHTML(data.anomalies[0].flag_reason || 'Unusual skill surge across resume uploads.')}`;
+          }
+        }
+      })
+      .catch(() => {});
+
+    // 3. Fetch quiz assessments
+    fetch(`/api/admin/candidate/${candUserId}/quizzes`)
+      .then(r => r.json())
+      .then(data => {
+        if (!quizHistEl) return;
+        if (data.success && Array.isArray(data.quiz_attempts) && data.quiz_attempts.length > 0) {
+          quizHistEl.innerHTML = `<strong>Assessments:</strong> ` + data.quiz_attempts.map(q => `
+            <span class="badge ${q.passed ? 'badge-success' : 'badge-gray'}" style="margin-right:4px">
+              ${escapeHTML(q.skill)}: ${q.score}% (${q.passed ? 'Passed' : 'Failed'})
+            </span>
+          `).join('');
+        } else {
+          quizHistEl.innerHTML = '<span class="text-muted" style="font-size:11px">No technical assessments taken yet.</span>';
+        }
+      })
+      .catch(() => {});
+  }
+
   Modal.open('view-cand-modal');
 }
 
@@ -2945,7 +3071,7 @@ function fetchNotificationsFromServer() {
           ];
         }
       }
-      UI.renderNotifications(DB.currentUser.role === 'hr' ? 'admin' : 'cand');
+      UI.renderNotifications((DB.currentUser.role === 'hr' || DB.currentUser.role === 'admin') ? 'admin' : 'cand');
       updateSidebarBadges();
     })
     .catch(() => {
@@ -2979,7 +3105,7 @@ function fetchNotificationsFromServer() {
           ];
         }
       }
-      UI.renderNotifications(DB.currentUser.role === 'hr' ? 'admin' : 'cand');
+      UI.renderNotifications((DB.currentUser.role === 'hr' || DB.currentUser.role === 'admin') ? 'admin' : 'cand');
       updateSidebarBadges();
     });
 }
@@ -3229,7 +3355,7 @@ function fetchJobsFromServer(forceMLRefresh = false) {
   }
 
   // 1. HR PORTAL: Fetch all jobs for the Admin view
-  if (DB.currentUser.role === 'hr') {
+  if (DB.currentUser.role === 'hr' || DB.currentUser.role === 'admin') {
     return fetch('/api/admin/jobs')
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -3497,7 +3623,7 @@ function fetchJobsFromServer(forceMLRefresh = false) {
 }
 
 function fetchCandidatesFromServer() {
-  if (!DB.currentUser || DB.currentUser.role !== 'hr') {
+  if (!DB.currentUser || (DB.currentUser.role !== 'hr' && DB.currentUser.role !== 'admin')) {
     return;
   }
   fetch('/api/admin/candidates')
@@ -3988,131 +4114,141 @@ function fetchNotificationsFromServer(userId) {
 
 // Pull ALL live stats and update admin dashboard numbers
 function fetchAdminStats() {
-  fetch('/api/admin/stats').then(r=>r.json()).then(d=>{
-    // Stat cards (dashboard KPIs)
-    setEl('stat-total-applicants', d.total_applicants);
-    setEl('stat-resumes-analyzed', d.resumes_analyzed);
-    setEl('stat-shortlisted',      d.shortlisted);
-    setEl('stat-active-jobs',      d.active_jobs);
-    setEl('stat-avg-ats',          d.avg_ats_score);
-    setEl('stat-reviewing',        d.reviewing);
-    // NOTE: tab counts (All/Shortlisted/Reviewing/Rejected) are set by
-    // fetchCandidatesFromServer() which uses the real joined candidate list.
+  fetch('/api/admin/stats')
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(d => {
+      if (!d || typeof d !== 'object') return;
+      // Stat cards (dashboard KPIs)
+      setEl('stat-total-applicants', d.total_applicants !== undefined ? d.total_applicants : '--');
+      setEl('stat-resumes-analyzed', d.resumes_analyzed !== undefined ? d.resumes_analyzed : '--');
+      setEl('stat-shortlisted',      d.shortlisted !== undefined ? d.shortlisted : '--');
+      setEl('stat-active-jobs',      d.active_jobs !== undefined ? d.active_jobs : '--');
+      setEl('stat-avg-ats',          d.avg_ats_score !== undefined ? d.avg_ats_score : '--');
+      setEl('stat-reviewing',        d.reviewing !== undefined ? d.reviewing : '--');
 
-    // Charts with real data
-    const skillLabels = d.top_skills.map(x=>x.skill);
-    const skillCounts = d.top_skills.map(x=>x.count);
+      // Charts with real data
+      const topSkills = Array.isArray(d.top_skills) ? d.top_skills : [];
+      const skillLabels = topSkills.map(x=>x.skill);
+      const skillCounts = topSkills.map(x=>x.count);
 
-    Charts.create('admin-skills-donut', {
-      type:'doughnut',
-      data:{ labels: skillLabels,
-        datasets:[{ data: skillCounts,
-          backgroundColor:['#1260cc','#00c9a7','#16a34a','#d97706','#7c3aed','#94a3b8','#e11d48','#0891b2'],
-          borderWidth:3, borderColor:'#fff' }] },
-      options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}, cutout:'60%' }
-    });
-
-    Charts.create('admin-app-trend', {
-      type:'bar',
-      data:{ labels:['Shortlisted','Reviewing','Pending','Rejected'],
-        datasets:[{ label:'Candidates', data:[d.shortlisted,d.reviewing,d.pending,d.rejected],
-          backgroundColor:['#16a34a','#1260cc','#d97706','#dc2626'], borderRadius:6 }] },
-      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} }}
-    });
-
-    // Analytics charts
-    const roleLabels = d.apps_by_role.map(x=>x.role);
-    const roleCounts = d.apps_by_role.map(x=>x.count);
-    Charts.create('admin-role-pie', {
-      type:'pie',
-      data:{ labels:roleLabels,
-        datasets:[{ data:roleCounts, backgroundColor:['#1260cc','#00c9a7','#16a34a','#d97706','#7c3aed','#94a3b8'], borderWidth:3, borderColor:'#fff' }] },
-      options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}}
-    });
-    Charts.create('admin-skills-bar', {
-      type:'bar',
-      data:{ labels:skillLabels,
-        datasets:[{ label:'Candidates with skill', data:skillCounts, backgroundColor:'#1260cc', borderRadius:6 }] },
-      options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false}}, scales:{ x:{beginAtZero:true,grid:{color:'#f0f4f9'}}, y:{grid:{display:false}} }}
-    });
-    Charts.create('admin-status-funnel', {
-      type:'doughnut',
-      data:{ labels:['Shortlisted','Reviewing','Pending','Rejected'],
-        datasets:[{ data:[d.shortlisted,d.reviewing,d.pending,d.rejected],
-          backgroundColor:['#16a34a','#1260cc','#d97706','#dc2626'], borderWidth:3, borderColor:'#fff' }] },
-      options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}, cutout:'65%' }
-    });
-    Charts.create('admin-ats-dist', {
-      type:'bar',
-      data:{
-        labels:['0–20','21–40','41–60','61–70','71–80','81–90','91–100'],
-        datasets:[{
-          label:'Candidates',
-          data:d.ats_distribution,
-          backgroundColor:['#fee2e2','#fecaca','#fed7aa','#fef08a','#bbf7d0','#6ee7b7','#00c9a7'],
-          borderRadius:6
-        }]
-      },
-      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
-    });
-    Charts.create('admin-app-time', {
-      type:'line',
-      data:{
-        labels:d.app_time.labels,
-        datasets:[{
-          label:'Total Applications',
-          data:d.app_time.total,
-          borderColor:'#1260cc', backgroundColor:'rgba(18,96,204,.1)',
-          tension:.4, fill:true, pointBackgroundColor:'#1260cc'
-        },{
-          label:'Shortlisted',
-          data:d.app_time.shortlisted,
-          borderColor:'#00c9a7', backgroundColor:'rgba(0,201,167,.08)',
-          tension:.4, fill:true, pointBackgroundColor:'#00c9a7'
-        }]
-      },
-      options:{ responsive:true, plugins:{ legend:{ position:'top', labels:{ font:{family:'DM Sans',size:12}, padding:14 } } }, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
-    });
-    Charts.create('admin-hires', {
-      type:'line',
-      data:{
-        labels: d.app_time.labels,
-        datasets:[{
-          label:'Shortlisted',
-          data: d.app_time.shortlisted,
-          borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,.1)',
-          tension:.4, fill:true, pointBackgroundColor:'#16a34a'
-        }]
-      },
-      options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
-    });
-
-    // ── Analytics page stat cards (dynamic) ──
-    const totalScreened = d.total_applicants || (Array.isArray(DB.candidates) ? DB.candidates.length : 0);
-    setEl('stat-analytics-avg-ats',        d.avg_ats_score || 0);
-    setEl('stat-analytics-time-shortlist', d.time_to_shortlist || '2.4h');
-    setEl('stat-analytics-top-skill',      d.top_skill_demanded || (d.top_skills && d.top_skills[0]?.skill) || 'Python');
-    setEl('stat-analytics-accept-rate',    (d.acceptance_rate !== undefined ? d.acceptance_rate : 0) + '%');
-    setEl('stat-analytics-total-screened', totalScreened);
-    setEl('stat-analytics-active-jobs',    d.active_jobs || 0);
-
-    // Populate analytics role filter dropdown if available
-    const roleSelect = document.getElementById('analytics-filter-job');
-    if (roleSelect && roleSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
-      const distinctJobTitles = Array.from(new Set(DB.jobs.map(j => j.title).filter(Boolean)));
-      distinctJobTitles.forEach(t => {
-        const opt = document.createElement('option');
-        opt.value = t;
-        opt.textContent = t;
-        roleSelect.appendChild(opt);
+      Charts.create('admin-skills-donut', {
+        type:'doughnut',
+        data:{ labels: skillLabels,
+          datasets:[{ data: skillCounts,
+            backgroundColor:['#1260cc','#00c9a7','#16a34a','#d97706','#7c3aed','#94a3b8','#e11d48','#0891b2'],
+            borderWidth:3, borderColor:'#fff' }] },
+        options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}, cutout:'60%' }
       });
-    }
 
-    // Cache latest stats payload
-    window._lastAdminStats = d;
-    
-    updateSidebarBadges();
-  });
+      Charts.create('admin-app-trend', {
+        type:'bar',
+        data:{ labels:['Shortlisted','Reviewing','Pending','Rejected'],
+          datasets:[{ label:'Candidates', data:[d.shortlisted || 0, d.reviewing || 0, d.pending || 0, d.rejected || 0],
+            backgroundColor:['#16a34a','#1260cc','#d97706','#dc2626'], borderRadius:6 }] },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} }}
+      });
+
+      // Analytics charts
+      const appsByRole = Array.isArray(d.apps_by_role) ? d.apps_by_role : [];
+      const roleLabels = appsByRole.map(x=>x.role);
+      const roleCounts = appsByRole.map(x=>x.count);
+      Charts.create('admin-role-pie', {
+        type:'pie',
+        data:{ labels:roleLabels,
+          datasets:[{ data:roleCounts, backgroundColor:['#1260cc','#00c9a7','#16a34a','#d97706','#7c3aed','#94a3b8'], borderWidth:3, borderColor:'#fff' }] },
+        options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}}
+      });
+      Charts.create('admin-skills-bar', {
+        type:'bar',
+        data:{ labels:skillLabels,
+          datasets:[{ label:'Candidates with skill', data:skillCounts, backgroundColor:'#1260cc', borderRadius:6 }] },
+        options:{ indexAxis:'y', responsive:true, plugins:{legend:{display:false}}, scales:{ x:{beginAtZero:true,grid:{color:'#f0f4f9'}}, y:{grid:{display:false}} }}
+      });
+      Charts.create('admin-status-funnel', {
+        type:'doughnut',
+        data:{ labels:['Shortlisted','Reviewing','Pending','Rejected'],
+          datasets:[{ data:[d.shortlisted || 0, d.reviewing || 0, d.pending || 0, d.rejected || 0],
+            backgroundColor:['#16a34a','#1260cc','#d97706','#dc2626'], borderWidth:3, borderColor:'#fff' }] },
+        options:{ responsive:true, plugins:{ legend:{ position:'bottom', labels:{ font:{family:'DM Sans',size:12}, padding:10 }}}, cutout:'65%' }
+      });
+      Charts.create('admin-ats-dist', {
+        type:'bar',
+        data:{
+          labels:['0–20','21–40','41–60','61–70','71–80','81–90','91–100'],
+          datasets:[{
+            label:'Candidates',
+            data: Array.isArray(d.ats_distribution) ? d.ats_distribution : [0,0,0,0,0,0,0],
+            backgroundColor:['#fee2e2','#fecaca','#fed7aa','#fef08a','#bbf7d0','#6ee7b7','#00c9a7'],
+            borderRadius:6
+          }]
+        },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
+      });
+      const appTime = d.app_time || { labels: [], total: [], shortlisted: [] };
+      Charts.create('admin-app-time', {
+        type:'line',
+        data:{
+          labels: appTime.labels || [],
+          datasets:[{
+            label:'Total Applications',
+            data: appTime.total || [],
+            borderColor:'#1260cc', backgroundColor:'rgba(18,96,204,.1)',
+            tension:.4, fill:true, pointBackgroundColor:'#1260cc'
+          },{
+            label:'Shortlisted',
+            data: appTime.shortlisted || [],
+            borderColor:'#00c9a7', backgroundColor:'rgba(0,201,167,.08)',
+            tension:.4, fill:true, pointBackgroundColor:'#00c9a7'
+          }]
+        },
+        options:{ responsive:true, plugins:{ legend:{ position:'top', labels:{ font:{family:'DM Sans',size:12}, padding:14 } } }, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
+      });
+      Charts.create('admin-hires', {
+        type:'line',
+        data:{
+          labels: appTime.labels || [],
+          datasets:[{
+            label:'Shortlisted',
+            data: appTime.shortlisted || [],
+            borderColor:'#16a34a', backgroundColor:'rgba(22,163,74,.1)',
+            tension:.4, fill:true, pointBackgroundColor:'#16a34a'
+          }]
+        },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{beginAtZero:true,grid:{color:'#f0f4f9'}}, x:{grid:{display:false}} } }
+      });
+
+      // ── Analytics page stat cards (dynamic) ──
+      const totalScreened = d.total_applicants || (Array.isArray(DB.candidates) ? DB.candidates.length : 0);
+      setEl('stat-analytics-avg-ats',        d.avg_ats_score || 0);
+      setEl('stat-analytics-time-shortlist', d.time_to_shortlist || '2.4h');
+      setEl('stat-analytics-top-skill',      d.top_skill_demanded || (d.top_skills && d.top_skills[0]?.skill) || 'Python');
+      setEl('stat-analytics-accept-rate',    (d.acceptance_rate !== undefined ? d.acceptance_rate : 0) + '%');
+      setEl('stat-analytics-total-screened', totalScreened);
+      setEl('stat-analytics-active-jobs',    d.active_jobs || 0);
+
+      // Populate analytics role filter dropdown if available
+      const roleSelect = document.getElementById('analytics-filter-job');
+      if (roleSelect && roleSelect.options.length <= 1 && Array.isArray(DB.jobs) && DB.jobs.length > 0) {
+        const distinctJobTitles = Array.from(new Set(DB.jobs.map(j => j.title).filter(Boolean)));
+        distinctJobTitles.forEach(t => {
+          const opt = document.createElement('option');
+          opt.value = t;
+          opt.textContent = t;
+          roleSelect.appendChild(opt);
+        });
+      }
+
+      // Cache latest stats payload
+      window._lastAdminStats = d;
+      
+      updateSidebarBadges();
+    })
+    .catch(err => {
+      console.error('Error in fetchAdminStats:', err);
+    });
 }
 
 function onAnalyticsFilterChange() {
@@ -4452,9 +4588,37 @@ function fetchCandidateStats(userId) {
       if (hasResume && d.missing_skills && d.missing_skills.length > 0) {
         missingContainer.innerHTML = d.missing_skills.map(s => `<span class="skill-tag skill-missing">${s} ✗</span>`).join('');
         if (missingCount) missingCount.textContent = `${d.missing_skills.length} Missing`;
+      } else if (hasResume) {
+        missingContainer.innerHTML = '<p class="text-muted text-sm" style="color:var(--text-3);padding:6px 0;"><i class="fas fa-check-circle" style="color:var(--success);margin-right:6px"></i>All top in-demand market skills detected on your profile! Excellent keyword alignment.</p>';
+        if (missingCount) missingCount.textContent = '0 Missing';
       } else {
         missingContainer.innerHTML = '<p class="text-muted text-sm" style="color:var(--text-3);padding:6px 0;">Upload your resume to see missing keyword recommendations.</p>';
         if (missingCount) missingCount.textContent = '0 Missing';
+      }
+    }
+
+    // Dynamic ATS Improvement Tips
+    const tipsList = document.getElementById('ats-improvement-list');
+    if (tipsList) {
+      if (!hasResume) {
+        tipsList.innerHTML = '<li style="font-size:12px;color:var(--text-3);padding:4px 0;"><i class="fas fa-info-circle" style="color:var(--primary);margin-right:6px"></i>Upload a resume to receive tailored improvement recommendations.</li>';
+      } else {
+        const tips = [];
+        if (d.missing_skills && d.missing_skills.length > 0) {
+          tips.push(`Strengthen profile competitiveness by adding projects or experience in <strong>${d.missing_skills.slice(0, 2).join(' & ')}</strong>.`);
+        }
+        if (score < 90) {
+          tips.push('Quantify accomplishments with metrics (e.g. <em>"reduced query latency by 40%"</em>) in project summaries.');
+        }
+        tips.push('Ensure section headers (Experience, Education, Skills) follow standardized ATS formats.');
+        tips.push('Include verifiable links to live projects, GitHub repositories, and LinkedIn profile.');
+
+        tipsList.innerHTML = tips.map(t => `
+          <li style="font-size:12px;color:var(--text-2);display:flex;align-items:flex-start;gap:8px;line-height:1.45;">
+            <i class="fas fa-arrow-circle-right" style="color:var(--primary);margin-top:2px;flex-shrink:0;"></i>
+            <span>${t}</span>
+          </li>
+        `).join('');
       }
     }
 
@@ -5057,7 +5221,428 @@ function fetchCandidateProfile(userId) {
       const skillsArray = d.skills.split(',').filter(s => s.trim() !== '');
       skillsTech.innerHTML = skillsArray.map(s => `<span class="skill-tag skill-neutral">${s.trim()}</span>`).join('');
     }
+    fetchCandidateProvenanceSkills();
   });
+}
+
+// ── Anti-Gaming Steps 5, 6, 7, 8: Candidate Provenance, Blind Declaration & Quiz Gatekeeper ──
+window._activeQuizSkill = '';
+window._activeQuizQuestions = [];
+
+function fetchCandidateProvenanceSkills() {
+  const container = document.getElementById('candidate-provenance-skills-cloud');
+  if (!container) return;
+
+  // 1. Fetch Candidate Provenance Skills
+  fetch('/api/user/skills')
+    .then(r => r.json())
+    .then(data => {
+      if (data.success && Array.isArray(data.skills)) {
+        if (data.skills.length === 0) {
+          container.innerHTML = '<span class="text-muted text-sm">No skills confirmed yet. Upload a resume or declare skills blindly below.</span>';
+        } else {
+          container.innerHTML = data.skills.map(s => {
+            let badgeBg = 'rgba(14,165,233,0.15)';
+            let badgeColor = '#0284c7';
+            let icon = 'fas fa-folder';
+            let label = '0.7 Proj';
+            let canDelete = false;
+
+            if (s.source === 'experience') {
+              badgeBg = 'rgba(22,163,74,0.15)'; badgeColor = '#16a34a'; icon = 'fas fa-briefcase'; label = '1.0 Exp';
+            } else if (s.source === 'project') {
+              badgeBg = 'rgba(14,165,233,0.15)'; badgeColor = '#0284c7'; icon = 'fas fa-laptop-code'; label = '0.7 Proj';
+            } else if (s.source === 'quiz_verified') {
+              badgeBg = 'rgba(124,58,237,0.15)'; badgeColor = '#7c3aed'; icon = 'fas fa-check-circle'; label = '1.0 Quiz';
+            } else if (s.source === 'self_declared') {
+              badgeBg = 'rgba(217,119,6,0.15)'; badgeColor = '#d97706'; icon = 'fas fa-user-edit'; label = '0.2 Declared';
+              canDelete = true;
+            }
+
+            const delBtn = canDelete ? `<button onclick="deleteCandidateSkill('${escapeHTML(s.skill)}')" title="Remove self-declared skill" style="background:none;border:none;color:#dc2626;cursor:pointer;font-weight:700;margin-left:5px;font-size:12px;vertical-align:middle">&times;</button>` : '';
+
+            return `<span class="skill-tag" style="background:${badgeBg};color:${badgeColor};border:1px solid ${badgeColor}40;display:inline-flex;align-items:center;padding:4px 10px;border-radius:20px;font-size:12.5px;margin:2px">
+              <i class="${icon}" style="margin-right:5px"></i>
+              <strong>${escapeHTML(s.skill)}</strong>
+              <span class="badge" style="background:${badgeColor}22;color:${badgeColor};font-size:9.5px;margin-left:6px;padding:2px 6px">${label}</span>
+              ${delBtn}
+            </span>`;
+          }).join('');
+        }
+      }
+    })
+    .catch(err => {
+      console.warn('Could not fetch candidate skills:', err);
+    });
+
+  // 2. Fetch Velocity Status & Disputed Skills
+  fetch('/api/user/velocity')
+    .then(r => r.json())
+    .then(data => {
+      const banner = document.getElementById('velocity-anomaly-banner');
+      const textEl = document.getElementById('velocity-disputed-text');
+      const btnsEl = document.getElementById('velocity-quiz-buttons');
+      if (!banner) return;
+
+      if (data.success && data.has_anomaly && Array.isArray(data.disputed_skills) && data.disputed_skills.length > 0) {
+        banner.style.display = 'block';
+        if (textEl) {
+          textEl.textContent = `Recent resume updates introduced ${data.disputed_skills.length} complex skill(s) (${data.disputed_skills.join(', ')}) in an accelerated timeframe. Take a quick technical quiz to verify your proficiency and elevate them to 1.0 weight.`;
+        }
+        if (btnsEl) {
+          btnsEl.innerHTML = data.disputed_skills.map(skill => `
+            <button class="btn btn-sm btn-primary" onclick="openSkillQuizModal('${escapeHTML(skill)}')">
+              <i class="fas fa-graduation-cap"></i> Take ${escapeHTML(skill)} Quiz
+            </button>
+          `).join('');
+        }
+      } else {
+        banner.style.display = 'none';
+      }
+    })
+    .catch(() => {});
+}
+
+function declareBlindSkill() {
+  const input = document.getElementById('blind-skill-input');
+  if (!input) return;
+  const val = input.value.trim();
+  if (!val) {
+    Toast.show('Please enter a skill name to declare.', 'warning');
+    return;
+  }
+
+  fetch('/api/user/skills/confirm', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ skills: [val] })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        input.value = '';
+        Toast.show(`Skill "${escapeHTML(val)}" declared! Added with 0.2 baseline weight. ✨`, 'success');
+        fetchCandidateProvenanceSkills();
+        if (DB.currentUser) {
+          const existing = (DB.currentUser.skills || '').split(',').map(s=>s.trim()).filter(Boolean);
+          if (!existing.includes(val)) {
+            existing.push(val);
+            DB.currentUser.skills = existing.join(',');
+          }
+        }
+      } else {
+        Toast.show(data.message || 'Could not declare skill.', 'error');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      Toast.show('Network error declaring skill.', 'error');
+    });
+}
+
+function deleteCandidateSkill(skillName) {
+  if (!skillName) return;
+  fetch(`/api/user/skills/${encodeURIComponent(skillName)}`, {
+    method: 'DELETE'
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        Toast.show(`Removed "${escapeHTML(skillName)}" from your profile.`, 'info');
+        fetchCandidateProvenanceSkills();
+      } else {
+        Toast.show(data.message || 'Could not remove skill.', 'error');
+      }
+    })
+    .catch(() => {
+      Toast.show('Network error removing skill.', 'error');
+    });
+}
+
+// =========================================================================
+// SMART ASSESSMENT LOCK (SAL): 3-Strike Tab Guard & Anti-Cheating Engine
+// =========================================================================
+let _salStrikes = 0;
+const _SAL_MAX_STRIKES = 3;
+let _salActive = false;
+let _salLastViolationTime = 0;
+
+function initAssessmentAntiCheat() {
+  _salStrikes = 0;
+  _salActive = true;
+  _salLastViolationTime = 0;
+  updateSalStrikeUI();
+
+  const quizModal = document.getElementById('quiz-modal');
+  if (quizModal) {
+    quizModal.addEventListener('copy', _salBlockClipboard);
+    quizModal.addEventListener('cut', _salBlockClipboard);
+    quizModal.addEventListener('contextmenu', _salBlockContextMenu);
+  }
+  document.addEventListener('visibilitychange', _salHandleVisibility);
+  window.addEventListener('blur', _salHandleBlur);
+}
+
+function cleanupAssessmentAntiCheat() {
+  _salActive = false;
+  _salStrikes = 0;
+  const quizModal = document.getElementById('quiz-modal');
+  if (quizModal) {
+    quizModal.removeEventListener('copy', _salBlockClipboard);
+    quizModal.removeEventListener('cut', _salBlockClipboard);
+    quizModal.removeEventListener('contextmenu', _salBlockContextMenu);
+  }
+  document.removeEventListener('visibilitychange', _salHandleVisibility);
+  window.removeEventListener('blur', _salHandleBlur);
+  updateSalStrikeUI();
+}
+
+function _salBlockClipboard(e) {
+  if (!_salActive) return;
+  e.preventDefault();
+  Toast.show('📋 Copying or cutting question content is strictly disabled during assessment.', 'warning');
+}
+
+function _salBlockContextMenu(e) {
+  if (!_salActive) return;
+  e.preventDefault();
+  return false;
+}
+
+function _salHandleVisibility() {
+  if (!_salActive) return;
+  if (document.hidden) {
+    _salRecordViolation();
+  }
+}
+
+function _salHandleBlur() {
+  if (!_salActive) return;
+  _salRecordViolation();
+}
+
+function _salRecordViolation() {
+  if (!_salActive) return;
+  const now = Date.now();
+  if (now - _salLastViolationTime < 1500) return; // Debounce rapid multi-events
+  _salLastViolationTime = now;
+
+  const contentEl = document.getElementById('quiz-content-container');
+  if (!contentEl || contentEl.style.display === 'none') return;
+
+  _salStrikes++;
+  updateSalStrikeUI();
+
+  if (_salStrikes === 1) {
+    Toast.show('⚠️ Strike 1/3: You navigated away from the assessment window! Leaving again will automatically submit your test.', 'warning', 7000);
+  } else if (_salStrikes === 2) {
+    Toast.show('🚨 FINAL WARNING (Strike 2/3): Leaving the window one more time will immediately terminate and submit your assessment!', 'error', 8000);
+  } else if (_salStrikes >= _SAL_MAX_STRIKES) {
+    Toast.show('🚨 Assessment Terminated: Maximum window switches exceeded. Submitting answers recorded so far...', 'error', 8000);
+    cleanupAssessmentAntiCheat();
+    submitCurrentQuiz(true);
+  }
+}
+
+function updateSalStrikeUI() {
+  const strikeBadge = document.getElementById('sal-strike-badge');
+  if (strikeBadge) {
+    strikeBadge.textContent = `Strikes: ${_salStrikes} / ${_SAL_MAX_STRIKES}`;
+    if (_salStrikes === 0) {
+      strikeBadge.className = 'badge badge-success';
+      strikeBadge.style.background = 'rgba(22,163,74,0.15)';
+      strikeBadge.style.color = '#16a34a';
+    } else if (_salStrikes === 1) {
+      strikeBadge.className = 'badge badge-warning';
+      strikeBadge.style.background = 'rgba(217,119,6,0.15)';
+      strikeBadge.style.color = '#d97706';
+    } else {
+      strikeBadge.className = 'badge badge-danger';
+      strikeBadge.style.background = 'rgba(220,38,38,0.15)';
+      strikeBadge.style.color = '#dc2626';
+    }
+  }
+}
+
+function openSkillQuizModal(skillName) {
+  if (!skillName) return;
+  window._activeQuizSkill = skillName;
+  window._activeQuizQuestions = [];
+
+  const modalTitle = document.getElementById('quiz-modal-title');
+  const activeSkillEl = document.getElementById('quiz-active-skill');
+  const activeDiffEl = document.getElementById('quiz-active-difficulty');
+  const loadingEl = document.getElementById('quiz-loading-state');
+  const contentEl = document.getElementById('quiz-content-container');
+  const resultEl = document.getElementById('quiz-result-container');
+  const questionsListEl = document.getElementById('quiz-questions-list');
+
+  if (activeSkillEl) activeSkillEl.textContent = skillName;
+  if (modalTitle) modalTitle.innerHTML = `<i class="fas fa-graduation-cap" style="color:var(--primary);margin-right:8px"></i>Technical Assessment: ${escapeHTML(skillName)}`;
+
+  Modal.open('quiz-modal');
+  if (loadingEl) loadingEl.style.display = 'block';
+  if (contentEl) contentEl.style.display = 'none';
+  if (resultEl) resultEl.style.display = 'none';
+
+  fetch(`/api/user/quiz/${encodeURIComponent(skillName)}`)
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+      if (loadingEl) loadingEl.style.display = 'none';
+      if (status === 429 || data.cooldown_active) {
+        if (resultEl) {
+          resultEl.style.display = 'block';
+          document.getElementById('quiz-result-icon').textContent = '⏳';
+          document.getElementById('quiz-result-title').textContent = 'Assessment Cooldown Active';
+          const badge = document.getElementById('quiz-result-score-badge');
+          badge.textContent = '2 Attempts Reached';
+          badge.style.background = 'rgba(217,119,6,0.15)';
+          badge.style.color = '#d97706';
+          document.getElementById('quiz-result-message').textContent = data.message || 'You have reached the maximum 2 quiz attempts in 24 hours. Please wait before retrying.';
+        }
+        return;
+      }
+
+      if (!data.success || !Array.isArray(data.questions) || data.questions.length === 0) {
+        if (resultEl) {
+          resultEl.style.display = 'block';
+          document.getElementById('quiz-result-icon').textContent = 'ℹ️';
+          document.getElementById('quiz-result-title').textContent = 'Skill Already Verified';
+          const badge = document.getElementById('quiz-result-score-badge');
+          badge.textContent = '100% Verified';
+          badge.style.background = 'rgba(22,163,74,0.15)';
+          badge.style.color = '#16a34a';
+          document.getElementById('quiz-result-message').textContent = data.message || 'This skill is already verified or no additional questions are required.';
+        }
+        return;
+      }
+
+      window._activeQuizQuestions = data.questions;
+      if (activeDiffEl) activeDiffEl.textContent = (data.questions[0] && data.questions[0].difficulty) || 'Intermediate';
+
+      if (questionsListEl) {
+        questionsListEl.innerHTML = data.questions.map((q, idx) => {
+          const opts = Array.isArray(q.options) ? q.options : [];
+          return `
+            <div style="padding:16px;background:var(--bg-card);border:1px solid var(--border);border-radius:12px">
+              <div style="font-weight:700;font-size:14px;color:var(--text);margin-bottom:12px">
+                <span class="badge badge-primary" style="margin-right:8px;font-size:11px">Q${idx + 1}</span>
+                ${escapeHTML(q.question)}
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                ${opts.map((opt, optIdx) => `
+                  <label style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;transition:all .15s">
+                    <input type="radio" name="q_${q.id}" value="${optIdx}" style="accent-color:var(--primary)">
+                    <span>${escapeHTML(opt)}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      if (contentEl) contentEl.style.display = 'block';
+      initAssessmentAntiCheat();
+    })
+    .catch(err => {
+      console.error(err);
+      if (loadingEl) loadingEl.style.display = 'none';
+      Toast.show('Error loading assessment questions.', 'error');
+    });
+}
+
+function submitCurrentQuiz(forcedCheatingSubmit = false) {
+  cleanupAssessmentAntiCheat();
+  const skillName = window._activeQuizSkill;
+  const questions = window._activeQuizQuestions;
+  if (!skillName || !questions.length) return;
+
+  const answers = {};
+  for (const q of questions) {
+    const selected = document.querySelector(`input[name="q_${q.id}"]:checked`);
+    if (!selected && !forcedCheatingSubmit) {
+      Toast.show('Please answer all questions before submitting.', 'warning');
+      return;
+    }
+    answers[String(q.id)] = selected ? parseInt(selected.value, 10) : -1;
+  }
+
+  const submitBtn = document.getElementById('btn-submit-quiz');
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Grading...';
+  }
+
+  fetch(`/api/user/quiz/${encodeURIComponent(skillName)}/submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ answers })
+  })
+    .then(r => r.json())
+    .then(data => {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Assessment';
+      }
+
+      const contentEl = document.getElementById('quiz-content-container');
+      const resultEl = document.getElementById('quiz-result-container');
+      if (contentEl) contentEl.style.display = 'none';
+      if (resultEl) resultEl.style.display = 'block';
+
+      const iconEl = document.getElementById('quiz-result-icon');
+      const titleEl = document.getElementById('quiz-result-title');
+      const badgeEl = document.getElementById('quiz-result-score-badge');
+      const msgEl = document.getElementById('quiz-result-message');
+
+      if (data.success && data.passed) {
+        if (iconEl) iconEl.textContent = '🎉';
+        if (titleEl) titleEl.textContent = 'Assessment Passed!';
+        if (badgeEl) {
+          badgeEl.textContent = `Score: ${data.score}% (Passed)`;
+          badgeEl.style.background = 'rgba(22,163,74,0.15)';
+          badgeEl.style.color = '#16a34a';
+        }
+        if (msgEl) {
+          msgEl.textContent = `Outstanding work! You scored ${data.score}% on ${escapeHTML(skillName)}. The skill has been elevated to 1.0 Quiz-Verified evidence weight, and your velocity anomaly flag has been resolved.`;
+        }
+        Toast.show(`Congratulations! ${escapeHTML(skillName)} verified with score ${data.score}%! 🏆`, 'success');
+      } else {
+        if (iconEl) iconEl.textContent = '📚';
+        if (titleEl) titleEl.textContent = 'Assessment Not Passed';
+        if (badgeEl) {
+          badgeEl.textContent = `Score: ${data.score || 0}% (Passing is 70%)`;
+          badgeEl.style.background = 'rgba(220,38,38,0.15)';
+          badgeEl.style.color = '#dc2626';
+        }
+        if (msgEl) {
+          msgEl.textContent = `You scored ${data.score || 0}%. A minimum score of 70% is required to elevate to Quiz-Verified status. The skill remains at baseline weight. You may re-attempt after cooldown.`;
+        }
+        Toast.show(`Quiz completed. Score: ${data.score || 0}%. Passing score is 70%.`, 'warning');
+      }
+
+      if (forcedCheatingSubmit) {
+        if (iconEl) iconEl.textContent = '🚨';
+        if (titleEl) titleEl.textContent = 'Assessment Automatically Submitted';
+        if (msgEl) {
+          msgEl.innerHTML = `<div style="background:rgba(220,38,38,0.1);color:#dc2626;padding:12px;border-radius:8px;font-size:13px;line-height:1.5;margin-bottom:12px;border:1px solid rgba(220,38,38,0.25);text-align:left">
+            <strong><i class="fas fa-exclamation-triangle"></i> Reason: Suspicious Window-Switching Activity Detected</strong><br>
+            Your assessment was automatically submitted because you switched away from the assessment window 3 times. Answers recorded before termination were evaluated.
+          </div>` + msgEl.innerHTML;
+        }
+      }
+
+      fetchCandidateProvenanceSkills();
+    })
+    .catch(err => {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit Assessment';
+      }
+      console.error(err);
+      Toast.show('Error submitting assessment answers.', 'error');
+    });
 }
 
 function setEl(id, val) {
@@ -5100,9 +5685,10 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.go('landing');
   if (DB.currentUser) {
     fetchJobsFromServer();
-    if (DB.currentUser.role === 'hr') {
+    if (DB.currentUser.role === 'hr' || DB.currentUser.role === 'admin') {
       fetchCandidatesFromServer();
       fetchAdminStats();
+      fetchTalentPool();
     }
   }
   UI.renderNotifications('cand');
@@ -5118,7 +5704,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Lightweight auto-refresh every 2 min (only stats, NOT the heavy ML pipeline)
   setInterval(() => {
     if (document.hidden) return;  // Don't poll when tab is in background
-    if (DB.currentUser?.role === 'hr') {
+    if (DB.currentUser?.role === 'hr' || DB.currentUser?.role === 'admin') {
       fetchAdminStats();
       fetchCandidatesFromServer();
     }

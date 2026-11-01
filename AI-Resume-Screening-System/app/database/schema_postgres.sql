@@ -81,6 +81,75 @@ CREATE TABLE IF NOT EXISTS resumes (
 CREATE INDEX IF NOT EXISTS idx_resumes_user ON resumes(user_id);
 CREATE INDEX IF NOT EXISTS idx_resumes_hash ON resumes(file_hash);
 
+-- Anti-Gaming: Log all resume upload events for 24-hour rate-limiting
+CREATE TABLE IF NOT EXISTS resume_upload_logs (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    file_hash   VARCHAR(64) DEFAULT '',
+    uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_resume_upload_logs_user_time ON resume_upload_logs(user_id, uploaded_at);
+
+-- Anti-Gaming Step 6: Blind Skill Confirmation (Candidate confirmed skills with evidence weight & provenance)
+CREATE TABLE IF NOT EXISTS candidate_skills (
+    id           SERIAL PRIMARY KEY,
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    skill        VARCHAR(100) NOT NULL,
+    source       VARCHAR(50) NOT NULL DEFAULT 'self_declared',
+    confidence   DOUBLE PRECISION DEFAULT 0.2,
+    confirmed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, skill)
+);
+
+CREATE INDEX IF NOT EXISTS idx_candidate_skills_user ON candidate_skills(user_id);
+CREATE INDEX IF NOT EXISTS idx_candidate_skills_skill ON candidate_skills(skill);
+
+-- Anti-Gaming Step 7: Learning Timeline Engine & Velocity Anomaly Detection
+CREATE TABLE IF NOT EXISTS skill_velocity_anomalies (
+    id                 SERIAL PRIMARY KEY,
+    user_id            INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    previous_resume_id INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
+    current_resume_id  INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
+    elapsed_days       DOUBLE PRECISION NOT NULL,
+    estimated_days     DOUBLE PRECISION NOT NULL,
+    new_skills         TEXT NOT NULL,
+    severity           VARCHAR(50) NOT NULL DEFAULT 'high',
+    velocity_ratio     DOUBLE PRECISION NOT NULL,
+    anomaly_reason     TEXT NOT NULL,
+    status             VARCHAR(50) NOT NULL DEFAULT 'flagged',
+    detected_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_user ON skill_velocity_anomalies(user_id);
+CREATE INDEX IF NOT EXISTS idx_velocity_anomalies_status ON skill_velocity_anomalies(status);
+
+-- Anti-Gaming Step 8: Technical Quiz Gatekeeper for Disputed / Sudden Skills
+CREATE TABLE IF NOT EXISTS quiz_questions (
+    id             SERIAL PRIMARY KEY,
+    skill          VARCHAR(100) NOT NULL,
+    question       TEXT NOT NULL,
+    options        TEXT NOT NULL,
+    correct_option INTEGER NOT NULL,
+    difficulty     VARCHAR(50) DEFAULT 'intermediate',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_questions_skill ON quiz_questions(skill);
+
+CREATE TABLE IF NOT EXISTS quiz_attempts (
+    id              SERIAL PRIMARY KEY,
+    user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    skill           VARCHAR(100) NOT NULL,
+    score           INTEGER NOT NULL,
+    total_questions INTEGER NOT NULL,
+    correct_answers INTEGER NOT NULL,
+    passed          INTEGER NOT NULL,
+    attempted_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_quiz_attempts_user_skill ON quiz_attempts(user_id, skill);
+
 CREATE TABLE IF NOT EXISTS jobs (
     id          SERIAL PRIMARY KEY,
     title       VARCHAR(255) NOT NULL,
@@ -98,11 +167,14 @@ CREATE TABLE IF NOT EXISTS applications (
     id          SERIAL PRIMARY KEY,
     user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     job_id      INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    resume_id   INTEGER REFERENCES resumes(id) ON DELETE SET NULL,
     match_score INTEGER DEFAULT 0,
     status      VARCHAR(50) DEFAULT 'Reviewing',
     applied_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, job_id)
 );
+
+CREATE INDEX IF NOT EXISTS idx_applications_resume ON applications(resume_id);
 
 CREATE TABLE IF NOT EXISTS notifications (
     id          SERIAL PRIMARY KEY,

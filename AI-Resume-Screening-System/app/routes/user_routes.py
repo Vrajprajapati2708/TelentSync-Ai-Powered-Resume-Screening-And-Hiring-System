@@ -156,9 +156,27 @@ def candidate_stats(user_id):
             except Exception:
                 pass
 
-        if has_resume and not missing:
-            candidate_skills_lower = [s.lower() for s in skills]
-            missing = [s for s, _ in top_skills if s.lower() not in candidate_skills_lower]
+        if has_resume:
+            candidate_skills_lower = {s.lower() for s in skills}
+            # Detect high-demand market skills absent from candidate profile
+            job_rows = conn.execute("SELECT skills FROM jobs WHERE status='Active' AND skills != ''").fetchall()
+            market_counts = {}
+            for jr in job_rows:
+                for sk in (jr[0] or '').split(','):
+                    sk = sk.strip()
+                    if sk and len(sk) > 1:
+                        market_counts[sk] = market_counts.get(sk, 0) + 1
+            top_market_skills = [s for s, _ in sorted(market_counts.items(), key=lambda x: x[1], reverse=True)[:25]]
+            missing = [s for s in top_market_skills if s.lower() not in candidate_skills_lower]
+            if not missing:
+                for s, _ in top_skills:
+                    if s.lower() not in candidate_skills_lower:
+                        missing.append(s)
+            if not missing:
+                fallback_pool = ['AWS', 'Kubernetes', 'React', 'Redis', 'PostgreSQL', 'TypeScript', 'GraphQL', 'Terraform']
+                missing = [s for s in fallback_pool if s.lower() not in candidate_skills_lower]
+        else:
+            missing = []
 
     return jsonify({
         'has_resume':           has_resume,
@@ -166,6 +184,7 @@ def candidate_stats(user_id):
         'skills_count':         len(skills),
         'skills':               skills,
         'missing_skills':       missing[:4] if has_resume else [],
+        'missing_skills_count': len(missing) if has_resume else 0,
         'skill_demand_pct':     skill_demand_pct,
         'profile_views':        profile_views,
         'profile_views_weekly': profile_views_weekly,
@@ -229,3 +248,195 @@ def user_profile(user_id):
         )
         conn.commit()
     return jsonify({'success': True})
+
+
+from app.services.candidate_skills_service import (
+    get_candidate_skills,
+    declare_blind_skills,
+    remove_candidate_skill
+)
+
+
+@user_bp.route('/user/skills', methods=['GET'])
+@user_bp.route('/candidate/skills', methods=['GET'])
+@login_required
+def get_user_skills_endpoint():
+    """
+    GET /api/user/skills
+    GET /api/candidate/skills
+    Returns confirmed skills for current user with evidence source and confidence weight.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    skills = get_candidate_skills(user_id)
+    self_decl = sum(1 for s in skills if s.get('source') == 'self_declared')
+    extracted = sum(1 for s in skills if s.get('source') in ('resume_extracted', 'experience', 'project'))
+    verified = sum(1 for s in skills if s.get('source') == 'quiz_verified' or s.get('confidence', 0) >= 1.0)
+
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'total_count': len(skills),
+        'self_declared_count': self_decl,
+        'extracted_count': extracted,
+        'verified_count': verified,
+        'skills': skills
+    }), 200
+
+
+@user_bp.route('/user/skills/confirm', methods=['POST'])
+@user_bp.route('/candidate/skills/declare', methods=['POST'])
+@user_bp.route('/candidate/skills/confirm', methods=['POST'])
+@login_required
+def confirm_user_skills_endpoint():
+    """
+    POST /api/user/skills/confirm
+    POST /api/candidate/skills/declare
+    Step 6: Blind Skill Confirmation.
+    Candidates confirm/declare skills blindly before viewing job gaps or recommendation feedback.
+    Payload:
+      { "skills": ["Docker", "Kubernetes", "Redis"] } or { "skill": "Docker" }
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    skills_input = data.get('skills')
+    if skills_input is None:
+        skills_input = data.get('skill')
+
+    if not skills_input:
+        return jsonify({
+            'success': False,
+            'message': 'No skills provided. Provide a "skills" array or "skill" string.'
+        }), 400
+
+    result = declare_blind_skills(user_id, skills_input, source='self_declared')
+    if not result.get('success'):
+        return jsonify(result), 400
+
+    return jsonify(result), 200
+
+
+@user_bp.route('/user/skills/<path:skill_name>', methods=['DELETE'])
+@user_bp.route('/candidate/skills/<path:skill_name>', methods=['DELETE'])
+@login_required
+def remove_user_skill_endpoint(skill_name: str):
+    """
+    DELETE /api/user/skills/<skill_name>
+    DELETE /api/candidate/skills/<skill_name>
+    Remove a skill from the candidate's profile.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    result = remove_candidate_skill(user_id, skill_name)
+    status_code = 200 if result.get('success') else 404
+    return jsonify(result), status_code
+
+
+@user_bp.route('/user/velocity', methods=['GET'])
+@user_bp.route('/candidate/velocity', methods=['GET'])
+@login_required
+def get_user_velocity_status():
+    """
+    GET /api/user/velocity
+    GET /api/candidate/velocity
+    Returns candidate's velocity status and flagged skills requiring verification.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    from app.services.velocity_service import get_user_velocity_anomalies
+    anomalies = get_user_velocity_anomalies(user_id)
+    flagged_anomalies = [a for a in anomalies if a.get('status') == 'flagged']
+
+    disputed_skills = []
+    for a in flagged_anomalies:
+        if isinstance(a.get('new_skills'), list):
+            disputed_skills.extend(a['new_skills'])
+
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'has_anomaly': bool(flagged_anomalies),
+        'disputed_skills': sorted(list(set(disputed_skills))),
+        'message': 'Skills flagged for technical assessment verification' if flagged_anomalies else 'Skill velocity within normal limits'
+    }), 200
+
+
+from app.services.quiz_service import (
+    get_quiz_for_skill,
+    submit_quiz_answers,
+    get_user_quiz_history
+)
+
+
+@user_bp.route('/user/quiz/<path:skill_name>', methods=['GET'])
+@user_bp.route('/candidate/quiz/<path:skill_name>', methods=['GET'])
+@login_required
+def get_skill_quiz_endpoint(skill_name: str):
+    """
+    GET /api/user/quiz/<skill_name>
+    Fetches randomized technical assessment questions for a skill.
+    Enforces cooldown and masks out correct options.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    quiz = get_quiz_for_skill(user_id, skill_name)
+    status_code = 200 if quiz.get('success') else (429 if quiz.get('cooldown_active') else 400)
+    return jsonify(quiz), status_code
+
+
+@user_bp.route('/user/quiz/<path:skill_name>/submit', methods=['POST'])
+@user_bp.route('/candidate/quiz/<path:skill_name>/submit', methods=['POST'])
+@login_required
+def submit_skill_quiz_endpoint(skill_name: str):
+    """
+    POST /api/user/quiz/<skill_name>/submit
+    Authoritatively grades submitted answers server-side.
+    Payload: { "answers": { "1": 1, "2": 2, ... } }
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    data = request.get_json(silent=True) or {}
+    answers = data.get('answers')
+    if not isinstance(answers, dict):
+        return jsonify({'success': False, 'message': 'Invalid format. Provide an "answers" map of question IDs to option indices.'}), 400
+
+    result = submit_quiz_answers(user_id, skill_name, answers)
+    status_code = 200 if result.get('success') else 400
+    return jsonify(result), status_code
+
+
+@user_bp.route('/user/quizzes', methods=['GET'])
+@user_bp.route('/candidate/quizzes', methods=['GET'])
+@login_required
+def get_user_quizzes_endpoint():
+    """
+    GET /api/user/quizzes
+    Returns full assessment history and verified skills for current user.
+    """
+    user_id = session.get('user_id')
+    if not user_id:
+        return jsonify({'success': False, 'message': 'Authentication required.'}), 401
+
+    history = get_user_quiz_history(user_id)
+    return jsonify({
+        'success': True,
+        'user_id': user_id,
+        'attempts_count': len(history),
+        'attempts': history
+    }), 200
+
+
+
